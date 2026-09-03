@@ -219,3 +219,44 @@ export const useInventory = () =>
     },
     initialData: [],
   });
+
+export const useCustomers = () =>
+  useQuery<any[], Error>({ queryKey: ["customers"], queryFn: async () => (await api.get("/customers")).data, initialData: [] });
+
+export const useAddCustomer = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string }>({
+    mutationFn: (payload) => api.post("/customers", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+  });
+};
+
+export const useUpdateCustomer = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string }>({
+    mutationFn: ({ id, ...payload }) => api.put(`/customers/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+  });
+};
+
+export const useCustomerPrices = (customerId: number) =>
+  useQuery<any[], Error>({ queryKey: ["customerPrices", customerId], queryFn: async () => (await api.get(`/customers/${customerId}/prices`)).data, enabled: !!customerId, initialData: [] });
+
+export const useSetCustomerPrice = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { customer_id: number; recipe_id: number; price_per_unit: number }>({
+    mutationFn: ({ customer_id, ...payload }) => api.put(`/customers/${customer_id}/prices`, payload),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["customerPrices", vars.customer_id] }),
+  });
+};
+
+export const useSales = () =>
+  useQuery<any[], Error>({ queryKey: ["sales"], queryFn: async () => (await api.get("/sales")).data, initialData: [] });
+
+export const useAddSale = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { customer_id?: number; reference?: string; payment_status: string; lines: { recipe_id: number; quantity: number; unit_price?: number }[] }>({
+    mutationFn: (payload) => api.post("/sales", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sales"] }),
+  });
+};
