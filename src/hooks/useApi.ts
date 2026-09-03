@@ -225,7 +225,7 @@ export const useCustomers = () =>
 
 export const useAddCustomer = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string }>({
+  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string; credit_limit: number }>({
     mutationFn: (payload) => api.post("/customers", payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
   });
@@ -233,7 +233,7 @@ export const useAddCustomer = () => {
 
 export const useUpdateCustomer = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string }>({
+  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string; credit_limit: number }>({
     mutationFn: ({ id, ...payload }) => api.put(`/customers/${id}`, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
   });
@@ -262,7 +262,7 @@ export const useSales = () =>
 
 export const useAddSale = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { customer_id?: number; reference?: string; payment_status: string; amount_paid: number; lines: { recipe_id: number; quantity: number; unit_price?: number }[] }>({
+  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; lines: { recipe_id: number; quantity: number; unit_price?: number }[] }>({
     mutationFn: (payload) => api.post("/sales", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales"] });
@@ -270,3 +270,20 @@ export const useAddSale = () => {
     },
   });
 };
+
+export const useRecordPayment = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { sale_id: number; amount: number; method: string; reference?: string }>({
+    mutationFn: ({ sale_id, ...payload }) => api.post(`/sales/${sale_id}/payments`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["customerProfile"] });
+    },
+  });
+};
+
+export const useSalesSummary = () =>
+  useQuery<any, Error>({ queryKey: ["salesSummary"], queryFn: async () => (await api.get("/report/sales-summary")).data });
+
+export const useFinishedInventory = () =>
+  useQuery<any[], Error>({ queryKey: ["finishedInventory"], queryFn: async () => (await api.get("/report/finished-inventory")).data, initialData: [] });

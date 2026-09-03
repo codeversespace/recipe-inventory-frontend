@@ -8,6 +8,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 * { box-sizing: border-box; }
+html, body, #root { min-height: 100%; }
+@media (max-width: 600px) {
+  body { overflow-x: hidden; }
+  .MuiTableContainer-root { max-width: 100vw; }
+  .MuiDialog-paper { margin: 10px; width: calc(100% - 20px); }
+}
+@media print {
+  body { background: white; }
+  .screen-content > *:not(.print-invoice) { display: none !important; }
+  .print-invoice { display: block !important; }
+  .invoice-actions { display: none !important; }
+  @page { margin: 12mm; }
+}
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;

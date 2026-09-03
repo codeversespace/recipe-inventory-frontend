@@ -6,12 +6,20 @@ import {
   Stack,                     // <-- new import
   Typography,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
-import { useBatches, useInventory } from "../hooks/useApi";
+import { useBatches, useFinishedInventory, useInventory, useSalesSummary } from "../hooks/useApi";
 
 export const Dashboard = () => {
   const { data: batches=[], isLoading } = useBatches(5);
   const { data: inventory = [] } = useInventory();
+  const { data: salesSummary } = useSalesSummary();
+  const { data: finishedInventory = [] } = useFinishedInventory();
   const lowStock = inventory.filter((item: any) => item.is_low_stock);
 
   const totalProfit = batches?.reduce((sum: number, b: any) => sum + (b.profit ?? 0), 0) ?? 0;
@@ -59,8 +67,17 @@ export const Dashboard = () => {
               {lowStock.slice(0, 3).map((item: any) => <Typography key={item.id} variant="body2">{item.name}: {item.on_hand_qty} / {item.min_stock} {item.base_unit}</Typography>)}
             </CardContent>
           </Card>
+          <Card sx={{ flex: 1, bgcolor: "#ede9fe" }}>
+            <CardContent>
+              <Typography variant="h6">Sales revenue</Typography>
+              <Typography variant="h4">₹{(salesSummary?.revenue ?? 0).toFixed(2)}</Typography>
+              <Typography variant="body2">Due: ₹{(salesSummary?.due ?? 0).toFixed(2)}</Typography>
+            </CardContent>
+          </Card>
         </Stack>
       )}
+      <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Finished-product stock</Typography>
+      <TableContainer component={Card}><Table size="small"><TableHead><TableRow><TableCell>Product</TableCell><TableCell>Produced</TableCell><TableCell>Sold</TableCell><TableCell>Available</TableCell></TableRow></TableHead><TableBody>{finishedInventory.map((item: any) => <TableRow key={item.recipe_id}><TableCell>{item.recipe_name}</TableCell><TableCell>{item.produced_qty}</TableCell><TableCell>{item.sold_qty}</TableCell><TableCell>{item.available_qty}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
     </Box>
   );
 };
