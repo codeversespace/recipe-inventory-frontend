@@ -242,6 +242,13 @@ export const useUpdateCustomer = () => {
 export const useCustomerPrices = (customerId: number) =>
   useQuery<any[], Error>({ queryKey: ["customerPrices", customerId], queryFn: async () => (await api.get(`/customers/${customerId}/prices`)).data, enabled: !!customerId, initialData: [] });
 
+export const useCustomerProfile = (customerId: number, status?: string, startDate?: string, endDate?: string) =>
+  useQuery<any, Error>({
+    queryKey: ["customerProfile", customerId, status, startDate, endDate],
+    queryFn: async () => (await api.get(`/customers/${customerId}/profile`, { params: { status: status || undefined, start_date: startDate || undefined, end_date: endDate || undefined } })).data,
+    enabled: !!customerId,
+  });
+
 export const useSetCustomerPrice = () => {
   const qc = useQueryClient();
   return useMutation<any, Error, { customer_id: number; recipe_id: number; price_per_unit: number }>({
@@ -255,8 +262,11 @@ export const useSales = () =>
 
 export const useAddSale = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { customer_id?: number; reference?: string; payment_status: string; lines: { recipe_id: number; quantity: number; unit_price?: number }[] }>({
+  return useMutation<any, Error, { customer_id?: number; reference?: string; payment_status: string; amount_paid: number; lines: { recipe_id: number; quantity: number; unit_price?: number }[] }>({
     mutationFn: (payload) => api.post("/sales", payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["sales"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sales"] });
+      qc.invalidateQueries({ queryKey: ["customerProfile"] });
+    },
   });
 };
