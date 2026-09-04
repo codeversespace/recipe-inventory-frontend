@@ -10,6 +10,7 @@ import { Production } from "./pages/Production";
 import { Inventory } from "./pages/Inventory";
 import { CustomersSales } from "./pages/CustomersSales";
 import { CustomerProfile } from "./pages/CustomerProfile";
+import { Packing } from "./pages/Packing";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/customers-sales" element={<CustomersSales />} />
           <Route path="/customers/:id" element={<CustomerProfile />} />
+          <Route path="/packing" element={<Packing />} />
         </Routes>
       </Layout>
     </Router>

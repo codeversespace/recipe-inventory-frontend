@@ -22,6 +22,7 @@ import {
   ReceiptLong as ReceiptIcon,
   Assessment as AssessmentIcon,
   People as PeopleIcon,
+  Inventory as InventoryIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { text: "Production", icon: <AssessmentIcon />, to: "/production" },
   { text: "Inventory", icon: <AssessmentIcon />, to: "/inventory" },
   { text: "Customers & Sales", icon: <PeopleIcon />, to: "/customers-sales" },
+  { text: "Packing", icon: <InventoryIcon />, to: "/packing" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

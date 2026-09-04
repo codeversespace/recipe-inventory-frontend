@@ -11,10 +11,11 @@ import {
   TableBody,
   Typography,
 } from "@mui/material";
-import { useInventory } from "../hooks/useApi";
+import { useFinishedInventory, useInventory } from "../hooks/useApi";
 
 export const Inventory = () => {
   const { data, isLoading, error } = useInventory();
+  const { data: finishedInventory = [] } = useFinishedInventory();
 
   return (
     <Box>
@@ -52,6 +53,34 @@ export const Inventory = () => {
           </Table>
         </TableContainer>
       )}
+
+      <Typography variant="h5" sx={{ mt: 4, mb: 2 }}>
+        Finished products available for sale
+      </Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Product</TableCell>
+              <TableCell>Produced (kg)</TableCell>
+              <TableCell>Packed / ready to ship (kg)</TableCell>
+              <TableCell>Sold (kg)</TableCell>
+              <TableCell>Available to sell (kg)</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {finishedInventory.map((item: any) => (
+              <TableRow key={item.recipe_id}>
+                <TableCell>{item.recipe_name}</TableCell>
+                <TableCell>{item.produced_qty}</TableCell>
+                <TableCell>{item.packed_qty}</TableCell>
+                <TableCell>{item.sold_qty}</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>{item.available_qty}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };

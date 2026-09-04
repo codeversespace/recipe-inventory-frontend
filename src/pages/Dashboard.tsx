@@ -77,7 +77,7 @@ export const Dashboard = () => {
         </Stack>
       )}
       <Typography variant="h6" sx={{ mt: 4, mb: 1 }}>Finished-product stock</Typography>
-      <TableContainer component={Card}><Table size="small"><TableHead><TableRow><TableCell>Product</TableCell><TableCell>Produced</TableCell><TableCell>Sold</TableCell><TableCell>Available</TableCell></TableRow></TableHead><TableBody>{finishedInventory.map((item: any) => <TableRow key={item.recipe_id}><TableCell>{item.recipe_name}</TableCell><TableCell>{item.produced_qty}</TableCell><TableCell>{item.sold_qty}</TableCell><TableCell>{item.available_qty}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
+      <TableContainer component={Card}><Table size="small"><TableHead><TableRow><TableCell>Product</TableCell><TableCell>Produced</TableCell><TableCell>Packed</TableCell><TableCell>Sold</TableCell><TableCell>Available to sell</TableCell></TableRow></TableHead><TableBody>{finishedInventory.map((item: any) => <TableRow key={item.recipe_id}><TableCell>{item.recipe_name}</TableCell><TableCell>{item.produced_qty}</TableCell><TableCell>{item.packed_qty}</TableCell><TableCell>{item.sold_qty}</TableCell><TableCell>{item.available_qty}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
     </Box>
   );
 };

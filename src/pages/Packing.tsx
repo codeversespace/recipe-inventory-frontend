@@ -1,0 +1,21 @@
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { useState } from "react";
+import { usePackBatch, useReadyToPack } from "../hooks/useApi";
+
+export const Packing = () => {
+  const { data: batches = [], isLoading } = useReadyToPack();
+  const pack = usePackBatch();
+  const [selected, setSelected] = useState<any>(null);
+  const [size, setSize] = useState("250");
+  const [count, setCount] = useState("");
+  const [employee, setEmployee] = useState("");
+  const [error, setError] = useState("");
+  const submit = async () => {
+    const packSize = Number(size);
+    const packCount = Number(count);
+    if (!selected || !Number.isFinite(packSize) || packSize <= 0 || !Number.isInteger(packCount) || packCount <= 0) { setError("Enter a valid pack size and whole-number box count."); return; }
+    try { await pack.mutateAsync({ batch_id: selected.id, pack_size_grams: packSize, pack_count: packCount, employee_name: employee || undefined }); setSelected(null); setCount(""); setEmployee(""); setError(""); }
+    catch (requestError: any) { setError(requestError.response?.data?.detail || "Could not record packing."); }
+  };
+  return <Box><Typography variant="h4" gutterBottom>Packing</Typography><Typography color="text.secondary" sx={{ mb: 3 }}>Select a prepared batch and record the boxes packed. Packed quantity becomes ready to ship.</Typography>{error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}{isLoading ? <CircularProgress /> : batches.length ? <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2 }}>{batches.map((batch: any) => <Card key={batch.id}><CardContent><Typography variant="h6">{batch.recipe_name}</Typography><Typography variant="body2" color="text.secondary">Batch #{batch.id}</Typography><Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, my: 2 }}><Box><Typography variant="caption">Produced</Typography><Typography>{batch.produced_qty} kg</Typography></Box><Box><Typography variant="caption">Packed / ready ship</Typography><Typography color="success.main">{batch.packed_qty} kg</Typography></Box><Box><Typography variant="caption">Remaining to pack</Typography><Typography color="warning.main">{batch.remaining_qty} kg</Typography></Box><Box><Typography variant="caption">Status</Typography><Typography>{batch.status.replace("_", " ")}</Typography></Box></Box><Button fullWidth variant="contained" onClick={() => setSelected(batch)}>Start packing</Button></CardContent></Card>)}</Box> : <Card><CardContent><Typography>No batches are waiting to be packed.</Typography></CardContent></Card>}<Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="sm" fullWidth><DialogTitle>Pack batch #{selected?.id}</DialogTitle><DialogContent>{selected && <><Typography sx={{ mb: 2 }}>{selected.recipe_name} · {selected.remaining_qty} kg remaining</Typography><TextField fullWidth margin="dense" label="Pack size (grams)" type="number" value={size} onChange={(e) => setSize(e.target.value)} /><TextField fullWidth margin="dense" label="Number of boxes" type="number" value={count} onChange={(e) => setCount(e.target.value)} /><TextField fullWidth margin="dense" label="Packing employee" value={employee} onChange={(e) => setEmployee(e.target.value)} /><Typography variant="body2" sx={{ mt: 2 }}>This will pack {((Number(size) * Number(count)) / 1000 || 0).toFixed(3)} kg and leave {Math.max(selected.remaining_qty - (Number(size) * Number(count)) / 1000, 0).toFixed(3)} kg.</Typography><TableContainer component={Paper} sx={{ mt: 2 }}><Table size="small"><TableHead><TableRow><TableCell>Pack size</TableCell><TableCell>Boxes</TableCell><TableCell>Employee</TableCell></TableRow></TableHead><TableBody>{selected.packages.map((item: any) => <TableRow key={item.id}><TableCell>{item.pack_size_grams} g</TableCell><TableCell>{item.pack_count}</TableCell><TableCell>{item.employee_name || "—"}</TableCell></TableRow>)}</TableBody></Table></TableContainer></>}</DialogContent><DialogActions><Button onClick={() => setSelected(null)}>Cancel</Button><Button variant="contained" onClick={submit} disabled={pack.isPending}>Confirm packing</Button></DialogActions></Dialog></Box>;
+};

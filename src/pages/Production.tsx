@@ -1,12 +1,13 @@
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import { useBatchDetail, useBatches, useCostPreview, useProduceBatch, useRecipes } from "../hooks/useApi";
+import { useBatchDetail, useBatches, useCostPreview, useProduceBatch, useRecipes, useUpdateBatch } from "../hooks/useApi";
 import { useState } from "react";
 
 export const Production = () => {
   const { data: recipes = [] } = useRecipes();
   const { data: batches = [], isLoading: batchesLoading } = useBatches(50);
   const produce = useProduceBatch();
+  const updateBatch = useUpdateBatch();
   const [open, setOpen] = useState(false);
   const [recipeId, setRecipeId] = useState(0);
   const [producedQty, setProducedQty] = useState("");
@@ -18,7 +19,30 @@ export const Production = () => {
   const [success, setSuccess] = useState("");
   const { data: preview, isFetching: previewLoading } = useCostPreview(recipeId, producedQty, overridePrice);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editQty, setEditQty] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editPrice, setEditPrice] = useState("");
   const { data: detail, isFetching: detailLoading } = useBatchDetail(detailId);
+
+  const openEdit = () => {
+    if (!detail) return;
+    setEditQty(String(detail.produced_qty));
+    setEditDate(new Date(detail.produced_at).toISOString().slice(0, 10));
+    setEditPrice(detail.total_revenue == null ? "" : String(detail.total_revenue));
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!detailId || !editQty || Number(editQty) <= 0 || !editDate) return;
+    try {
+      await updateBatch.mutateAsync({ id: detailId, produced_qty: Number(editQty), produced_at: new Date(`${editDate}T00:00:00`).toISOString(), selling_price: editPrice ? Number(editPrice) : null });
+      setEditOpen(false);
+      setSuccess(`Batch #${detailId} updated.`);
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not update the batch.");
+    }
+  };
 
   const close = () => { setOpen(false); setError(""); };
   const submit = async () => {
@@ -51,7 +75,8 @@ export const Production = () => {
       {previewLoading && <CircularProgress size={20} sx={{ mt: 2 }} />}
       {preview && <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "action.hover" }}><Typography sx={{ fontWeight: 700 }}>Live cost preview</Typography><Typography variant="body2">Scale: {preview.batch_multiplier}× · Estimated cost: ₹{preview.estimated_total_cost.toFixed(2)}{preview.estimated_profit != null ? ` · Estimated profit: ₹${preview.estimated_profit.toFixed(2)}` : ""}{preview.estimated_margin_pct != null ? ` · Margin: ${preview.estimated_margin_pct.toFixed(2)}%` : ""}</Typography>{preview.lines.map((line: any) => <Typography key={line.ingredient_id} variant="caption" sx={{ display: "block" }} color={line.is_short ? "error.main" : "text.secondary"}>{line.ingredient_name}: need {line.needed_qty} {line.unit} (₹{line.estimated_cost.toFixed(2)}), in stock {line.on_hand_qty}{line.is_short ? " — insufficient" : ""}</Typography>)}{preview.lines.some((line: any) => line.is_short) && <Alert severity="error" sx={{ mt: 1 }}>Insufficient stock. Add the missing ingredients before recording this batch.</Alert>}</Box>}
     </DialogContent><DialogActions sx={{ p: 2 }}><Button onClick={close}>Cancel</Button><Button variant="contained" onClick={submit} disabled={produce.isPending || !!preview?.lines.some((line: any) => line.is_short)}>{produce.isPending ? <CircularProgress size={22} /> : "Record batch"}</Button></DialogActions></Dialog>
-    <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="md" fullWidth><DialogTitle>Batch details</DialogTitle><DialogContent>{detailLoading ? <CircularProgress /> : detail && <Box><Typography><strong>#{detail.id} {detail.recipe_name}</strong> · {detail.produced_qty} output · {detail.costing_method}</Typography><Typography sx={{ mt: 1 }}>Cost: ₹{detail.total_cost.toFixed(2)} · Revenue: {detail.total_revenue == null ? "—" : `₹${detail.total_revenue.toFixed(2)}`} · Profit: {detail.profit == null ? "—" : `₹${detail.profit.toFixed(2)}`} · Margin: {detail.margin_pct == null ? "—" : `${detail.margin_pct.toFixed(2)}%`}</Typography><TableContainer component={Paper} sx={{ mt: 2 }}><Table size="small"><TableHead><TableRow><TableCell>Ingredient</TableCell><TableCell>Quantity</TableCell><TableCell>Unit cost</TableCell><TableCell>Line cost</TableCell></TableRow></TableHead><TableBody>{detail.consumptions.map((item: any, index: number) => <TableRow key={`${item.ingredient_name}-${index}`}><TableCell>{item.ingredient_name}</TableCell><TableCell>{item.qty_used}</TableCell><TableCell>₹{item.unit_cost.toFixed(2)}</TableCell><TableCell>₹{item.line_cost.toFixed(2)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></Box>}</DialogContent><DialogActions><Button onClick={() => setDetailId(null)}>Close</Button></DialogActions></Dialog>
+    <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="md" fullWidth><DialogTitle>Batch details</DialogTitle><DialogContent>{detailLoading ? <CircularProgress /> : detail && <Box><Typography><strong>#{detail.id} {detail.recipe_name}</strong> · {detail.produced_qty} output · {detail.costing_method}</Typography><Typography sx={{ mt: 1 }}>Cost: ₹{detail.total_cost.toFixed(2)} · Revenue: {detail.total_revenue == null ? "—" : `₹${detail.total_revenue.toFixed(2)}`} · Profit: {detail.profit == null ? "—" : `₹${detail.profit.toFixed(2)}`} · Margin: {detail.margin_pct == null ? "—" : `${detail.margin_pct.toFixed(2)}%`}</Typography><TableContainer component={Paper} sx={{ mt: 2 }}><Table size="small"><TableHead><TableRow><TableCell>Ingredient</TableCell><TableCell>Quantity</TableCell><TableCell>Unit cost</TableCell><TableCell>Line cost</TableCell></TableRow></TableHead><TableBody>{detail.consumptions.map((item: any, index: number) => <TableRow key={`${item.ingredient_name}-${index}`}><TableCell>{item.ingredient_name}</TableCell><TableCell>{item.qty_used}</TableCell><TableCell>₹{item.unit_cost.toFixed(2)}</TableCell><TableCell>₹{item.line_cost.toFixed(2)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></Box>}</DialogContent><DialogActions><Button onClick={openEdit} disabled={!detail || detailLoading}>Edit batch</Button><Button onClick={() => setDetailId(null)}>Close</Button></DialogActions></Dialog>
+    <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth><DialogTitle>Update batch record</DialogTitle><DialogContent><Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Packed and sold quantities cannot be reduced.</Typography><TextField fullWidth margin="dense" label="Produced quantity" type="number" value={editQty} onChange={(event) => setEditQty(event.target.value)} /><TextField fullWidth margin="dense" label="Production date" type="date" value={editDate} onChange={(event) => setEditDate(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField fullWidth margin="dense" label="Total selling revenue (optional)" type="number" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setEditOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveEdit} disabled={updateBatch.isPending}>Save changes</Button></DialogActions></Dialog>
     <Snackbar open={!!success} autoHideDuration={3500} onClose={() => setSuccess("")}><Alert severity="success" variant="filled">{success}</Alert></Snackbar>
   </Box>;
 };
