@@ -1,28 +1,16 @@
-// src/pages/Inventory.tsx
-import {
-  Box,
-  CircularProgress,
-  TableContainer,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Typography,
-} from "@mui/material";
-import { useFinishedInventory, useInventory } from "../hooks/useApi";
+import { Box, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { useInventory, useSaleableStock } from "../hooks/useApi";
 
 export const Inventory = () => {
-  const { data, isLoading, error } = useInventory();
-  const { data: finishedInventory = [] } = useFinishedInventory();
+  const { data: saleableStock = [], isLoading, error } = useSaleableStock();
+  const { data: rawMaterials = [], isLoading: rawMaterialsLoading, error: rawMaterialsError } = useInventory();
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Current Inventory
+      <Typography variant="h4" gutterBottom>Saleable Inventory</Typography>
+      <Typography color="text.secondary" sx={{ mb: 2 }}>
+        Purchased saleable goods and packaged production stock appear here. Raw materials are tracked separately below.
       </Typography>
-
       {isLoading ? (
         <CircularProgress />
       ) : error ? (
@@ -32,55 +20,55 @@ export const Inventory = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Ingredient</TableCell>
-                <TableCell>On‑hand Qty</TableCell>
-                <TableCell>Avg Unit Price (₹)</TableCell>
-                <TableCell>Minimum Stock</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>Saleable item</TableCell>
+                <TableCell>Available quantity</TableCell>
+                <TableCell>Unit</TableCell>
+                <TableCell>Cost per unit</TableCell>
+                <TableCell>Selling price</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {data?.map((inv: any) => (
-                <TableRow key={inv.id}>
-                  <TableCell>{inv.name}</TableCell>
-                  <TableCell>{inv.on_hand_qty}</TableCell>
-                  <TableCell>{inv.avg_unit_price?.toFixed(2) ?? "0.00"}</TableCell>
-                  <TableCell>{inv.min_stock ?? 0}</TableCell>
-                  <TableCell><Typography color={inv.is_low_stock ? "error" : "success.main"}>{inv.is_low_stock ? "Low stock" : "OK"}</Typography></TableCell>
+              {saleableStock.length ? saleableStock.map((item: any) => (
+                <TableRow key={item.id}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>{item.qty}</TableCell>
+                  <TableCell>{item.unit}</TableCell>
+                  <TableCell>{item.cost_per_unit > 0 ? `₹${item.cost_per_unit.toFixed(2)}` : "Not calculated"}</TableCell>
+                  <TableCell>{item.unit_price > 0 ? `₹${item.unit_price.toFixed(2)}` : "Not set"}</TableCell>
                 </TableRow>
-              ))}
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">No saleable goods in stock.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
       )}
-
-      <Typography variant="h5" sx={{ mt: 4, mb: 2 }}>
-        Finished products available for sale
-      </Typography>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Product</TableCell>
-              <TableCell>Produced (kg)</TableCell>
-              <TableCell>Packed / ready to ship (kg)</TableCell>
-              <TableCell>Sold (kg)</TableCell>
-              <TableCell>Available to sell (kg)</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {finishedInventory.map((item: any) => (
-              <TableRow key={item.recipe_id}>
-                <TableCell>{item.recipe_name}</TableCell>
-                <TableCell>{item.produced_qty}</TableCell>
-                <TableCell>{item.packed_qty}</TableCell>
-                <TableCell>{item.sold_qty}</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>{item.available_qty}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Typography variant="h4" gutterBottom sx={{ mt: 4 }}>Raw Materials</Typography>
+      {rawMaterialsLoading ? <CircularProgress /> : rawMaterialsError ? (
+        <Typography color="error">{(rawMaterialsError as any).message}</Typography>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead><TableRow>
+              <TableCell>Ingredient</TableCell><TableCell>Available quantity</TableCell>
+              <TableCell>Unit</TableCell><TableCell>Average cost</TableCell><TableCell>Stock status</TableCell>
+            </TableRow></TableHead>
+            <TableBody>
+              {rawMaterials.length ? rawMaterials.map((item: any) => (
+                <TableRow key={item.id}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>{item.on_hand_qty}</TableCell>
+                  <TableCell>{item.base_unit}</TableCell>
+                  <TableCell>₹{item.avg_unit_price.toFixed(2)}</TableCell>
+                  <TableCell>{item.is_low_stock ? "Low stock" : "Available"}</TableCell>
+                </TableRow>
+              )) : <TableRow><TableCell colSpan={5} align="center">No raw materials recorded.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Box>
   );
 };

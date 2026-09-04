@@ -2,7 +2,7 @@ import { ArrowBack, Payments, TrendingUp } from "@mui/icons-material";
 import { Alert, Box, Button, Card, CardContent, CircularProgress, FormControl, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import * as React from "react";
-import { useCustomerProfile } from "../hooks/useApi";
+import { useCustomerProfile, useCustomerPrices, useSaleableStock, useSetCustomerPrice } from "../hooks/useApi";
 
 export const CustomerProfile = () => {
   const navigate = useNavigate();
@@ -11,6 +11,11 @@ export const CustomerProfile = () => {
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
   const { data: profile, isLoading, error } = useCustomerProfile(customerId, status, startDate, endDate);
+  const { data: prices = [] } = useCustomerPrices(customerId);
+  const { data: saleableStock = [] } = useSaleableStock();
+  const setPrice = useSetCustomerPrice();
+  const [priceItem, setPriceItem] = React.useState(0);
+  const [priceValue, setPriceValue] = React.useState("");
 
   if (isLoading) return <CircularProgress />;
   if (error || !profile) return <Alert severity="error">Could not load this customer profile.</Alert>;
@@ -34,6 +39,7 @@ export const CustomerProfile = () => {
   return <Box className="profile-page">
     <Button startIcon={<ArrowBack />} onClick={() => navigate("/customers-sales")} sx={{ mb: 2 }}>Back to customers</Button>
     <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap", mb: 3 }}><Box><Typography variant="h4">{profile.name}</Typography><Typography color="text.secondary">{profile.phone || "No phone"} · {profile.email || "No email"}</Typography></Box><Typography color="text.secondary">Credit limit: ₹{(profile.credit_limit || 0).toFixed(2)}</Typography></Box>
+    <Card sx={{ mb: 3 }}><CardContent><Typography variant="h6">Customer item prices</Typography><Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}><FormControl sx={{ minWidth: 240 }} size="small"><InputLabel>Saleable item</InputLabel><Select value={priceItem} label="Saleable item" onChange={(event) => setPriceItem(Number(event.target.value))}>{saleableStock.map((item: any) => <MenuItem key={item.id} value={item.id}>{item.name}</MenuItem>)}</Select></FormControl><TextField size="small" label="Price per unit" type="number" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} /><Button variant="contained" onClick={async () => { const item = saleableStock.find((stock: any) => stock.id === priceItem); if (item && Number(priceValue) >= 0) { await setPrice.mutateAsync({ customer_id: customerId, recipe_id: item.recipe_id, price_per_unit: Number(priceValue) }); setPriceItem(0); setPriceValue(""); } }}>Save price</Button></Box><Table size="small" sx={{ mt: 2 }}><TableHead><TableRow><TableCell>Item</TableCell><TableCell>Customer price</TableCell></TableRow></TableHead><TableBody>{prices.map((item: any) => <TableRow key={item.id}><TableCell>{item.recipe_name}</TableCell><TableCell>₹{item.price_per_unit.toFixed(2)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, gap: 2, mb: 3 }}>
       {[["Invoices", profile.total_sales, ""], ["Billed", `₹${profile.total_billed.toFixed(2)}`, ""], ["Paid", `₹${profile.total_paid.toFixed(2)}`, ""], ["Due", `₹${profile.total_due.toFixed(2)}`, profile.total_due ? "error.main" : "success.main"], ["Top product", topProduct ? topProduct[0] : "—", ""]].map(([label, value, color]) => <Card key={label}><CardContent><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant={label === "Top product" ? "body1" : "h6"} color={color}>{value}</Typography></CardContent></Card>)}
     </Box>

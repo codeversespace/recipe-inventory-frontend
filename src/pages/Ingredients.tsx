@@ -17,11 +17,12 @@ import {
   CircularProgress,
   Typography,
 } from "@mui/material";
-import { useIngredients, useAddIngredient, useDeleteIngredient, useUpdateIngredient } from "../hooks/useApi";
+import { useIngredients, useAddIngredient, useDeleteIngredient, useUpdateIngredient, useInventory } from "../hooks/useApi";
 import { useState } from "react";
 
 export const Ingredients = () => {
   const { data:ingredients = [], isLoading, error } = useIngredients();
+  const { data: inventory = [] } = useInventory();
   const addIngredient = useAddIngredient();
   const updateIngredient = useUpdateIngredient();
   const deleteIngredient = useDeleteIngredient();
@@ -80,7 +81,10 @@ export const Ingredients = () => {
                 <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Unit</TableCell>
+                <TableCell>On-hand</TableCell>
+                <TableCell>Average Cost</TableCell>
                 <TableCell>Minimum Stock</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -90,7 +94,10 @@ export const Ingredients = () => {
                   <TableCell>{ing.id}</TableCell>
                   <TableCell>{ing.name}</TableCell>
                   <TableCell>{ing.base_unit}</TableCell>
+                  <TableCell>{inventory.find((item: any) => item.id === ing.id)?.on_hand_qty ?? 0}</TableCell>
+                  <TableCell>₹{(inventory.find((item: any) => item.id === ing.id)?.avg_unit_price ?? 0).toFixed(2)}</TableCell>
                   <TableCell>{ing.min_stock ?? 0}</TableCell>
+                  <TableCell><Typography color={inventory.find((item: any) => item.id === ing.id)?.is_low_stock ? "error" : "success.main"}>{inventory.find((item: any) => item.id === ing.id)?.is_low_stock ? "Low stock" : "OK"}</Typography></TableCell>
                   <TableCell><Button size="small" onClick={() => editIngredient(ing)}>Edit</Button><Button size="small" color="error" onClick={() => removeIngredient(ing)}>Delete</Button></TableCell>
                 </TableRow>
               ))}

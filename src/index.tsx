@@ -5,6 +5,7 @@ import App from "./App";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import "./index.css";
+import { AuthProvider } from "./auth/AuthContext";
 
 const queryClient = new QueryClient();
 const theme = createTheme({
@@ -17,7 +18,7 @@ const theme = createTheme({
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <ThemeProvider theme={theme}><QueryClientProvider client={queryClient}>
-      <App />
+      <AuthProvider><App /></AuthProvider>
     </QueryClientProvider></ThemeProvider>
   </React.StrictMode>
 );

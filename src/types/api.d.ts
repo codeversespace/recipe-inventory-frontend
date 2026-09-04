@@ -23,7 +23,6 @@ export interface Recipe {
   name: string;
   batch_qty: number;
   batch_unit: string;
-  selling_price?: number | null;
 }
 
 export interface RecipeIngredient {
