@@ -61,7 +61,7 @@ export const Ingredients = () => {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center", justifyContent: "space-between", mb: 2 }}>
         <Typography variant="h4">Ingredients</Typography>
         <Button variant="contained" onClick={() => { setEditingId(null); setName(""); setUnit(""); setMinStock(""); setOpen(true); }}>
           Add Ingredient

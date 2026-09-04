@@ -6,12 +6,21 @@ body {
   color: #172033;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-x: none;
 }
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; }
 @media (max-width: 600px) {
   body { overflow-x: hidden; }
   .MuiTableContainer-root { max-width: 100vw; }
+  .MuiTypography-h4 { font-size: 1.7rem; line-height: 1.15; }
+  .MuiTypography-h5 { font-size: 1.35rem; }
+  .MuiTypography-h6 { font-size: 1.05rem; }
+  .MuiButton-root { min-height: 42px; }
+  .MuiCardContent-root { padding: 16px; }
+  .MuiCardContent-root:last-child { padding-bottom: 16px; }
+  .MuiDialogContent-root { overflow-x: hidden; }
+  .MuiTable-root { white-space: nowrap; }
   .MuiDialog-paper { margin: 10px; width: calc(100% - 20px); }
 }
 @media print {

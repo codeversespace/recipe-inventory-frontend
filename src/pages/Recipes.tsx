@@ -70,7 +70,7 @@ export const Recipes = () => {
   };
 
   return <Box>
-    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}><Typography variant="h4">Recipes</Typography><Button variant="contained" onClick={() => { reset(); setOpen(true); }}>Add Recipe</Button></Box>
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center", justifyContent: "space-between", mb: 2 }}><Typography variant="h4">Recipes</Typography><Button variant="contained" onClick={() => { reset(); setOpen(true); }}>Add Recipe</Button></Box>
     {isLoading ? <CircularProgress /> : error ? <Typography color="error">{(error as Error).message}</Typography> :
       <TableContainer component={Paper}><Table><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Batch Qty</TableCell><TableCell>Batch Unit</TableCell><TableCell>Default Sell (per kg)</TableCell><TableCell>Actions</TableCell></TableRow></TableHead><TableBody>
         {recipes.map((recipe) => <TableRow key={recipe.id}><TableCell>{recipe.name}</TableCell><TableCell>{recipe.batch_qty}</TableCell><TableCell>{recipe.batch_unit}</TableCell><TableCell>{recipe.selling_price ?? "—"}</TableCell><TableCell><Button size="small" onClick={() => editRecipe(recipe)}>Edit</Button><Button size="small" color="error" onClick={() => removeRecipe(recipe)}>Delete</Button></TableCell></TableRow>)}

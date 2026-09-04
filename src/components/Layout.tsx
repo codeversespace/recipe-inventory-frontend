@@ -90,7 +90,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap component="div" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" }, fontWeight: 800 }}>
             Recipe‑Inventory
           </Typography>
         </Toolbar>
@@ -132,6 +132,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           flexGrow: 1,
           p: { xs: 1.5, sm: 3 },
           width: { md: `calc(100% - ${drawerWidth}px)` },
+          minWidth: 0,
+          overflowX: "hidden",
         }}
       >
         <Toolbar />
