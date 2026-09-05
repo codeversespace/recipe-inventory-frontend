@@ -26,6 +26,7 @@ export const Recipes = () => {
   const [newIngredientName, setNewIngredientName] = useState("");
   const [newIngredientUnit, setNewIngredientUnit] = useState("");
   const [newIngredientMinStock, setNewIngredientMinStock] = useState("0");
+  const [loadingAction, setLoadingAction] = useState("");
 
   const reset = () => {
     setName(""); setBatchQty(""); setBatchUnit("");
@@ -55,7 +56,10 @@ export const Recipes = () => {
     try {
       const payload = { name: name.trim(), batch_qty: quantity, batch_unit: batchUnit.trim() };
       const recipe = editingId ? await updateRecipe.mutateAsync({ id: editingId, ...payload }) : await addRecipe.mutateAsync(payload);
-      if (editingId) await Promise.all(lines.filter((line) => line.id).map((line) => api.delete(`/recipes/${recipe.id}/ingredients/${line.id}`)));
+      if (editingId) {
+        const { data: existingLines } = await api.get(`/recipes/${recipe.id}/ingredients`);
+        await Promise.all(existingLines.map((line: any) => api.delete(`/recipes/${recipe.id}/ingredients/${line.id}`)));
+      }
       await Promise.all(lines.map((line) => addRecipeIngredient.mutateAsync({ recipe_id: recipe.id, ingredient_id: line.ingredientId, qty_per_batch: line.quantity, unit: line.unit })));
       close();
     } catch (requestError: any) {
@@ -91,11 +95,16 @@ export const Recipes = () => {
     }
   };
 
+  const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
+
   return <Box>
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center", justifyContent: "space-between", mb: 2 }}><Typography variant="h4">Recipes</Typography><Button variant="contained" onClick={() => { reset(); setOpen(true); }}>Add Recipe</Button></Box>
-    {isLoading ? <CircularProgress /> : error ? <Typography color="error">{(error as Error).message}</Typography> :
-      <TableContainer component={Paper}><Table><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Batch Qty</TableCell><TableCell>Batch Unit</TableCell><TableCell>Actions</TableCell></TableRow></TableHead><TableBody>
-        {recipes.map((recipe) => <TableRow key={recipe.id}><TableCell>{recipe.name}</TableCell><TableCell>{recipe.batch_qty}</TableCell><TableCell>{recipe.batch_unit}</TableCell><TableCell><Button size="small" onClick={() => editRecipe(recipe)}>Edit</Button><Button size="small" color="error" onClick={() => removeRecipe(recipe)}>Delete</Button></TableCell></TableRow>)}
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+      <Typography variant="h4" sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Recipes</Typography>
+      <Button variant="contained" size="small" onClick={() => { reset(); setOpen(true); }} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Add Recipe</Button>
+    </Box>
+    {isLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box> : error ? <Typography color="error" sx={{ fontSize: "0.85rem" }}>{(error as Error).message}</Typography> :
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Name</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Batch</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell></TableRow></TableHead><TableBody>
+        {recipes.map((recipe) => <TableRow key={recipe.id}><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{recipe.name}</TableCell><TableCell sx={cellSx}>{recipe.batch_qty}</TableCell><TableCell sx={cellSx}>{recipe.batch_unit}</TableCell><TableCell sx={cellSx}><Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={async () => { setLoadingAction(`edit-${recipe.id}`); try { await editRecipe(recipe); } finally { setLoadingAction(""); } }}>{loadingAction === `edit-${recipe.id}` ? <CircularProgress size={14} /> : "Edit"}</Button><Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={async () => { setLoadingAction(`delete-${recipe.id}`); try { await removeRecipe(recipe); } finally { setLoadingAction(""); } }}>{loadingAction === `delete-${recipe.id}` ? <CircularProgress size={14} /> : "Del"}</Button></TableCell></TableRow>)}
       </TableBody></Table></TableContainer>}
     <Dialog open={open} onClose={close} maxWidth="sm" fullWidth><DialogTitle>{editingId ? "Edit Recipe" : "Add Recipe"}</DialogTitle><DialogContent>
       {formError && <Alert severity="error" sx={{ mt: 1 }}>{formError}</Alert>}
@@ -106,7 +115,7 @@ export const Recipes = () => {
       {!ingredients.length && <Alert severity="info" sx={{ mt: 1 }}>Add ingredients first from the Ingredients page.</Alert>}
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small"><InputLabel>Ingredient</InputLabel><Select value={ingredientId} label="Ingredient" onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{ingredients.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!ingredients.length}>Add</Button><Button onClick={() => setNewIngredientOpen(true)} variant="text">New ingredient</Button></Box>
       {lines.map((line) => <Box key={line.ingredientId} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{line.name}: {line.quantity} {line.unit}</Typography><Button size="small" color="error" onClick={() => setLines(lines.filter((item) => item.ingredientId !== line.ingredientId))}>Remove</Button></Box>)}
-    </DialogContent><DialogActions><Button onClick={close}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || addRecipeIngredient.isPending}>{editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
-    <Dialog open={newIngredientOpen} onClose={() => setNewIngredientOpen(false)} maxWidth="xs" fullWidth><DialogTitle>New ingredient</DialogTitle><DialogContent>{formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}<TextField autoFocus margin="dense" label="Name" fullWidth value={newIngredientName} onChange={(event) => setNewIngredientName(event.target.value)} /><TextField margin="dense" label="Unit (kg, L, pcs)" fullWidth value={newIngredientUnit} onChange={(event) => setNewIngredientUnit(event.target.value)} /><TextField margin="dense" label="Minimum stock alert" type="number" fullWidth value={newIngredientMinStock} onChange={(event) => setNewIngredientMinStock(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setNewIngredientOpen(false)}>Cancel</Button><Button onClick={saveNewIngredient} variant="contained" disabled={addIngredient.isPending}>Add ingredient</Button></DialogActions></Dialog>
+    </DialogContent><DialogActions><Button onClick={close} disabled={addRecipe.isPending || addRecipeIngredient.isPending}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || addRecipeIngredient.isPending}>{addRecipe.isPending || addRecipeIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
+    <Dialog open={newIngredientOpen} onClose={() => setNewIngredientOpen(false)} maxWidth="xs" fullWidth><DialogTitle>New ingredient</DialogTitle><DialogContent>{formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}<TextField autoFocus margin="dense" label="Name" fullWidth value={newIngredientName} onChange={(event) => setNewIngredientName(event.target.value)} /><TextField margin="dense" label="Unit (kg, L, pcs)" fullWidth value={newIngredientUnit} onChange={(event) => setNewIngredientUnit(event.target.value)} /><TextField margin="dense" label="Minimum stock alert" type="number" fullWidth value={newIngredientMinStock} onChange={(event) => setNewIngredientMinStock(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setNewIngredientOpen(false)} disabled={addIngredient.isPending}>Cancel</Button><Button onClick={saveNewIngredient} variant="contained" disabled={addIngredient.isPending}>{addIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : "Add ingredient"}</Button></DialogActions></Dialog>
   </Box>;
 };

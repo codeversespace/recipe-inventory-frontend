@@ -1,11 +1,13 @@
 import {
-  Box, Button, ButtonGroup, Card, CardContent, CircularProgress, Stack, TextField,
+  Box, Button, ButtonGroup, Card, CardContent, CircularProgress, IconButton, Stack, TextField,
+  Tooltip,
   Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useState } from "react";
 import { useDashboard } from "../hooks/useApi";
 
-const money = (value: number) => `₹${(value || 0).toFixed(2)}`;
+const money = (value: number) => `₹${(value || 0).toFixed(0)}`;
 
 const dateValue = (date: Date) => {
   const year = date.getFullYear();
@@ -43,87 +45,99 @@ export const Dashboard = () => {
   const [endDate, setEndDate] = useState(initialRange.end);
   const { data, isLoading, isError } = useDashboard(startDate, endDate);
 
-  if (isLoading) return <CircularProgress />;
+  if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>;
   if (isError) return <Typography color="error">Unable to load dashboard data.</Typography>;
 
   return (
     <Box>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ flex: 1 }}>Dashboard</Typography>
-        <ButtonGroup variant="outlined" size="small">
+      <Typography variant="h4" sx={{ mb: 2, fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Dashboard</Typography>
+
+      {/* Date range presets - scrollable on mobile */}
+      <Box sx={{ mb: 2, overflowX: "auto", pb: 0.5 }}>
+        <Stack direction="row" spacing={1} sx={{ minWidth: "max-content" }}>
           {[
-            ["today", "Today"], ["last7", "Last 7 days"], ["thisMonth", "This month"],
-            ["lastMonth", "Last month"], ["thisYear", "This year"], ["lastYear", "Last year"],
+            ["today", "Today"], ["last7", "7D"], ["thisMonth", "This Mo."],
+            ["lastMonth", "Last Mo."], ["thisYear", "This Yr."], ["lastYear", "Last Yr."],
           ].map(([value, label]) => (
-            <Button key={value} variant={preset === value ? "contained" : "outlined"} onClick={() => {
+            <Button key={value} size="small" variant={preset === value ? "contained" : "outlined"} onClick={() => {
               const range = rangeFor(value);
               setPreset(value);
               setStartDate(range.start);
               setEndDate(range.end);
-            }}>{label}</Button>
+            }} sx={{ minWidth: "auto", px: 1.5, fontSize: "0.75rem", whiteSpace: "nowrap" }}>{label}</Button>
           ))}
-        </ButtonGroup>
-        <TextField label="From" type="date" value={startDate} onChange={(e) => { setPreset(""); setStartDate(e.target.value); }} slotProps={{ inputLabel: { shrink: true } }} />
-        <TextField label="To" type="date" value={endDate} onChange={(e) => { setPreset(""); setEndDate(e.target.value); }} slotProps={{ inputLabel: { shrink: true } }} />
+        </Stack>
+      </Box>
+
+      {/* Date inputs - stacked on mobile */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 3 }}>
+        <TextField label="From" type="date" size="small" value={startDate} onChange={(e) => { setPreset(""); setStartDate(e.target.value); }} slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: 1 }} />
+        <TextField label="To" type="date" size="small" value={endDate} onChange={(e) => { setPreset(""); setEndDate(e.target.value); }} slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: 1 }} />
       </Stack>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(6, 1fr)" }, gap: 2 }}>
+      {/* KPI cards - 2 columns on mobile, 6 on desktop */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(6, 1fr)" }, gap: { xs: 1, sm: 2 } }}>
         {[
-          ["Revenue", money(data.revenue), "#e3f2fd"],
-          ["Cost", money(data.cost), "#fff3e0"],
-          ["Profit", money(data.profit), "#e8f5e9"],
-          ["Margin", `${(data.margin_pct || 0).toFixed(2)}%`, "#ede9fe"],
-          ["Pending payments", money(data.due), "#ffebee"],
-          ["Stock value", money(data.saleable_stock_value), "#f3f4f6"],
-        ].map(([label, value, bgcolor]) => (
-          <Box key={label}>
-            <Card sx={{ bgcolor }}><CardContent>
-              <Typography variant="body2">{label}</Typography>
-              <Typography variant="h5">{value}</Typography>
-            </CardContent></Card>
-          </Box>
+          ["Revenue", money(data.revenue), "#e3f2fd", "Total sales value during the selected date range."],
+          ["Cost", money(data.cost), "#fff3e0", "Estimated cost of the products sold during the selected date range."],
+          ["Profit", money(data.profit), "#e8f5e9", "Revenue minus estimated product cost."],
+          ["Margin", `${(data.margin_pct || 0).toFixed(1)}%`, "#ede7f6", "Profit expressed as a percentage of revenue."],
+          ["Due", money(data.due), "#ffebee", "Amount still due from sales in the selected date range."],
+          ["Stock", money(data.saleable_stock_value), "#f3f4f6", "Current cost value of active saleable stock."],
+        ].map(([label, value, bgcolor, description]) => (
+          <Card key={label} sx={{ bgcolor }}>
+            <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body2" sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, color: "text.secondary" }}>{label}</Typography>
+                <Tooltip title={description} placement="top"><IconButton size="small" sx={{ p: 0.25 }}><InfoOutlinedIcon sx={{ fontSize: "0.9rem" }} /></IconButton></Tooltip>
+              </Box>
+              <Typography variant="h6" sx={{ fontSize: { xs: "1rem", sm: "1.25rem" }, fontWeight: 700 }}>{value}</Typography>
+            </CardContent>
+          </Card>
         ))}
       </Box>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: 2, mt: 2 }}>
-        <Card><CardContent>
-          <Typography variant="h6">Operations</Typography>
-          <Typography>Sales: {data.invoice_count} invoices | Paid: {money(data.paid)}</Typography>
-          <Typography>Production: {data.batch_count} batches, {data.produced_qty} units</Typography>
-          <Typography>Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
-          <Typography>Finished stock: {data.packaged_stock_packs} packs</Typography>
+      {/* Operations & Alerts - stacked on mobile */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
+        <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Sales: {data.invoice_count} invoices | Paid: {money(data.paid)}</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Finished stock: {data.packaged_stock_packs} packs</Typography>
         </CardContent></Card>
-        <Card><CardContent>
-          <Typography variant="h6">Alerts</Typography>
-          <Typography>Low stock: {data.low_stock_count} | Out of stock: {data.out_of_stock_count}</Typography>
-          <Typography>Missing selling price: {data.missing_price_count}</Typography>
-          {data.alerts?.slice(0, 5).map((alert: any) => (
-            <Typography variant="body2" key={`${alert.category}-${alert.name}`}>
+        <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Low stock: {data.low_stock_count} | Out of stock: {data.out_of_stock_count}</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Missing selling price: {data.missing_price_count}</Typography>
+          {data.alerts?.slice(0, 3).map((alert: any) => (
+            <Typography variant="caption" key={`${alert.category}-${alert.name}`} sx={{ display: "block", fontSize: "0.7rem" }}>
               {alert.category}: {alert.name} ({alert.quantity} {alert.unit})
             </Typography>
           ))}
         </CardContent></Card>
       </Box>
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: 2, mt: 2 }}>
-        <Card><CardContent>
-          <Typography variant="h6">Sales trend</Typography>
-          <TableContainer><Table size="small"><TableHead><TableRow>
-            <TableCell>Date</TableCell><TableCell>Revenue</TableCell><TableCell>Profit</TableCell>
+      {/* Trend & Products - stacked on mobile */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
+        <Card><CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales trend</Typography>
+          <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Date</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Revenue</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Profit</TableCell>
           </TableRow></TableHead><TableBody>
-            {data.trend?.map((point: any) => <TableRow key={point.date}>
-              <TableCell>{point.date}</TableCell><TableCell>{money(point.revenue)}</TableCell><TableCell>{money(point.profit)}</TableCell>
+            {data.trend?.slice(-7).reverse().map((point: any) => <TableRow key={point.date}>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{point.date.slice(5)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(point.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(point.profit)}</TableCell>
             </TableRow>)}
           </TableBody></Table></TableContainer>
         </CardContent></Card>
-        <Card><CardContent>
-          <Typography variant="h6">Top products</Typography>
-          <TableContainer><Table size="small"><TableHead><TableRow>
-            <TableCell>Product</TableCell><TableCell>Qty</TableCell><TableCell>Revenue</TableCell><TableCell>Profit</TableCell>
+        <Card><CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top products</Typography>
+          <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Product</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Qty</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Revenue</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Profit</TableCell>
           </TableRow></TableHead><TableBody>
-            {data.top_products?.map((product: any) => <TableRow key={product.name}>
-              <TableCell>{product.name}</TableCell><TableCell>{product.quantity}</TableCell>
-              <TableCell>{money(product.revenue)}</TableCell><TableCell>{money(product.profit)}</TableCell>
+            {data.top_products?.slice(0, 5).map((product: any) => <TableRow key={product.name}>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{product.name}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{product.quantity}</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.profit)}</TableCell>
             </TableRow>)}
           </TableBody></Table></TableContainer>
         </CardContent></Card>

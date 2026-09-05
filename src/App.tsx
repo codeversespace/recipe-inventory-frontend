@@ -14,6 +14,7 @@ import { Packing } from "./pages/Packing";
 import { Payments } from "./pages/Payments";
 import { Settings } from "./pages/Settings";
 import { PackTypes } from "./pages/PackTypes";
+import { Suppliers } from "./pages/Suppliers";
 import { Login } from "./pages/Login";
 import { useAuth } from "./auth/AuthContext";
 
@@ -46,6 +47,7 @@ function App() {
         <Routes>
           <Route path="/" element={<RoleRoute roles={["super_admin", "admin", "manager", "viewer"]}><Dashboard /></RoleRoute>} />
           <Route path="/purchases" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Purchases /></RoleRoute>} />
+          <Route path="/suppliers" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Suppliers /></RoleRoute>} />
           <Route path="/recipes" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><Recipes /></RoleRoute>} />
           <Route path="/production" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Production /></RoleRoute>} />
           <Route path="/inventory" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Inventory /></RoleRoute>} />
@@ -53,7 +55,7 @@ function App() {
           <Route path="/sales" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
           <Route path="/customers/:id" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomerProfile /></RoleRoute>} />
           <Route path="/packing" element={<RoleRoute roles={["super_admin", "admin", "manager", "packing"]}><Packing /></RoleRoute>} />
-          <Route path="/payments" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><Payments /></RoleRoute>} />
+          <Route path="/payments" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "inventory"]}><Payments /></RoleRoute>} />
           <Route path="/pack-types" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><PackTypes /></RoleRoute>} />
           <Route path="/settings" element={<RoleRoute roles={["super_admin"]}><Settings /></RoleRoute>} />
         </Routes>

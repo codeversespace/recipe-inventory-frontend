@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -22,15 +23,14 @@ import {
 } from "@mui/material";
 import {
   useIngredients,
-  usePurchaseLots,
   useAddPurchaseLot,
   useDeletePurchaseLot,
   useUpdatePurchaseLot,
   useManualStock,
   usePackingMaterials,
-  useAddManualStock,
+  useAddManualStock, useAllPurchaseLots, useSuppliers,
 } from "../hooks/useApi";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 type PurchaseCategory = "raw_material" | "saleable_good" | "packing_material";
 
@@ -38,9 +38,10 @@ export const Purchases = () => {
   const { data: ingredients } = useIngredients();
   const { data: saleableGoods = [] } = useManualStock();
   const { data: packingMaterials = [] } = usePackingMaterials();
+  const { data: suppliers = [] } = useSuppliers();
   const [category, setCategory] = useState<PurchaseCategory>("raw_material");
   const [selectedIngredient, setSelectedIngredient] = useState<number>(0);
-  const { data: lots, refetch } = usePurchaseLots(selectedIngredient);
+  const { data: allLots = [], isLoading: allLotsLoading, refetch: refetchAll } = useAllPurchaseLots();
   const addLot = useAddPurchaseLot();
   const updateLot = useUpdatePurchaseLot();
   const deleteLot = useDeletePurchaseLot();
@@ -57,10 +58,7 @@ export const Purchases = () => {
   const [saleableUnit, setSaleableUnit] = useState("pcs");
   const [editingLot, setEditingLot] = useState<any>(null);
   const [formError, setFormError] = useState("");
-
-  useEffect(() => {
-    if (selectedIngredient) refetch();
-  }, [selectedIngredient, refetch]);
+  const [supplierId, setSupplierId] = useState(0);
 
   const resetForm = () => {
     setOpen(false);
@@ -73,6 +71,7 @@ export const Purchases = () => {
     setSaleableName("");
     setSaleableUnit("pcs");
     setEditingLot(null);
+    setSupplierId(0);
     setFormError("");
   };
 
@@ -96,6 +95,7 @@ export const Purchases = () => {
         unit: saleableUnit.trim(),
         unit_price: unitPrice,
         category: category === "packing_material" ? "packing_material" : "saleable_good",
+        supplier_id: supplierId || undefined,
         });
         resetForm();
       } catch (requestError: any) {
@@ -106,6 +106,7 @@ export const Purchases = () => {
 
     const payload = {
       ingredient_id: selectedIngredient,
+      supplier_id: supplierId || undefined,
       qty: quantity,
       unit_price: unitPrice,
       supplier: supplier || undefined,
@@ -121,7 +122,7 @@ export const Purchases = () => {
       if (editingLot) await updateLot.mutateAsync({ ...payload, id: editingLot.id });
       else await addLot.mutateAsync(payload);
       resetForm();
-      refetch();
+      refetchAll();
     } catch (requestError: any) {
       setFormError(requestError.response?.data?.detail || "Could not save purchase.");
     }
@@ -141,28 +142,24 @@ export const Purchases = () => {
 
   const removeLot = async (lot: any) => {
     if (window.confirm(`Delete purchase lot ${lot.id}?`)) {
-      await deleteLot.mutateAsync({ ingredient_id: selectedIngredient, id: lot.id });
-      refetch();
+      await deleteLot.mutateAsync({ ingredient_id: lot.ingredient.id, id: lot.id });
+      refetchAll();
     }
   };
 
+  const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
+
   return (
     <Box>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-        <Typography variant="h4">Purchase Ledger</Typography>
-        <Button
-          variant="contained"
-          onClick={() => { setEditingLot(null); resetForm(); setOpen(true); }}
-          disabled={category === "raw_material" && !ingredients?.length}
-        >
-          Add Purchase
-        </Button>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Typography variant="h4" sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Purchases</Typography>
+        <Button variant="contained" size="small" onClick={() => { setEditingLot(null); resetForm(); setOpen(true); }} disabled={category === "raw_material" && !ingredients?.length} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Add Purchase</Button>
       </Box>
 
-      <FormControl fullWidth margin="dense">
-        <InputLabel>Purchase category</InputLabel>
-        <Select value={category} label="Purchase category" onChange={(event) => setCategory(event.target.value as PurchaseCategory)}>
-          <MenuItem value="raw_material">Raw material / ingredient</MenuItem>
+      <FormControl fullWidth size="small" margin="dense" sx={{ mb: 2 }}>
+        <InputLabel>Category</InputLabel>
+        <Select value={category} label="Category" onChange={(event) => setCategory(event.target.value as PurchaseCategory)}>
+          <MenuItem value="raw_material">Raw material</MenuItem>
           <MenuItem value="saleable_good">Saleable good</MenuItem>
           <MenuItem value="packing_material">Packing material</MenuItem>
         </Select>
@@ -170,35 +167,33 @@ export const Purchases = () => {
 
       {category === "raw_material" ? (
         <>
-          <FormControl fullWidth margin="dense">
+          <FormControl fullWidth size="small" margin="dense" sx={{ mb: 1 }}>
             <InputLabel>Ingredient</InputLabel>
             <Select value={selectedIngredient} label="Ingredient" onChange={(event) => setSelectedIngredient(event.target.value as number)}>
               {ingredients?.map((ing: any) => <MenuItem key={ing.id} value={ing.id}>{ing.name}</MenuItem>)}
             </Select>
           </FormControl>
-          {selectedIngredient ? (
-            lots?.length ? (
-              <TableContainer component={Paper} sx={{ mt: 2 }}>
-                <Table>
-                  <TableHead><TableRow><TableCell>Lot ID</TableCell><TableCell>Qty</TableCell><TableCell>Unit Price (₹)</TableCell><TableCell>Received At</TableCell><TableCell>Supplier</TableCell><TableCell>Reference</TableCell><TableCell>Lot</TableCell><TableCell>Expiry</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
-                  <TableBody>{lots.map((lot: any) => (
+          {allLotsLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={24} /></Box> : allLots.length ? (
+              <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+                <Table size="small">
+                  <TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Price</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell></TableRow></TableHead>
+                  <TableBody>{allLots.map((lot: any) => (
                     <TableRow key={lot.id}>
-                      <TableCell>{lot.id}</TableCell><TableCell>{lot.qty}</TableCell><TableCell>{lot.unit_price}</TableCell><TableCell>{new Date(lot.received_at).toLocaleString()}</TableCell><TableCell>{lot.supplier || "—"}</TableCell><TableCell>{lot.reference || "—"}</TableCell><TableCell>{lot.lot_number || "—"}</TableCell><TableCell>{lot.expiry_date || "—"}</TableCell>
-                      <TableCell><Button size="small" onClick={() => editLot(lot)}>Edit</Button><Button size="small" color="error" onClick={() => removeLot(lot)}>Delete</Button></TableCell>
+                      <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{lot.ingredient.name}</TableCell><TableCell sx={cellSx}>{lot.qty}</TableCell><TableCell sx={cellSx}>₹{lot.unit_price}</TableCell><TableCell sx={cellSx}>{lot.supplier || "—"}</TableCell>
+                      <TableCell sx={cellSx}><Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={deleteLot.isPending || updateLot.isPending} onClick={() => { setSelectedIngredient(lot.ingredient.id); editLot(lot); }}>Edit</Button><Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={deleteLot.isPending || updateLot.isPending} onClick={() => removeLot(lot)}>{deleteLot.isPending ? <CircularProgress size={14} /> : "Del"}</Button></TableCell>
                     </TableRow>
                   ))}</TableBody>
                 </Table>
               </TableContainer>
-            ) : <Typography sx={{ mt: 2 }}>No lots for this ingredient.</Typography>
-          ) : <Typography sx={{ mt: 2 }}>Select an ingredient to view its purchase lots.</Typography>}
+            ) : <Typography sx={{ mt: 2, fontSize: "0.85rem", color: "text.secondary" }}>No raw-material purchases recorded.</Typography>}
         </>
       ) : (
-        <TableContainer component={Paper} sx={{ mt: 2 }}>
-          <Table>
-            <TableHead><TableRow><TableCell>{category === "packing_material" ? "Packing material" : "Saleable good"}</TableCell><TableCell>Quantity</TableCell><TableCell>Unit</TableCell><TableCell>Average cost (₹)</TableCell></TableRow></TableHead>
+        <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>{category === "packing_material" ? "Material" : "Item"}</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell></TableRow></TableHead>
             <TableBody>{(category === "packing_material" ? packingMaterials : saleableGoods).length ? (category === "packing_material" ? packingMaterials : saleableGoods).map((item: any) => (
-              <TableRow key={item.id}><TableCell>{item.name}</TableCell><TableCell>{item.qty}</TableCell><TableCell>{item.unit}</TableCell><TableCell>{item.unit_price}</TableCell></TableRow>
-            )) : <TableRow><TableCell colSpan={4} align="center">No purchases recorded.</TableCell></TableRow>}</TableBody>
+              <TableRow key={item.id}><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{item.name}</TableCell><TableCell sx={cellSx}>{item.qty}</TableCell><TableCell sx={cellSx}>{item.unit}</TableCell><TableCell sx={cellSx}>₹{item.unit_price}</TableCell></TableRow>
+            )) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No purchases recorded.</TableCell></TableRow>}</TableBody>
           </Table>
         </TableContainer>
       )}
@@ -220,6 +215,7 @@ export const Purchases = () => {
               </Select>
             </FormControl>
           )}
+          <FormControl fullWidth margin="dense"><InputLabel>Supplier</InputLabel><Select value={supplierId} label="Supplier" onChange={(event) => setSupplierId(Number(event.target.value))}><MenuItem value={0}>No supplier selected</MenuItem>{suppliers.map((supplier: any) => <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>)}</Select></FormControl>
           <TextField margin="dense" label="Quantity" type="number" fullWidth value={qty} onChange={(event) => setQty(event.target.value)} />
           <TextField margin="dense" label="Unit Price (₹)" type="number" fullWidth value={price} onChange={(event) => setPrice(event.target.value)} />
           {category === "raw_material" && (
@@ -231,7 +227,7 @@ export const Purchases = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions><Button onClick={resetForm}>Cancel</Button><Button onClick={handleAdd} variant="contained">Save</Button></DialogActions>
+        <DialogActions><Button onClick={resetForm} disabled={addLot.isPending || updateLot.isPending || addSaleableGood.isPending}>Cancel</Button><Button onClick={handleAdd} variant="contained" disabled={addLot.isPending || updateLot.isPending || addSaleableGood.isPending}>{addLot.isPending || updateLot.isPending || addSaleableGood.isPending ? <CircularProgress size={20} color="inherit" /> : "Save"}</Button></DialogActions>
       </Dialog>
     </Box>
   );

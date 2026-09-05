@@ -17,6 +17,36 @@ export const useAuthUsers = (enabled: boolean) =>
     initialData: [],
   });
 
+export const useSuppliers = () =>
+  useQuery<any[], Error>({
+    queryKey: ["suppliers"],
+    queryFn: async () => (await api.get("/suppliers")).data,
+    initialData: [],
+  });
+
+export const useSupplier = (supplierId: number) =>
+  useQuery<any, Error>({
+    queryKey: ["supplier", supplierId],
+    queryFn: async () => (await api.get(`/suppliers/${supplierId}`)).data,
+    enabled: !!supplierId,
+  });
+
+export const useAddSupplier = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string; tax_id?: string; notes?: string }>({
+    mutationFn: (payload) => api.post("/suppliers", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["suppliers"] }),
+  });
+};
+
+export const useAddSupplierPayment = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { supplierId: number; amount: number; method: string; reference?: string; notes?: string }>({
+    mutationFn: ({ supplierId, ...payload }) => api.post(`/suppliers/${supplierId}/payments`, payload),
+    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: ["supplier", variables.supplierId] }),
+  });
+};
+
 export const useAuthRoles = (enabled: boolean) =>
   useQuery<any[], Error>({
     queryKey: ["authRoles"],
@@ -117,9 +147,16 @@ export const usePurchaseLots = (ingredientId?: number) =>
     initialData: [],
   });
 
+export const useAllPurchaseLots = () =>
+  useQuery<PurchaseLot[], Error>({
+    queryKey: ["purchaseLots", "all"],
+    queryFn: async () => (await api.get<PurchaseLot[]>("/ingredients/lots/all")).data,
+    initialData: [],
+  });
+
 export const useAddPurchaseLot = () => {
   const qc = useQueryClient();
-  return useMutation<void, Error, { ingredient_id: number; qty: number; unit_price: number; supplier?: string; reference?: string; lot_number?: string; expiry_date?: string }>({
+  return useMutation<void, Error, { ingredient_id: number; supplier_id?: number; qty: number; unit_price: number; supplier?: string; reference?: string; lot_number?: string; expiry_date?: string }>({
     mutationFn: (payload) =>
       api.post(`/ingredients/${payload.ingredient_id}/lots`, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
@@ -431,7 +468,7 @@ export const useManualStock = () =>
 
 export const useAddManualStock = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { name: string; unit: string; qty: number; unit_price: number; category?: "saleable_good" | "packing_material" }>({
+  return useMutation<any, Error, { name: string; unit: string; qty: number; unit_price: number; category?: "saleable_good" | "packing_material"; supplier_id?: number; reference?: string }>({
     mutationFn: (payload) => api.post("/packing/manual-stock", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["manualStock"] });
@@ -449,6 +486,24 @@ export const usePackBatch = () => {
       qc.invalidateQueries({ queryKey: ["finishedInventory"] });
       qc.invalidateQueries({ queryKey: ["packagedStock"] });
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
+    },
+  });
+};
+
+/* ------------------------------------------------------------------ */
+/* Supplier Payments                                                   */
+/* ------------------------------------------------------------------ */
+export const useSupplierPayments = () =>
+  useQuery<any[], Error>({ queryKey: ["supplierPayments"], queryFn: async () => (await api.get("/suppliers/payments/history")).data, initialData: [] });
+
+export const useAddSupplierPaymentFromPayments = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { supplierId: number; amount: number; method: string; reference?: string; notes?: string }>({
+    mutationFn: ({ supplierId, ...payload }) => api.post(`/suppliers/${supplierId}/payments`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplierPayments"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier"] });
     },
   });
 };
