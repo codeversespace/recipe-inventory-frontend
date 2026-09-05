@@ -3,7 +3,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { useState } from "react";
-import { useCreateOrder, useCustomers, useDeleteOrder, useOrders, useSaleableStock } from "../hooks/useApi";
+import { useCreateOrder, useCustomers, useDeleteOrder, useOrders, useSaleableStock, useUpdateOrderStatus } from "../hooks/useApi";
 
 export const Orders = () => {
   const { data: orders = [], isLoading } = useOrders();
@@ -11,6 +11,7 @@ export const Orders = () => {
   const { data: stock = [] } = useSaleableStock();
   const createOrder = useCreateOrder();
   const deleteOrder = useDeleteOrder();
+  const updateStatus = useUpdateOrderStatus();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -259,7 +260,12 @@ export const Orders = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: "space-between" }}>
+          <Box>
+            {detailOrder?.status === "PENDING" && <Button size="small" color="success" variant="outlined" disabled={updateStatus.isPending} onClick={() => updateStatus.mutateAsync({ orderId: detailOrder.id, status: "CONFIRMED" })}>Confirm</Button>}
+            {detailOrder?.status === "CONFIRMED" && <Button size="small" color="warning" variant="outlined" disabled={updateStatus.isPending} onClick={() => updateStatus.mutateAsync({ orderId: detailOrder.id, status: "PENDING" })}>Mark pending</Button>}
+            {detailOrder?.status !== "CANCELLED" && <Button size="small" color="error" variant="outlined" disabled={updateStatus.isPending} onClick={() => { if (window.confirm("Cancel this order?")) updateStatus.mutateAsync({ orderId: detailOrder!.id, status: "CANCELLED" }); }}>Cancel order</Button>}
+          </Box>
           <Button onClick={() => setDetailId(null)}>Close</Button>
         </DialogActions>
       </Dialog>

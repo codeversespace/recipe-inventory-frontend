@@ -562,5 +562,16 @@ export const useDeleteOrder = () => {
   });
 };
 
+export const useUpdateOrderStatus = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { orderId: number; status: string }>({
+    mutationFn: ({ orderId, status }) => api.put(`/orders/${orderId}/status`, { status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["orderDemand"] });
+    },
+  });
+};
+
 export const useOrderDemand = () =>
   useQuery<any[], Error>({ queryKey: ["orderDemand"], queryFn: async () => (await api.get("/orders/demand")).data, initialData: [] });
