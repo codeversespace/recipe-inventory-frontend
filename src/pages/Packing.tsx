@@ -36,8 +36,9 @@ export const Packing = () => {
       <VoiceInput onResult={(json) => {
         try {
           const parsed = JSON.parse(json);
-          if (parsed.count) setCount(String(parsed.count));
-          if (parsed.employee) setEmployee(parsed.employee);
+          const item = parsed.items?.[0] || parsed;
+          if (item.count) setCount(String(item.count));
+          if (item.employee) setEmployee(item.employee);
           if (!selected && batches.length) setSelected(batches[0]);
           setError("");
         } catch { /* ignore */ }

@@ -1,5 +1,5 @@
-import { Box, Card, CardContent, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
-import { useInventory, useSaleableStock } from "../hooks/useApi";
+import { Alert, Box, Card, CardContent, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { useInventory, useOrderDemand, useSaleableStock } from "../hooks/useApi";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from "recharts";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
@@ -21,6 +21,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 export const Inventory = () => {
   const { data: saleableStock = [], isLoading, error } = useSaleableStock();
   const { data: rawMaterials = [], isLoading: rawMaterialsLoading, error: rawMaterialsError } = useInventory();
+  const { data: orderDemand = [] } = useOrderDemand();
 
   const stockBarData = rawMaterials.map((item: any) => ({
     name: item.name.length > 12 ? item.name.slice(0, 12) + "..." : item.name,
@@ -45,32 +46,64 @@ export const Inventory = () => {
       ) : error ? (
         <Typography color="error" sx={{ fontSize: "0.85rem" }}>{(error as any).message}</Typography>
       ) : (
+        <>
         <TableContainer component={Paper} sx={{ mb: 3, overflowX: "auto" }}>
           <Table size="small">
             <TableHead><TableRow>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Item</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell>
+              <TableCell sx={{ ...cellSx, fontWeight: 700, display: { xs: "none", sm: "table-cell" } }}>Pending Orders</TableCell>
+              <TableCell sx={{ ...cellSx, fontWeight: 700, display: { xs: "none", sm: "table-cell" } }}>Production Needed</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Price</TableCell>
             </TableRow></TableHead>
             <TableBody>
-              {saleableStock.length ? saleableStock.map((item: any) => (
-                <TableRow key={item.id}>
-                  <TableCell sx={cellSx}>{item.name}</TableCell>
-                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{item.qty}</TableCell>
-                  <TableCell sx={cellSx}>{item.unit}</TableCell>
-                  <TableCell sx={cellSx}>{item.cost_per_unit > 0 ? `₹${item.cost_per_unit.toFixed(0)}` : "—"}</TableCell>
-                  <TableCell sx={cellSx}>{item.unit_price > 0 ? `₹${item.unit_price.toFixed(0)}` : "—"}</TableCell>
-                </TableRow>
-              )) : (
+              {saleableStock.length ? saleableStock.map((item: any) => {
+                const demand = orderDemand.find((d: any) => d.stock_item_id === item.id);
+                const pendingQty = demand?.total_ordered || 0;
+                const shortage = demand?.shortage || 0;
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell sx={cellSx}>{item.name}</TableCell>
+                    <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{item.qty}</TableCell>
+                    <TableCell sx={cellSx}>{item.unit}</TableCell>
+                    <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }}>
+                      {pendingQty > 0 ? (
+                        <Chip label={`${pendingQty} ${item.unit}`} color="info" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }}>
+                      {shortage > 0 ? (
+                        <Chip label={`${shortage} ${item.unit}`} color="error" size="small" sx={{ fontSize: "0.65rem", height: 20, fontWeight: 700 }} />
+                      ) : pendingQty > 0 ? (
+                        <Chip label="Sufficient" color="success" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell sx={cellSx}>{item.cost_per_unit > 0 ? `₹${item.cost_per_unit.toFixed(0)}` : "—"}</TableCell>
+                    <TableCell sx={cellSx}>{item.unit_price > 0 ? `₹${item.unit_price.toFixed(0)}` : "—"}</TableCell>
+                  </TableRow>
+                );
+              }) : (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}>No saleable goods in stock.</TableCell>
+                  <TableCell colSpan={7} align="center" sx={{ ...cellSx, py: 3 }}>No saleable goods in stock.</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
+
+        {orderDemand.filter((d: any) => d.shortage > 0).length > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Production needed to fulfill pending orders:</Typography>
+            {orderDemand.filter((d: any) => d.shortage > 0).map((d: any) => (
+              <Typography key={d.stock_item_id} variant="caption" sx={{ display: "block" }}>
+                {d.stock_item_name}: <strong>{d.shortage}</strong> units short ({d.total_ordered} ordered − {d.stock_available} in stock)
+              </Typography>
+            ))}
+          </Alert>
+        )}
+        </>
       )}
 
       {/* Raw Materials */}

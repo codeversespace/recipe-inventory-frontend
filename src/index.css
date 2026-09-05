@@ -26,8 +26,9 @@ html, body, #root { min-height: 100%; }
   .MuiTypography-subtitle2 { font-size: 0.8rem !important; }
 
   /* Buttons - touch-friendly (44px minimum) */
-  .MuiButton-root { min-height: 36px; font-size: 0.8rem !important; }
-  .MuiButton-contained { min-height: 38px; }
+  .MuiButton-root { min-height: 40px; font-size: 0.8rem !important; }
+  .MuiButton-contained { min-height: 42px; }
+  .MuiButton-sizeSmall { min-height: 34px; padding: 4px 10px !important; }
 
   /* Cards */
   .MuiCardContent-root { padding: 12px !important; }
@@ -54,7 +55,7 @@ html, body, #root { min-height: 100%; }
 
   /* Bottom navigation */
   .MuiBottomNavigation-root { height: 60px !important; }
-  .MuiBottomNavigationAction-root { min-width: 0 !important; padding: 6px 0 !important; }
+  .MuiBottomNavigationAction-root { min-width: 48px !important; padding: 6px 0 !important; }
   .MuiBottomNavigationAction-label { font-size: 0.6rem !important; margin-top: 2px; }
   .MuiBottomNavigationAction-label.Mui-selected { font-size: 0.6rem !important; }
 

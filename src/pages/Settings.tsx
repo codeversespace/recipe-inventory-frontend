@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { ChangeEvent, useState } from "react";
 import { useAuthActivities, useAuthRoles, useAuthUsers, useCreateAuthUser, useResetAuthPassword, useUpdateAuthUser } from "../hooks/useApi";
 import { useAuth } from "../auth/AuthContext";
@@ -15,6 +15,9 @@ export const Settings = () => {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("viewer");
+  const [showCount, setShowCount] = useState(5);
+  const visibleActivities = activities.slice(0, showCount);
+  const hasMoreActivities = showCount < activities.length;
   const [resetUserId, setResetUserId] = useState<number | null>(null);
   const [resetValue, setResetValue] = useState("");
   const [error, setError] = useState("");
@@ -110,7 +113,8 @@ export const Settings = () => {
       <Card sx={{ maxWidth: 1100, mt: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>User activity</Typography>
-          <Table size="small"><TableHead><TableRow><TableCell>Time</TableCell><TableCell>User</TableCell><TableCell>Action</TableCell><TableCell>Details</TableCell></TableRow></TableHead><TableBody>{activities.map((activity: any) => <TableRow key={activity.id}><TableCell>{new Date(activity.created_at).toLocaleString()}</TableCell><TableCell>{activity.username}</TableCell><TableCell>{activity.action}</TableCell><TableCell>{activity.details || "—"}</TableCell></TableRow>)}</TableBody></Table>
+          <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Time</TableCell><TableCell>User</TableCell><TableCell>Action</TableCell><TableCell>Details</TableCell></TableRow></TableHead><TableBody>{visibleActivities.map((activity: any) => <TableRow key={activity.id}><TableCell>{new Date(activity.created_at).toLocaleString()}</TableCell><TableCell>{activity.username}</TableCell><TableCell>{activity.action}</TableCell><TableCell>{activity.details || "—"}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
+          {hasMoreActivities && <Box sx={{ mt: 1, textAlign: "center" }}><Button size="small" onClick={() => setShowCount((c) => Math.min(c + 20, activities.length))} sx={{ fontSize: "0.75rem" }}>Show more ({activities.length - showCount} remaining)</Button></Box>}
         </CardContent>
       </Card>
       {resetUserId && <Card sx={{ maxWidth: 420, mt: 3 }}><CardContent><Typography variant="h6">Reset password</Typography><TextField fullWidth margin="dense" label="New password" type="password" value={resetValue} onChange={(event) => setResetValue(event.target.value)} /><Box sx={{ display: "flex", gap: 1, mt: 1 }}><Button onClick={() => setResetUserId(null)}>Cancel</Button><Button variant="contained" onClick={resetManagedPassword} disabled={resetValue.length < 8 || resetPassword.isPending}>Save password</Button></Box></CardContent></Card>}

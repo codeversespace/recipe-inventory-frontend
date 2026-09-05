@@ -5,6 +5,7 @@ import {
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDashboard } from "../hooks/useApi";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 
@@ -56,6 +57,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const Dashboard = () => {
+  const navigate = useNavigate();
   const initialRange = rangeFor("last7");
   const [preset, setPreset] = useState("last7");
   const [startDate, setStartDate] = useState(initialRange.start);
@@ -104,15 +106,19 @@ export const Dashboard = () => {
         <TextField label="To" type="date" size="small" value={endDate} onChange={(e) => { setPreset(""); setEndDate(e.target.value); }} slotProps={{ inputLabel: { shrink: true } }} sx={{ flex: 1 }} />
       </Stack>
 
-      {/* KPI cards - 2 columns on mobile, 6 on desktop */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(6, 1fr)" }, gap: { xs: 1, sm: 2 } }}>
+      {/* KPI cards */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(5, 1fr)" }, gap: { xs: 1, sm: 2 } }}>
         {[
           ["Revenue", money(data.revenue), "#e3f2fd", "Total sales value during the selected date range."],
           ["Cost", money(data.cost), "#fff3e0", "Estimated cost of the products sold during the selected date range."],
           ["Profit", money(data.profit), "#e8f5e9", "Revenue minus estimated product cost."],
           ["Margin", `${(data.margin_pct || 0).toFixed(1)}%`, "#ede7f6", "Profit expressed as a percentage of revenue."],
           ["Due", money(data.due), "#ffebee", "Amount still due from sales in the selected date range."],
-          ["Stock", money(data.saleable_stock_value), "#f3f4f6", "Current cost value of active saleable stock."],
+          ["Supplier Dues", money(data.supplier_dues), "#fff8e1", "Outstanding balance owed to suppliers."],
+          ["Cash In", money(data.cash_in), "#e8f5e9", "Customer payments received in the selected date range."],
+          ["Cash Out", money(data.cash_out), "#ffebee", "Supplier payments made in the selected date range."],
+          ["Advances", money(data.advance_balances_total), "#e3f2fd", "Total advance balances held from customers."],
+          ["Avg Batch", money(data.avg_batch_cost), "#f3e5f5", "Average production batch cost in the selected date range."],
         ].map(([label, value, bgcolor, description]) => (
           <Card key={label} sx={{ bgcolor }}>
             <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
@@ -167,6 +173,8 @@ export const Dashboard = () => {
                     outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
+                    labelLine={false}
+                    label={false}
                   >
                     {productData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -190,9 +198,12 @@ export const Dashboard = () => {
         <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Sales: {data.invoice_count} invoices | Paid: {money(data.paid)}</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {money(data.avg_batch_cost)}</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Finished stock: {data.packaged_stock_packs} packs</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" }, color: data.pending_orders_count > 0 ? "warning.main" : "text.secondary", fontWeight: data.pending_orders_count > 0 ? 700 : 400 }}>
+            Pending orders: {data.pending_orders_count} {data.order_shortage_count > 0 ? `| ${data.order_shortage_count} units short` : ""}
+          </Typography>
         </CardContent></Card>
         <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>
@@ -220,6 +231,36 @@ export const Dashboard = () => {
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{product.name}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{product.quantity}</TableCell>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.profit)}</TableCell>
             </TableRow>)}
+          </TableBody></Table></TableContainer>
+        </CardContent>
+      </Card>
+
+      {/* Top Customers Table */}
+      <Card sx={{ mt: 2 }}>
+        <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Customers</Typography>
+          <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Customer</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Cost</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Profit</TableCell>
+          </TableRow></TableHead><TableBody>
+            {(data.top_customers || []).slice(0, 8).map((customer: any) => (
+              <TableRow
+                key={customer.customer_id}
+                hover
+                sx={{ cursor: "pointer" }}
+                onClick={() => navigate(`/customers/${customer.customer_id}`)}
+              >
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{customer.name}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(customer.revenue)}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(customer.cost)}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "success.main" : "error.main" }}>{money(customer.profit)}</TableCell>
+              </TableRow>
+            ))}
+            {(!data.top_customers || data.top_customers.length === 0) && (
+              <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3, fontSize: "0.8rem", color: "text.secondary" }}>No customer data for this period</TableCell></TableRow>
+            )}
           </TableBody></Table></TableContainer>
         </CardContent>
       </Card>

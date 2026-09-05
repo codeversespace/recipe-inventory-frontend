@@ -155,14 +155,44 @@ export const Purchases = () => {
   const handleVoiceResult = (resultJson: string) => {
     try {
       const parsed = JSON.parse(resultJson);
-      const matchIng = bestMatch(ingredients || [], parsed.name);
-      if (matchIng) setSelectedIngredient(matchIng.id);
-      const matchSup = bestMatch(suppliers, parsed.supplier || "");
-      if (matchSup) setSupplierId(matchSup.id);
-      setQty(parsed.qty ? String(parsed.qty) : "");
-      setPrice(parsed.price ? String(parsed.price) : "");
-      setCategory("raw_material");
-      setOpen(true);
+      const shared = parsed.shared || {};
+      const items = parsed.items || [];
+      if (!items.length) return;
+
+      // Apply shared supplier to all items
+      if (shared.supplier) {
+        const matchSup = bestMatch(suppliers, shared.supplier);
+        if (matchSup) setSupplierId(matchSup.id);
+      }
+
+      if (items.length === 1) {
+        // Single item: open form for review
+        const item = items[0];
+        const matchIng = bestMatch(ingredients || [], item.name);
+        if (matchIng) setSelectedIngredient(matchIng.id);
+        setQty(item.qty ? String(item.qty) : "");
+        setPrice(item.price ? String(item.price) : "");
+        setCategory("raw_material");
+        setOpen(true);
+      } else {
+        // Multiple items: batch add all directly
+        setCategory("raw_material");
+        let added = 0;
+        for (const item of items) {
+          const matchIng = bestMatch(ingredients || [], item.name);
+          if (!matchIng) continue;
+          const qty = Number(item.qty);
+          const price = Number(item.price);
+          if (!qty || !price) continue;
+          addLot.mutate({
+            ingredient_id: matchIng.id,
+            supplier_id: supplierId || shared.supplier ? (bestMatch(suppliers, shared.supplier || "")?.id || undefined) : undefined,
+            qty, unit_price: price,
+            supplier: shared.supplier || undefined,
+          }, { onSuccess: () => added++ });
+        }
+        if (added > 0) refetchAll();
+      }
     } catch { /* ignore parse errors */ }
   };
 

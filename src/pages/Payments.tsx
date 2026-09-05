@@ -1,7 +1,7 @@
 import { Alert, Autocomplete, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useSuppliers, useSupplierPayments } from "../hooks/useApi";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, LineChart, Line, ReferenceLine } from "recharts";
 import { VoiceInput } from "../components/VoiceInput";
 import { bestMatch } from "../utils/fuzzy";
 
@@ -39,6 +39,7 @@ export const Payments = () => {
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [paymentResult, setPaymentResult] = useState<any>(null);
   const { data: allHistory = [] } = usePaymentHistory(true);
   const { data: history = [], isFetching: historyLoading } = usePaymentHistory(historyOpen);
   const { data: supplierHistory = [] } = useSupplierPayments();
@@ -54,8 +55,10 @@ export const Payments = () => {
   const submitCustomerPayment = async () => {
     if (!customer || !Number.isFinite(Number(amount)) || Number(amount) <= 0) { setError("Select a customer and enter a valid payment amount."); return; }
     try {
-      await customerPayment.mutateAsync({ customer_id: customer.id, amount: Number(amount), method, reference: reference || undefined });
-      setCustomerOpen(false); setCustomer(null); setAmount(""); setReference(""); setError("");
+      const result = await customerPayment.mutateAsync({ customer_id: customer.id, amount: Number(amount), method, reference: reference || undefined });
+      setPaymentResult(result);
+      setCustomer(null); setAmount(""); setReference(""); setError("");
+      setTimeout(() => setCustomerOpen(false), 1500);
     } catch (requestError: any) { setError(requestError.response?.data?.detail || "Could not allocate customer payment."); }
   };
 
@@ -76,16 +79,17 @@ export const Payments = () => {
   const handlePaymentVoice = (json: string) => {
     try {
       const parsed = JSON.parse(json);
-      setAmount(String(parsed.amount || ""));
+      const item = parsed.items?.[0] || parsed;
+      setAmount(String(item.amount || ""));
       setReference("");
       setNotes("");
-      if (parsed.method) setMethod(parsed.method.toUpperCase());
+      if (item.method) setMethod(item.method.toUpperCase());
       if (tab === 0) {
-        const matchCust = bestMatch(customers, parsed.entity || "");
+        const matchCust = bestMatch(customers, item.entity || "");
         if (matchCust) setCustomer(matchCust);
         setCustomerOpen(true);
       } else {
-        const matchSup = bestMatch(suppliers, parsed.entity || "");
+        const matchSup = bestMatch(suppliers, item.entity || "");
         if (matchSup) setSupplier(matchSup);
         setSupplierOpen(true);
       }
@@ -93,35 +97,55 @@ export const Payments = () => {
   };
 
   const cashFlowData = useMemo(() => {
-    const totalCustomerPaid = allHistory.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-    const totalSupplierPaid = supplierHistory.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-    return [
-      { name: "Money In", "Customer Payments": totalCustomerPaid },
-      { name: "Money Out", "Supplier Payments": totalSupplierPaid },
-      { name: "Net", "Net Cash Flow": totalCustomerPaid - totalSupplierPaid },
-    ];
+    // Build daily running balance from all payment history
+    const dailyIn: Record<string, number> = {};
+    const dailyOut: Record<string, number> = {};
+    allHistory.forEach((p: any) => {
+      const day = (p.paid_at || "").slice(0, 10);
+      if (day) dailyIn[day] = (dailyIn[day] || 0) + (p.amount || 0);
+    });
+    supplierHistory.forEach((p: any) => {
+      const day = (p.paid_at || "").slice(0, 10);
+      if (day) dailyOut[day] = (dailyOut[day] || 0) + (p.amount || 0);
+    });
+    const allDays = Array.from(new Set([...Object.keys(dailyIn), ...Object.keys(dailyOut)])).sort();
+    if (!allDays.length) return [];
+    let running = 0;
+    return allDays.map((day) => {
+      const inflow = dailyIn[day] || 0;
+      const outflow = dailyOut[day] || 0;
+      running += inflow - outflow;
+      return { date: day.slice(5), "Cash In": inflow, "Cash Out": outflow, Balance: Math.round(running) };
+    });
   }, [allHistory, supplierHistory]);
 
   return <Box>
     <Typography variant="h4" sx={{ mb: 1, fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Payments</Typography>
     <Typography color="text.secondary" sx={{ mb: 2, fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Unified module for customer and supplier payments.</Typography>
 
-    {/* Cash Flow Summary Chart */}
+    {/* Cash Flow Chart */}
     <Card sx={{ mb: 2 }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cash Flow Overview</Typography>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} />
-            <RechartsTooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="Customer Payments" fill="#388e3c" radius={[4, 4, 0, 0]} barSize={30} />
-            <Bar dataKey="Supplier Payments" fill="#d32f2f" radius={[4, 4, 0, 0]} barSize={30} />
-            <Bar dataKey="Net Cash Flow" fill="#1976d2" radius={[4, 4, 0, 0]} barSize={30} />
-          </BarChart>
-        </ResponsiveContainer>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cash Flow</Typography>
+        {cashFlowData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <RechartsTooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="Cash In" fill="#388e3c" radius={[4, 4, 0, 0]} barSize={16} />
+              <Bar dataKey="Cash Out" fill="#d32f2f" radius={[4, 4, 0, 0]} barSize={16} />
+              <ReferenceLine y={0} stroke="#999" />
+              <Line type="monotone" dataKey="Balance" stroke="#1976d2" strokeWidth={2} dot={false} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No payment data yet</Typography>
+          </Box>
+        )}
       </CardContent>
     </Card>
 
@@ -137,8 +161,8 @@ export const Payments = () => {
         <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Due</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700, color: "error.main" }}>₹{(search ? filteredDue : totalDue).toFixed(0)}</Typography></CardContent></Card>
         <Card><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Invoices</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>{search ? filtered.length : dueSales.length}</Typography></CardContent></Card>
       </Box>
-      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-        <TextField size="small" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+        <TextField size="small" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: "1 1 200px", "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
         <VoiceInput onResult={handlePaymentVoice} label="Quick voice payment" variant="payment" />
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setCustomerOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Receive</Button>
       </Box>
@@ -161,13 +185,13 @@ export const Payments = () => {
     </>}
 
     {tab === 1 && <>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(3, 1fr)" }, gap: { xs: 1, sm: 2 }, mb: 2 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)" }, gap: { xs: 1, sm: 2 }, mb: 2 }}>
         <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Total paid</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>₹{supplierHistory.reduce((sum: number, p: any) => sum + p.amount, 0).toFixed(0)}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Suppliers</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{new Set(supplierHistory.map((p: any) => p.supplier_id)).size}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Transactions</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{supplierHistory.length}</Typography></CardContent></Card>
       </Box>
-      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-        <TextField size="small" placeholder="Search supplier..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+        <TextField size="small" placeholder="Search supplier..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: "1 1 200px", "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
         <VoiceInput onResult={handlePaymentVoice} label="Quick voice payment" variant="payment" />
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setNotes(""); setSupplierOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Payment</Button>
       </Box>
@@ -185,7 +209,11 @@ export const Payments = () => {
       <DialogTitle sx={{ fontSize: "1rem", fontWeight: 700 }}>Receive payment</DialogTitle>
       <DialogContent sx={{ p: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 1, fontSize: "0.8rem" }}>{error}</Alert>}
-        <Autocomplete options={customers} getOptionLabel={(item: any) => item.name} value={customer} onChange={(_, item) => setCustomer(item)} renderInput={(params) => <TextField {...params} label="Customer" size="small" margin="dense" />} />
+        <Autocomplete options={customers} getOptionLabel={(item: any) => item.name} value={customer} onChange={(_, item) => { setCustomer(item); setPaymentResult(null); }} renderInput={(params) => <TextField {...params} label="Customer" size="small" margin="dense" />} />
+        {customer && (customer.advance_balance || 0) > 0 && <Alert severity="info" sx={{ mt: 1, fontSize: "0.8rem" }}>Current advance balance: ₹{(customer.advance_balance || 0).toFixed(2)}</Alert>}
+        {paymentResult && <Alert severity="success" sx={{ mt: 1, fontSize: "0.8rem" }} onClose={() => setPaymentResult(null)}>
+          Paid ₹{(paymentResult.total_paid || 0).toFixed(2)}{paymentResult.invoices_paid?.length > 0 ? ` → cleared ${paymentResult.invoices_paid.length} invoice(s)` : ""}{(paymentResult.advance_created || 0) > 0 ? ` · ₹${paymentResult.advance_created.toFixed(2)} added to advance (new balance: ₹${paymentResult.new_advance_balance.toFixed(2)})` : ""}
+        </Alert>}
         <TextField fullWidth margin="dense" size="small" label="Amount" type="number" value={amount} onChange={(event) => setAmount(event.target.value)} />
         <Select fullWidth size="small" value={method} onChange={(event) => setMethod(event.target.value)} sx={{ mt: 1 }}><MenuItem value="CASH">Cash</MenuItem><MenuItem value="UPI">UPI</MenuItem><MenuItem value="BANK">Bank</MenuItem><MenuItem value="CHEQUE">Cheque</MenuItem></Select>
         <TextField fullWidth margin="dense" size="small" label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />

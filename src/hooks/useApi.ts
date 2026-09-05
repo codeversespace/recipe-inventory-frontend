@@ -250,11 +250,38 @@ export const useAddRecipeIngredient = () => {
 };
 
 /* ------------------------------------------------------------------ */
+/* Recipe Overheads                                                    */
+/* ------------------------------------------------------------------ */
+export const useRecipeOverheads = (recipeId: number) =>
+  useQuery<any[], Error>({
+    queryKey: ["recipeOverheads", recipeId],
+    queryFn: async () => (await api.get(`/recipes/${recipeId}/overheads`)).data,
+    enabled: !!recipeId,
+    initialData: [],
+  });
+
+export const useAddRecipeOverhead = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { recipe_id: number; name: string; cost_per_batch: number; overhead_type: string }>({
+    mutationFn: (payload) => api.post(`/recipes/${payload.recipe_id}/overheads`, { name: payload.name, cost_per_batch: payload.cost_per_batch, overhead_type: payload.overhead_type }),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["recipeOverheads", vars.recipe_id] }),
+  });
+};
+
+export const useDeleteRecipeOverhead = () => {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { recipe_id: number; overhead_id: number }>({
+    mutationFn: ({ recipe_id, overhead_id }) => api.delete(`/recipes/${recipe_id}/overheads/${overhead_id}`),
+    onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["recipeOverheads", vars.recipe_id] }),
+  });
+};
+
+/* ------------------------------------------------------------------ */
 /* Production (batch)                                                  */
 /* ------------------------------------------------------------------ */
 export const useProduceBatch = () => {
   const qc = useQueryClient();
-  return useMutation<ProductionBatch, Error, { recipe_id: number; produced_qty: number; costing_method?: "FIFO" | "LIFO" | "AVG" }>({
+  return useMutation<ProductionBatch, Error, { recipe_id: number; produced_qty: number; costing_method?: "FIFO" | "LIFO" | "AVG"; overheads?: { name: string; cost_per_batch: number; overhead_type: string }[] }>({
     mutationFn: async (payload) => {
       const { data } = await api.post<ProductionBatch>("/production", payload);
       return data;
@@ -328,7 +355,7 @@ export const useCustomers = () =>
 
 export const useAddCustomer = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string; credit_limit: number }>({
+  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string; credit_limit: number; advance_balance?: number }>({
     mutationFn: (payload) => api.post("/customers", payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
   });
@@ -336,7 +363,7 @@ export const useAddCustomer = () => {
 
 export const useUpdateCustomer = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string; credit_limit: number }>({
+  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string; credit_limit: number; advance_balance?: number }>({
     mutationFn: ({ id, ...payload }) => api.put(`/customers/${id}`, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
   });
@@ -365,7 +392,7 @@ export const useSales = () =>
 
 export const useAddSale = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; payment_method?: string; payment_reference?: string; lines: { recipe_id?: number; stock_item_id?: number; quantity: number; unit_price?: number }[] }>({
+  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; payment_method?: string; payment_reference?: string; use_advance?: boolean; lines: { recipe_id?: number; stock_item_id?: number; quantity: number; unit_price?: number }[] }>({
     mutationFn: (payload) => api.post("/sales", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales"] });
@@ -373,6 +400,7 @@ export const useAddSale = () => {
       qc.invalidateQueries({ queryKey: ["paymentSales"] });
       qc.invalidateQueries({ queryKey: ["paymentHistory"] });
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 };
@@ -398,13 +426,14 @@ export const usePaymentHistory = (enabled: boolean) =>
 
 export const useCustomerPayment = () => {
   const qc = useQueryClient();
-  return useMutation<any[], Error, { customer_id: number; amount: number; method: string; reference?: string }>({
+  return useMutation<any, Error, { customer_id: number; amount: number; method: string; reference?: string }>({
     mutationFn: (payload) => api.post("/payments/customer", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["paymentSales"] });
       qc.invalidateQueries({ queryKey: ["paymentHistory"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customerProfile"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 };
@@ -507,3 +536,31 @@ export const useAddSupplierPaymentFromPayments = () => {
     },
   });
 };
+
+/* ------------------------------------------------------------------ */
+/* Customer Orders                                                     */
+/* ------------------------------------------------------------------ */
+export const useOrders = () =>
+  useQuery<any[], Error>({ queryKey: ["orders"], queryFn: async () => (await api.get("/orders")).data, initialData: [] });
+
+export const useCreateOrder = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { customer_id: number; expected_delivery?: string; notes?: string; lines: { stock_item_id: number; quantity: number; unit_price?: number }[] }>({
+    mutationFn: (payload) => api.post("/orders", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+    },
+  });
+};
+
+export const useDeleteOrder = () => {
+  const qc = useQueryClient();
+  return useMutation<void, Error, number>({
+    mutationFn: (orderId) => api.delete(`/orders/${orderId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+};
+
+export const useOrderDemand = () =>
+  useQuery<any[], Error>({ queryKey: ["orderDemand"], queryFn: async () => (await api.get("/orders/demand")).data, initialData: [] });

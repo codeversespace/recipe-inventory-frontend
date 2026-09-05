@@ -69,10 +69,11 @@ export const Ingredients = () => {
           <VoiceInput onResult={(json) => {
             try {
               const parsed = JSON.parse(json);
+              const item = parsed.items?.[0] || parsed;
               setEditingId(null);
-              setName(parsed.name || "");
-              setUnit(parsed.unit || "");
-              setMinStock(parsed.minStock ? String(parsed.minStock) : "");
+              setName(item.name || "");
+              setUnit(item.unit || "");
+              setMinStock(item.minStock ? String(item.minStock) : "");
               setOpen(true);
             } catch { /* ignore */ }
           }} label="Quick voice ingredient" variant="ingredient" />

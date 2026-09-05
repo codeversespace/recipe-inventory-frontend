@@ -30,6 +30,7 @@ import {
   Inventory as InventoryIcon,
   Payments as PaymentsIcon,
   LocalShipping as SupplierIcon,
+  Assignment as OrderIcon,
   Settings as SettingsIcon,
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
@@ -52,6 +53,7 @@ const navItems: NavItem[] = [
   { text: "Sales", icon: <ReceiptIcon />, to: "/sales", roles: ["super_admin", "admin", "manager", "sales"] },
   { text: "Packing", icon: <InventoryIcon />, to: "/packing", roles: ["super_admin", "admin", "manager", "packing"] },
   { text: "Payments", icon: <PaymentsIcon />, to: "/payments", roles: ["super_admin", "admin", "manager", "sales"] },
+  { text: "Orders", icon: <OrderIcon />, to: "/orders", roles: ["super_admin", "admin", "manager", "sales", "production"] },
   { text: "Settings", icon: <SettingsIcon />, roles: ["super_admin", "admin", "manager"], children: [
     { text: "Pack types", to: "/pack-types", roles: ["super_admin", "admin", "manager"] },
     { text: "Admin settings", to: "/settings", roles: ["super_admin"] },
