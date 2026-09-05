@@ -1,6 +1,19 @@
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from "@mui/material";
 import { useState, useMemo } from "react";
 import { useAddSupplier, useSupplier, useSuppliers } from "../hooks/useApi";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+
+const COLORS = ["#1976d2", "#388e3c", "#f57c00", "#d32f2f", "#7b1fa2", "#00796b"];
+
+const CustomTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <Card sx={{ p: 1, boxShadow: 3 }}>
+      <Typography variant="caption" sx={{ fontWeight: 700 }}>{payload[0].name}</Typography>
+      <Typography variant="caption" sx={{ display: "block" }}>₹{payload[0].value.toFixed(0)}</Typography>
+    </Card>
+  );
+};
 
 export const Suppliers = () => {
   const { data: suppliers = [], isLoading } = useSuppliers();
@@ -23,6 +36,16 @@ export const Suppliers = () => {
     try { await addSupplier.mutateAsync(form); setOpen(false); setForm({ name: "", phone: "", email: "", address: "", tax_id: "", notes: "" }); setError(""); }
     catch (e: any) { setError(e.response?.data?.detail || "Could not save supplier."); }
   };
+
+  const spendingData = useMemo(() => {
+    if (!profile?.purchases) return [];
+    const byCategory: Record<string, number> = {};
+    profile.purchases.forEach((p: any) => {
+      const cat = p.category || "Other";
+      byCategory[cat] = (byCategory[cat] || 0) + (p.total_amount || 0);
+    });
+    return Object.entries(byCategory).map(([name, value]) => ({ name, value }));
+  }, [profile]);
 
   return <Box>
     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
@@ -51,9 +74,34 @@ export const Suppliers = () => {
               <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Paid</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700, color: "success.main" }}>₹{profile.total_paid.toFixed(0)}</Typography></CardContent></Card>
               <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Due</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700, color: "error.main" }}>₹{profile.balance_due.toFixed(0)}</Typography></CardContent></Card>
             </Box>
+
+            {/* Spending Breakdown Chart */}
+            {spendingData.length > 0 && (
+              <Card sx={{ mb: 2, bgcolor: "grey.50" }}>
+                <CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Spending by Category</Typography>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie data={spendingData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={2} dataKey="value">
+                        {spendingData.map((_: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Transactions</Typography>
             {profile.purchases.map((purchase: any) => <Box key={`p-${purchase.id}`} sx={{ py: 0.75, borderBottom: 1, borderColor: "divider" }}><Typography variant="body2" sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}>{purchase.item_name}</Typography><Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary" }}>{purchase.quantity} {purchase.unit} · ₹{purchase.total_amount.toFixed(2)}</Typography></Box>)}
-          </> : <Box sx={{ py: 4, textAlign: "center" }}><Typography color="text.secondary" sx={{ fontSize: "0.9rem" }}>Select a supplier to view transactions.</Typography></Box>}
+            {profile.payments?.length > 0 && <>
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 700 }}>Payments</Typography>
+              {profile.payments.map((pay: any) => <Box key={`pay-${pay.id}`} sx={{ py: 0.75, borderBottom: 1, borderColor: "divider" }}><Typography variant="body2" sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" }, color: "success.main" }}>Payment ₹{pay.amount.toFixed(2)}</Typography><Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary" }}>{pay.method} · {new Date(pay.paid_at).toLocaleDateString()}</Typography></Box>)}
+            </>}
+          </> : <Box sx={{ py: 4, textAlign: "center" }}><Typography color="text.secondary" sx={{ fontSize: "0.9rem" }}>Select a supplier to view details.</Typography></Box>}
         </CardContent>
       </Card>
     </Box>}

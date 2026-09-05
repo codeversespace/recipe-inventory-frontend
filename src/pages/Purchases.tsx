@@ -1,7 +1,10 @@
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
+  Card,
+  CardContent,
   CircularProgress,
   Dialog,
   DialogTitle,
@@ -30,7 +33,9 @@ import {
   usePackingMaterials,
   useAddManualStock, useAllPurchaseLots, useSuppliers,
 } from "../hooks/useApi";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { VoiceInput } from "../components/VoiceInput";
+import { fuzzyMatch, bestMatch } from "../utils/fuzzy";
 
 type PurchaseCategory = "raw_material" | "saleable_good" | "packing_material";
 
@@ -50,7 +55,6 @@ export const Purchases = () => {
   const [open, setOpen] = useState(false);
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
-  const [supplier, setSupplier] = useState("");
   const [reference, setReference] = useState("");
   const [lotNumber, setLotNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -64,7 +68,6 @@ export const Purchases = () => {
     setOpen(false);
     setQty("");
     setPrice("");
-    setSupplier("");
     setReference("");
     setLotNumber("");
     setExpiryDate("");
@@ -104,12 +107,13 @@ export const Purchases = () => {
       return;
     }
 
+    const selectedSupplier = suppliers.find((s: any) => s.id === supplierId);
     const payload = {
       ingredient_id: selectedIngredient,
       supplier_id: supplierId || undefined,
       qty: quantity,
       unit_price: unitPrice,
-      supplier: supplier || undefined,
+      supplier: selectedSupplier?.name || undefined,
       reference: reference || undefined,
       lot_number: lotNumber || undefined,
       expiry_date: expiryDate || undefined,
@@ -132,7 +136,8 @@ export const Purchases = () => {
     setEditingLot(lot);
     setQty(String(lot.qty));
     setPrice(String(lot.unit_price));
-    setSupplier(lot.supplier || "");
+    const matchSupplier = suppliers.find((s: any) => s.name === lot.supplier);
+    setSupplierId(matchSupplier?.id || 0);
     setReference(lot.reference || "");
     setLotNumber(lot.lot_number || "");
     setExpiryDate(lot.expiry_date || "");
@@ -147,13 +152,49 @@ export const Purchases = () => {
     }
   };
 
+  const handleVoiceResult = (resultJson: string) => {
+    try {
+      const parsed = JSON.parse(resultJson);
+      const matchIng = bestMatch(ingredients || [], parsed.name);
+      if (matchIng) setSelectedIngredient(matchIng.id);
+      const matchSup = bestMatch(suppliers, parsed.supplier || "");
+      if (matchSup) setSupplierId(matchSup.id);
+      setQty(parsed.qty ? String(parsed.qty) : "");
+      setPrice(parsed.price ? String(parsed.price) : "");
+      setCategory("raw_material");
+      setOpen(true);
+    } catch { /* ignore parse errors */ }
+  };
+
   const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
+
+  const supplierComparison = useMemo(() => {
+    if (!selectedIngredient || !allLots.length) return [];
+    const lotsForIngredient = allLots.filter((lot: any) => lot.ingredient.id === selectedIngredient);
+    const bySupplier: Record<string, { totalQty: number; totalCost: number; lots: number; avgPrice: number }> = {};
+    lotsForIngredient.forEach((lot: any) => {
+      const key = lot.supplier || "Unknown";
+      if (!bySupplier[key]) bySupplier[key] = { totalQty: 0, totalCost: 0, lots: 0, avgPrice: 0 };
+      bySupplier[key].totalQty += lot.qty;
+      bySupplier[key].totalCost += lot.qty * lot.unit_price;
+      bySupplier[key].lots += 1;
+    });
+    return Object.entries(bySupplier).map(([name, data]) => ({
+      name,
+      totalQty: data.totalQty,
+      avgPrice: data.totalQty > 0 ? data.totalCost / data.totalQty : 0,
+      lots: data.lots,
+    })).sort((a, b) => a.avgPrice - b.avgPrice);
+  }, [selectedIngredient, allLots]);
 
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h4" sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Purchases</Typography>
-        <Button variant="contained" size="small" onClick={() => { setEditingLot(null); resetForm(); setOpen(true); }} disabled={category === "raw_material" && !ingredients?.length} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Add Purchase</Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <VoiceInput onResult={handleVoiceResult} disabled={!ingredients?.length} label="Quick voice entry" />
+          <Button variant="contained" size="small" onClick={() => { setEditingLot(null); resetForm(); setOpen(true); }} disabled={category === "raw_material" && !ingredients?.length} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Add Purchase</Button>
+        </Box>
       </Box>
 
       <FormControl fullWidth size="small" margin="dense" sx={{ mb: 2 }}>
@@ -173,6 +214,31 @@ export const Purchases = () => {
               {ingredients?.map((ing: any) => <MenuItem key={ing.id} value={ing.id}>{ing.name}</MenuItem>)}
             </Select>
           </FormControl>
+
+          {/* Supplier Price Comparison */}
+          {selectedIngredient > 0 && supplierComparison.length > 1 && (
+            <Card sx={{ mb: 2, bgcolor: "grey.50" }}>
+              <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Supplier Price Comparison</Typography>
+                <TableContainer><Table size="small"><TableHead><TableRow>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Avg Price</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Total Qty</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Lots</TableCell>
+                </TableRow></TableHead><TableBody>
+                  {supplierComparison.map((s, i) => (
+                    <TableRow key={s.name}>
+                      <TableCell sx={{ ...cellSx, fontWeight: i === 0 ? 700 : 400 }}>{s.name} {i === 0 && "★"}</TableCell>
+                      <TableCell sx={{ ...cellSx, color: i === 0 ? "success.main" : "text.primary", fontWeight: i === 0 ? 700 : 400 }}>₹{s.avgPrice.toFixed(2)}</TableCell>
+                      <TableCell sx={cellSx}>{s.totalQty.toFixed(0)}</TableCell>
+                      <TableCell sx={cellSx}>{s.lots}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody></Table></TableContainer>
+              </CardContent>
+            </Card>
+          )}
+
           {allLotsLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={24} /></Box> : allLots.length ? (
               <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
                 <Table size="small">
@@ -215,12 +281,20 @@ export const Purchases = () => {
               </Select>
             </FormControl>
           )}
-          <FormControl fullWidth margin="dense"><InputLabel>Supplier</InputLabel><Select value={supplierId} label="Supplier" onChange={(event) => setSupplierId(Number(event.target.value))}><MenuItem value={0}>No supplier selected</MenuItem>{suppliers.map((supplier: any) => <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>)}</Select></FormControl>
+          <Autocomplete
+            options={suppliers}
+            getOptionLabel={(option: any) => option.name}
+            value={suppliers.find((s: any) => s.id === supplierId) || null}
+            onChange={(_, newValue) => setSupplierId(newValue?.id || 0)}
+            renderInput={(params) => <TextField {...params} margin="dense" label="Supplier" placeholder="Search suppliers..." />}
+            isOptionEqualToValue={(option: any, value: any) => option.id === value?.id}
+            fullWidth
+            size="small"
+          />
           <TextField margin="dense" label="Quantity" type="number" fullWidth value={qty} onChange={(event) => setQty(event.target.value)} />
           <TextField margin="dense" label="Unit Price (₹)" type="number" fullWidth value={price} onChange={(event) => setPrice(event.target.value)} />
           {category === "raw_material" && (
             <>
-              <TextField margin="dense" label="Supplier" fullWidth value={supplier} onChange={(event) => setSupplier(event.target.value)} />
               <TextField margin="dense" label="Invoice / reference number" fullWidth value={reference} onChange={(event) => setReference(event.target.value)} />
               <TextField margin="dense" label="Lot number" fullWidth value={lotNumber} onChange={(event) => setLotNumber(event.target.value)} />
               <TextField margin="dense" label="Expiry date" type="date" fullWidth value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />

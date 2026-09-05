@@ -2,6 +2,8 @@ import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAddCustomer, useAddSale, useCustomerPrices, useCustomerProfile, useCustomers, useSaleableStock, useUpdateCustomer, useSales } from "../hooks/useApi";
+import { VoiceInput } from "../components/VoiceInput";
+import { bestMatch } from "../utils/fuzzy";
 
 type SaleLine = { stock_item_id: number; quantity: number; unit_price: string };
 
@@ -69,9 +71,21 @@ export const CustomersSales = () => {
   };
   const saveSale = async () => {
     if (!saleLines.length) { setSaleError("Add at least one product to the sale."); return; }
+    const totalAmount = saleLines.reduce((sum, line) => sum + line.quantity * Number(line.unit_price), 0);
+    const paid = amountPaid ? Number(amountPaid) : 0;
+    const dueAmount = totalAmount - paid;
+    if (customerId > 0 && dueAmount > 0) {
+      const cust = customers.find((c: any) => c.id === customerId);
+      if (cust && cust.credit_limit > 0) {
+        const existingDue = cust.total_due || 0;
+        if (existingDue + dueAmount > cust.credit_limit) {
+          setSaleError(`Credit limit exceeded. Limit: ₹${cust.credit_limit.toFixed(0)}, Current due: ₹${existingDue.toFixed(0)}, This sale adds: ₹${dueAmount.toFixed(0)}`);
+          return;
+        }
+      }
+    }
     try {
-      const paid = amountPaid ? Number(amountPaid) : 0;
-      await addSale.mutateAsync({ customer_id: customerId || undefined, reference: saleReference || undefined, due_date: saleDueDate || undefined, payment_status: "PENDING", amount_paid: paid, payment_method: paymentMethod, payment_reference: paymentReference || undefined, lines: saleLines.map((line) => ({ stock_item_id: line.stock_item_id, quantity: line.quantity, unit_price: line.unit_price ? Number(line.unit_price) : undefined })) });
+      await addSale.mutateAsync({ customer_id: customerId || undefined, reference: saleReference || undefined, due_date: saleDueDate || undefined, payment_status: paid >= totalAmount ? "PAID" : paid > 0 ? "PARTIAL" : "PENDING", amount_paid: paid, payment_method: paymentMethod, payment_reference: paymentReference || undefined, lines: saleLines.map((line) => ({ stock_item_id: line.stock_item_id, quantity: line.quantity, unit_price: line.unit_price ? Number(line.unit_price) : undefined })) });
       setSaleOpen(false); setSaleLines([]); setEditingLineIndex(null); setSaleReference(""); setSaleDueDate(""); setAmountPaid(""); setPaymentReference(""); setPaymentMethod("CASH"); setCustomerId(0); setSaleError("");
     } catch (requestError: any) { setSaleError(requestError.response?.data?.detail || "Could not record sale."); }
   };
@@ -84,12 +98,27 @@ export const CustomersSales = () => {
     link.click();
     URL.revokeObjectURL(link.href);
   };
+
+  const handleSaleVoice = (json: string) => {
+    try {
+      const parsed = JSON.parse(json);
+      const matchItem = bestMatch(saleableStock, parsed.name);
+      if (matchItem) { setSaleRecipe(matchItem.id); setSalePrice(parsed.price ? String(parsed.price) : (matchItem.unit_price > 0 ? String(matchItem.unit_price) : "")); }
+      const matchCust = bestMatch(customers, parsed.customer || "");
+      if (matchCust) setCustomerId(matchCust.id);
+      setSaleQty(parsed.qty ? String(parsed.qty) : "");
+      if (parsed.price) setSalePrice(String(parsed.price));
+      setSaleLines([]);
+      setSaleError("");
+      setSaleOpen(true);
+    } catch { /* ignore */ }
+  };
   return <Box className="screen-content">
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, justifyContent: "space-between", alignItems: "center" }}><Typography variant="h4" gutterBottom>Customers & Sales</Typography></Box>
     {!salesOnly && <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
       <Card><CardContent><Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}><Typography variant="h6">Customers</Typography><Button variant="contained" onClick={() => { resetCustomer(); setCustomerOpen(true); }}>Add customer</Button></Box><Table size="small"><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Phone</TableCell><TableCell>Credit limit</TableCell><TableCell>Actions</TableCell></TableRow></TableHead><TableBody>{customers.map((item: any) => <TableRow key={item.id} hover onClick={() => navigate(`/customers/${item.id}`)} sx={{ cursor: "pointer" }}><TableCell>{item.name}</TableCell><TableCell>{item.phone || "—"}</TableCell><TableCell>₹{(item.credit_limit || 0).toFixed(2)}</TableCell><TableCell><Button size="small" onClick={(event) => { event.stopPropagation(); setEditingId(item.id); setCustomer({ name: item.name, phone: item.phone || "", email: item.email || "", address: item.address || "", credit_limit: item.credit_limit || 0 }); setCustomerOpen(true); }}>Edit</Button></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
     </Box>}
-    {salesOnly && <><Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, justifyContent: "space-between", alignItems: "center", mt: 4, mb: 2 }}><Typography variant="h6">Sales history</Typography><Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}><Button onClick={exportSales}>Export CSV</Button><Button onClick={() => window.print()}>Print</Button><Button variant="contained" onClick={() => { setSaleLines([]); setCustomerId(0); setSaleError(""); setSaleOpen(true); }}>Record sale</Button></Box></Box>
+    {salesOnly && <><Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, justifyContent: "space-between", alignItems: "center", mt: 4, mb: 2 }}><Typography variant="h6">Sales history</Typography><Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}><Button onClick={exportSales}>Export CSV</Button><Button onClick={() => window.print()}>Print</Button><VoiceInput onResult={handleSaleVoice} disabled={!saleableStock.length} label="Quick voice sale" variant="sale" /><Button variant="contained" onClick={() => { setSaleLines([]); setCustomerId(0); setSaleError(""); setSaleOpen(true); }}>Record sale</Button></Box></Box>
     <TableContainer component={Paper}><Table><TableHead><TableRow><TableCell>Invoice</TableCell><TableCell>Date</TableCell><TableCell>Customer</TableCell><TableCell>Products</TableCell><TableCell>Status</TableCell><TableCell>Total</TableCell><TableCell>Invoice</TableCell></TableRow></TableHead><TableBody>{sales.map((sale: any) => <TableRow key={sale.id}><TableCell>#{sale.id}{sale.reference ? ` · ${sale.reference}` : ""}</TableCell><TableCell>{new Date(sale.sold_at).toLocaleDateString()}</TableCell><TableCell>{sale.customer_name || "Walk-in"}</TableCell><TableCell>{sale.lines.map((line: any) =>     `${line.item_name || line.recipe_name} × ${line.quantity}`).join(", ")}</TableCell><TableCell>{sale.payment_status}</TableCell><TableCell>₹{sale.total_amount.toFixed(2)}</TableCell><TableCell><Button size="small" onClick={() => setInvoiceSale(sale)}>View / Print</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer>
     </>}
     <Dialog open={customerOpen} onClose={() => setCustomerOpen(false)}><DialogTitle>{editingId ? "Edit customer" : "Add customer"}</DialogTitle><DialogContent>{customerError && <Alert severity="error" sx={{ mt: 1 }}>{customerError}</Alert>}<TextField margin="dense" label="Name" fullWidth value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} /><TextField margin="dense" label="Phone" fullWidth value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} /><TextField margin="dense" label="Email" fullWidth value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} /><TextField margin="dense" label="Address" fullWidth multiline value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} /><TextField margin="dense" label="Credit limit" type="number" fullWidth value={customer.credit_limit} onChange={(e) => setCustomer({ ...customer, credit_limit: Number(e.target.value) })} /></DialogContent><DialogActions><Button onClick={() => setCustomerOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveCustomer}>Save</Button></DialogActions></Dialog>

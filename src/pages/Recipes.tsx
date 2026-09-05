@@ -27,6 +27,10 @@ export const Recipes = () => {
   const [newIngredientUnit, setNewIngredientUnit] = useState("");
   const [newIngredientMinStock, setNewIngredientMinStock] = useState("0");
   const [loadingAction, setLoadingAction] = useState("");
+  const [scaleOpen, setScaleOpen] = useState(false);
+  const [scaleRecipe, setScaleRecipe] = useState<any>(null);
+  const [scaleTarget, setScaleTarget] = useState("");
+  const [scaleLines, setScaleLines] = useState<{ name: string; qty: number; unit: string }[]>([]);
 
   const reset = () => {
     setName(""); setBatchQty(""); setBatchUnit("");
@@ -97,6 +101,18 @@ export const Recipes = () => {
 
   const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
 
+  const openScale = async (recipe: any) => {
+    try {
+      const { data } = await api.get(`/recipes/${recipe.id}/ingredients`);
+      setScaleRecipe(recipe);
+      setScaleTarget(String(recipe.batch_qty));
+      setScaleLines(data.map((line: any) => ({ name: line.ingredient.name, qty: line.qty_per_batch, unit: line.unit })));
+      setScaleOpen(true);
+    } catch { /* ignore */ }
+  };
+
+  const scaleMultiplier = scaleRecipe && Number(scaleTarget) > 0 ? Number(scaleTarget) / scaleRecipe.batch_qty : 1;
+
   return <Box>
     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
       <Typography variant="h4" sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Recipes</Typography>
@@ -104,7 +120,7 @@ export const Recipes = () => {
     </Box>
     {isLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box> : error ? <Typography color="error" sx={{ fontSize: "0.85rem" }}>{(error as Error).message}</Typography> :
       <TableContainer component={Paper} sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Name</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Batch</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell></TableRow></TableHead><TableBody>
-        {recipes.map((recipe) => <TableRow key={recipe.id}><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{recipe.name}</TableCell><TableCell sx={cellSx}>{recipe.batch_qty}</TableCell><TableCell sx={cellSx}>{recipe.batch_unit}</TableCell><TableCell sx={cellSx}><Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={async () => { setLoadingAction(`edit-${recipe.id}`); try { await editRecipe(recipe); } finally { setLoadingAction(""); } }}>{loadingAction === `edit-${recipe.id}` ? <CircularProgress size={14} /> : "Edit"}</Button><Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={async () => { setLoadingAction(`delete-${recipe.id}`); try { await removeRecipe(recipe); } finally { setLoadingAction(""); } }}>{loadingAction === `delete-${recipe.id}` ? <CircularProgress size={14} /> : "Del"}</Button></TableCell></TableRow>)}
+        {recipes.map((recipe) => <TableRow key={recipe.id}><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{recipe.name}</TableCell><TableCell sx={cellSx}>{recipe.batch_qty}</TableCell><TableCell sx={cellSx}>{recipe.batch_unit}</TableCell><TableCell sx={cellSx}><Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={() => openScale(recipe)}>Scale</Button><Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={async () => { setLoadingAction(`edit-${recipe.id}`); try { await editRecipe(recipe); } finally { setLoadingAction(""); } }}>{loadingAction === `edit-${recipe.id}` ? <CircularProgress size={14} /> : "Edit"}</Button><Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={!!loadingAction} onClick={async () => { setLoadingAction(`delete-${recipe.id}`); try { await removeRecipe(recipe); } finally { setLoadingAction(""); } }}>{loadingAction === `delete-${recipe.id}` ? <CircularProgress size={14} /> : "Del"}</Button></TableCell></TableRow>)}
       </TableBody></Table></TableContainer>}
     <Dialog open={open} onClose={close} maxWidth="sm" fullWidth><DialogTitle>{editingId ? "Edit Recipe" : "Add Recipe"}</DialogTitle><DialogContent>
       {formError && <Alert severity="error" sx={{ mt: 1 }}>{formError}</Alert>}
@@ -117,5 +133,21 @@ export const Recipes = () => {
       {lines.map((line) => <Box key={line.ingredientId} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{line.name}: {line.quantity} {line.unit}</Typography><Button size="small" color="error" onClick={() => setLines(lines.filter((item) => item.ingredientId !== line.ingredientId))}>Remove</Button></Box>)}
     </DialogContent><DialogActions><Button onClick={close} disabled={addRecipe.isPending || addRecipeIngredient.isPending}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || addRecipeIngredient.isPending}>{addRecipe.isPending || addRecipeIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
     <Dialog open={newIngredientOpen} onClose={() => setNewIngredientOpen(false)} maxWidth="xs" fullWidth><DialogTitle>New ingredient</DialogTitle><DialogContent>{formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}<TextField autoFocus margin="dense" label="Name" fullWidth value={newIngredientName} onChange={(event) => setNewIngredientName(event.target.value)} /><TextField margin="dense" label="Unit (kg, L, pcs)" fullWidth value={newIngredientUnit} onChange={(event) => setNewIngredientUnit(event.target.value)} /><TextField margin="dense" label="Minimum stock alert" type="number" fullWidth value={newIngredientMinStock} onChange={(event) => setNewIngredientMinStock(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setNewIngredientOpen(false)} disabled={addIngredient.isPending}>Cancel</Button><Button onClick={saveNewIngredient} variant="contained" disabled={addIngredient.isPending}>{addIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : "Add ingredient"}</Button></DialogActions></Dialog>
+    {/* Scale Calculator Dialog */}
+    <Dialog open={scaleOpen} onClose={() => setScaleOpen(false)} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>Scale Recipe: {scaleRecipe?.name}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Original batch: {scaleRecipe?.batch_qty} {scaleRecipe?.batch_unit}</Typography>
+        <TextField autoFocus margin="dense" label={`Target quantity (${scaleRecipe?.batch_unit})`} type="number" fullWidth size="small" value={scaleTarget} onChange={(e) => setScaleTarget(e.target.value)} />
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 700 }}>Scaled Ingredients ({scaleMultiplier.toFixed(2)}×)</Typography>
+        {scaleLines.map((line, i) => (
+          <Box key={i} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: 1, borderColor: "divider" }}>
+            <Typography variant="body2" sx={{ fontSize: "0.85rem" }}>{line.name}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{(line.qty * scaleMultiplier).toFixed(2)} {line.unit}</Typography>
+          </Box>
+        ))}
+      </DialogContent>
+      <DialogActions><Button onClick={() => setScaleOpen(false)} size="small">Close</Button></DialogActions>
+    </Dialog>
   </Box>;
 };

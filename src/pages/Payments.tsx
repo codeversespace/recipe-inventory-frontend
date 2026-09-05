@@ -1,8 +1,25 @@
 import { Alert, Autocomplete, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useSuppliers, useSupplierPayments } from "../hooks/useApi";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { VoiceInput } from "../components/VoiceInput";
+import { bestMatch } from "../utils/fuzzy";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <Card sx={{ p: 1, boxShadow: 3 }}>
+      <Typography variant="caption" sx={{ fontWeight: 700 }}>{label}</Typography>
+      {payload.map((entry: any, i: number) => (
+        <Typography key={i} variant="caption" sx={{ display: "block", color: entry.color }}>
+          {entry.name}: ₹{(entry.value || 0).toFixed(0)}
+        </Typography>
+      ))}
+    </Card>
+  );
+};
 
 export const Payments = () => {
   const { data: sales = [] } = usePaymentsSales();
@@ -22,6 +39,7 @@ export const Payments = () => {
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const { data: allHistory = [] } = usePaymentHistory(true);
   const { data: history = [], isFetching: historyLoading } = usePaymentHistory(historyOpen);
   const { data: supplierHistory = [] } = useSupplierPayments();
 
@@ -55,9 +73,57 @@ export const Payments = () => {
     return supplierHistory.filter((p: any) => p.supplier_name.toLowerCase().includes(q) || (p.reference || "").toLowerCase().includes(q));
   }, [supplierHistory, search]);
 
+  const handlePaymentVoice = (json: string) => {
+    try {
+      const parsed = JSON.parse(json);
+      setAmount(String(parsed.amount || ""));
+      setReference("");
+      setNotes("");
+      if (parsed.method) setMethod(parsed.method.toUpperCase());
+      if (tab === 0) {
+        const matchCust = bestMatch(customers, parsed.entity || "");
+        if (matchCust) setCustomer(matchCust);
+        setCustomerOpen(true);
+      } else {
+        const matchSup = bestMatch(suppliers, parsed.entity || "");
+        if (matchSup) setSupplier(matchSup);
+        setSupplierOpen(true);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const cashFlowData = useMemo(() => {
+    const totalCustomerPaid = allHistory.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+    const totalSupplierPaid = supplierHistory.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+    return [
+      { name: "Money In", "Customer Payments": totalCustomerPaid },
+      { name: "Money Out", "Supplier Payments": totalSupplierPaid },
+      { name: "Net", "Net Cash Flow": totalCustomerPaid - totalSupplierPaid },
+    ];
+  }, [allHistory, supplierHistory]);
+
   return <Box>
     <Typography variant="h4" sx={{ mb: 1, fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Payments</Typography>
     <Typography color="text.secondary" sx={{ mb: 2, fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Unified module for customer and supplier payments.</Typography>
+
+    {/* Cash Flow Summary Chart */}
+    <Card sx={{ mb: 2 }}>
+      <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cash Flow Overview</Typography>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <RechartsTooltip content={<CustomTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="Customer Payments" fill="#388e3c" radius={[4, 4, 0, 0]} barSize={30} />
+            <Bar dataKey="Supplier Payments" fill="#d32f2f" radius={[4, 4, 0, 0]} barSize={30} />
+            <Bar dataKey="Net Cash Flow" fill="#1976d2" radius={[4, 4, 0, 0]} barSize={30} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
 
     <Tabs value={tab} onChange={(_, v) => { setTab(v); setSearch(""); }} sx={{ mb: 2, minHeight: 40, "& .MuiTab-root": { minHeight: 40, py: 0, fontSize: { xs: "0.75rem", sm: "0.875rem" } } }}>
       <Tab label="Customer" />
@@ -73,6 +139,7 @@ export const Payments = () => {
       </Box>
       <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
         <TextField size="small" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
+        <VoiceInput onResult={handlePaymentVoice} label="Quick voice payment" variant="payment" />
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setCustomerOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Receive</Button>
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
@@ -101,6 +168,7 @@ export const Payments = () => {
       </Box>
       <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
         <TextField size="small" placeholder="Search supplier..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: 1, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
+        <VoiceInput onResult={handlePaymentVoice} label="Quick voice payment" variant="payment" />
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setNotes(""); setSupplierOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Payment</Button>
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>

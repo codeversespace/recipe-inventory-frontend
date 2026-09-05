@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { useIngredients, useAddIngredient, useDeleteIngredient, useUpdateIngredient, useInventory } from "../hooks/useApi";
 import { useState } from "react";
+import { VoiceInput } from "../components/VoiceInput";
 
 export const Ingredients = () => {
   const { data:ingredients = [], isLoading, error } = useIngredients();
@@ -64,9 +65,21 @@ export const Ingredients = () => {
     <Box>
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center", justifyContent: "space-between", mb: 2 }}>
         <Typography variant="h4">Ingredients</Typography>
-        <Button variant="contained" onClick={() => { setEditingId(null); setName(""); setUnit(""); setMinStock(""); setOpen(true); }}>
-          Add Ingredient
-        </Button>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          <VoiceInput onResult={(json) => {
+            try {
+              const parsed = JSON.parse(json);
+              setEditingId(null);
+              setName(parsed.name || "");
+              setUnit(parsed.unit || "");
+              setMinStock(parsed.minStock ? String(parsed.minStock) : "");
+              setOpen(true);
+            } catch { /* ignore */ }
+          }} label="Quick voice ingredient" variant="ingredient" />
+          <Button variant="contained" onClick={() => { setEditingId(null); setName(""); setUnit(""); setMinStock(""); setOpen(true); }}>
+            Add Ingredient
+          </Button>
+        </Box>
       </Box>
 
       {isLoading ? (

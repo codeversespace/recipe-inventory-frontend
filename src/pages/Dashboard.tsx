@@ -1,11 +1,12 @@
 import {
-  Box, Button, ButtonGroup, Card, CardContent, CircularProgress, IconButton, Stack, TextField,
+  Box, Button, Card, CardContent, CircularProgress, IconButton, Stack, TextField,
   Tooltip,
   Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useState } from "react";
 import { useDashboard } from "../hooks/useApi";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 
 const money = (value: number) => `₹${(value || 0).toFixed(0)}`;
 
@@ -38,6 +39,22 @@ const rangeFor = (range: string) => {
   return { start: dateValue(start), end: dateValue(end) };
 };
 
+const PIE_COLORS = ["#1976d2", "#388e3c", "#f57c00", "#d32f2f", "#7b1fa2", "#00796b", "#c2185b", "#5d4037"];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <Card sx={{ p: 1, boxShadow: 3 }}>
+      <Typography variant="caption" sx={{ fontWeight: 700 }}>{label}</Typography>
+      {payload.map((entry: any, i: number) => (
+        <Typography key={i} variant="caption" sx={{ display: "block", color: entry.color }}>
+          {entry.name}: ₹{(entry.value || 0).toFixed(0)}
+        </Typography>
+      ))}
+    </Card>
+  );
+};
+
 export const Dashboard = () => {
   const initialRange = rangeFor("last7");
   const [preset, setPreset] = useState("last7");
@@ -47,6 +64,18 @@ export const Dashboard = () => {
 
   if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>;
   if (isError) return <Typography color="error">Unable to load dashboard data.</Typography>;
+
+  const trendData = (data.trend || []).map((t: any) => ({
+    date: t.date.slice(5),
+    Revenue: t.revenue || 0,
+    Profit: t.profit || 0,
+  }));
+
+  const productData = (data.top_products || []).slice(0, 6).map((p: any, i: number) => ({
+    name: p.name,
+    value: p.revenue || 0,
+    fill: PIE_COLORS[i % PIE_COLORS.length],
+  }));
 
   return (
     <Box>
@@ -97,7 +126,66 @@ export const Dashboard = () => {
         ))}
       </Box>
 
-      {/* Operations & Alerts - stacked on mobile */}
+      {/* Charts Row */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
+        {/* Revenue & Profit Line Chart */}
+        <Card>
+          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Revenue & Profit Trend</Typography>
+            {trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <RechartsTooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="Revenue" stroke="#1976d2" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Profit" stroke="#388e3c" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Product Mix Donut Chart */}
+        <Card>
+          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales by Product</Typography>
+            {productData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={productData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {productData.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip formatter={(value: any) => `₹${Number(value).toFixed(0)}`} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No product data yet</Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Operations & Alerts */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
         <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
@@ -118,30 +206,23 @@ export const Dashboard = () => {
         </CardContent></Card>
       </Box>
 
-      {/* Trend & Products - stacked on mobile */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card><CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales trend</Typography>
+      {/* Top Products Table */}
+      <Card sx={{ mt: 2 }}>
+        <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Products</Typography>
           <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Date</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Revenue</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Profit</TableCell>
-          </TableRow></TableHead><TableBody>
-            {data.trend?.slice(-7).reverse().map((point: any) => <TableRow key={point.date}>
-              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{point.date.slice(5)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(point.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(point.profit)}</TableCell>
-            </TableRow>)}
-          </TableBody></Table></TableContainer>
-        </CardContent></Card>
-        <Card><CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top products</Typography>
-          <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Product</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Qty</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Revenue</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>Profit</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Product</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Qty</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
+            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Profit</TableCell>
           </TableRow></TableHead><TableBody>
             {data.top_products?.slice(0, 5).map((product: any) => <TableRow key={product.name}>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{product.name}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{product.quantity}</TableCell>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.profit)}</TableCell>
             </TableRow>)}
           </TableBody></Table></TableContainer>
-        </CardContent></Card>
-      </Box>
+        </CardContent>
+      </Card>
     </Box>
   );
 };

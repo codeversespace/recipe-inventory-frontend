@@ -1,6 +1,7 @@
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import { usePackBatch, usePackTypes, useReadyToPack } from "../hooks/useApi";
+import { VoiceInput } from "../components/VoiceInput";
 
 export const Packing = () => {
   const { data: batches = [], isLoading } = useReadyToPack();
@@ -27,8 +28,21 @@ export const Packing = () => {
     } catch (requestError: any) { setError(requestError.response?.data?.detail || "Could not record packing."); }
   };
   return <Box>
-    <Typography variant="h4" gutterBottom>Packing queue</Typography>
-    <Typography color="text.secondary" sx={{ mb: 3 }}>Search and pack prepared batches. Packed quantity becomes ready to ship.</Typography>
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Box>
+        <Typography variant="h4" gutterBottom>Packing queue</Typography>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>Search and pack prepared batches. Packed quantity becomes ready to ship.</Typography>
+      </Box>
+      <VoiceInput onResult={(json) => {
+        try {
+          const parsed = JSON.parse(json);
+          if (parsed.count) setCount(String(parsed.count));
+          if (parsed.employee) setEmployee(parsed.employee);
+          if (!selected && batches.length) setSelected(batches[0]);
+          setError("");
+        } catch { /* ignore */ }
+      }} label="Quick voice packing" variant="packing" />
+    </Box>
     {isLoading ? <CircularProgress /> : <Card><CardContent sx={{ p: { xs: 1.5, sm: 2.5 } }}>
       <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 2 }}><TextField size="small" label="Search batch or product" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} sx={{ flex: "1 1 240px" }} /><FormControl size="small" sx={{ minWidth: 170 }}><InputLabel>Status</InputLabel><Select value={statusFilter} label="Status" onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }}><MenuItem value="ALL">All statuses</MenuItem><MenuItem value="READY_TO_PACK">Ready to pack</MenuItem><MenuItem value="PARTIALLY_PACKED">Partially packed</MenuItem></Select></FormControl></Box>
       <TableContainer sx={{ maxHeight: "calc(100vh - 310px)", overflowX: "auto" }}><Table stickyHeader size="small" sx={{ minWidth: 760 }}><TableHead><TableRow><TableCell>Batch</TableCell><TableCell>Product</TableCell><TableCell>Produced</TableCell><TableCell>Packed / ship</TableCell><TableCell>Remaining</TableCell><TableCell>Status</TableCell><TableCell align="right">Action</TableCell></TableRow></TableHead><TableBody>{visibleBatches.length ? visibleBatches.map((batch: any) => <TableRow key={batch.id} hover><TableCell sx={{ fontWeight: 700 }}>#{batch.id}</TableCell><TableCell>{batch.recipe_name}</TableCell><TableCell>{batch.produced_qty} kg</TableCell><TableCell sx={{ color: "success.main" }}>{batch.packed_qty} kg</TableCell><TableCell sx={{ color: "warning.main" }}>{batch.remaining_qty} kg</TableCell><TableCell>{batch.status.replace("_", " ")}</TableCell><TableCell align="right"><Button size="small" variant="contained" onClick={() => setSelected(batch)}>Pack</Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={7} align="center">{batches.length ? "No batches match your filters." : "No batches are waiting to be packed."}</TableCell></TableRow>}</TableBody></Table></TableContainer>
