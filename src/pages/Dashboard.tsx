@@ -7,7 +7,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "../hooks/useApi";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 
 const money = (value: number) => `₹${(value || 0).toFixed(0)}`;
 
@@ -71,6 +71,17 @@ export const Dashboard = () => {
     date: t.date.slice(5),
     Revenue: t.revenue || 0,
     Profit: t.profit || 0,
+  }));
+
+  const costRevenueData = (data.trend || []).map((t: any) => ({
+    date: t.date.slice(5),
+    Cost: t.cost || 0,
+    Revenue: t.revenue || 0,
+  }));
+
+  const marginData = (data.trend || []).map((t: any) => ({
+    date: t.date.slice(5),
+    "Margin %": (t.revenue || 0) > 0 ? ((t.profit || 0) / t.revenue * 100) : 0,
   }));
 
   const productData = (data.top_products || []).slice(0, 6).map((p: any, i: number) => ({
@@ -187,6 +198,54 @@ export const Dashboard = () => {
             ) : (
               <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No product data yet</Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Cost vs Revenue & Margin % Trend */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
+        <Card>
+          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cost vs Revenue</Typography>
+            {costRevenueData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={costRevenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <RechartsTooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Cost" fill="#f57c00" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Revenue" fill="#1976d2" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Margin % Trend</Typography>
+            {marginData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={marginData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} unit="%" />
+                  <RechartsTooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="Margin %" stroke="#7b1fa2" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
               </Box>
             )}
           </CardContent>

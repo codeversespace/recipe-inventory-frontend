@@ -23,294 +23,160 @@ import {
   TableCell,
   TableBody,
   Typography,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
-  useIngredients,
-  useAddPurchaseLot,
-  useDeletePurchaseLot,
-  useUpdatePurchaseLot,
-  useManualStock,
-  usePackingMaterials,
-  useAddManualStock, useAllPurchaseLots, useSuppliers,
+  useAllSupplierPurchases,
+  useCreateSupplierPurchase,
+  useSuppliers,
 } from "../hooks/useApi";
 import { useState, useMemo } from "react";
-import { VoiceInput } from "../components/VoiceInput";
-import { fuzzyMatch, bestMatch } from "../utils/fuzzy";
-
-type PurchaseCategory = "raw_material" | "saleable_good" | "packing_material";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { formatDate } from "../utils/formatDate";
 
 export const Purchases = () => {
-  const { data: ingredients } = useIngredients();
-  const { data: saleableGoods = [] } = useManualStock();
-  const { data: packingMaterials = [] } = usePackingMaterials();
   const { data: suppliers = [] } = useSuppliers();
-  const [category, setCategory] = useState<PurchaseCategory>("raw_material");
-  const [selectedIngredient, setSelectedIngredient] = useState<number>(0);
-  const { data: allLots = [], isLoading: allLotsLoading, refetch: refetchAll } = useAllPurchaseLots();
-  const addLot = useAddPurchaseLot();
-  const updateLot = useUpdatePurchaseLot();
-  const deleteLot = useDeletePurchaseLot();
-  const addSaleableGood = useAddManualStock();
+  const { data: purchases = [], isLoading } = useAllSupplierPurchases();
+  const createPurchase = useCreateSupplierPurchase();
 
   const [open, setOpen] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const [supplierId, setSupplierId] = useState(0);
+  const [category, setCategory] = useState("raw_material");
+  const [itemName, setItemName] = useState("");
+  const [unit, setUnit] = useState("kg");
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [reference, setReference] = useState("");
-  const [lotNumber, setLotNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [saleableName, setSaleableName] = useState("");
-  const [saleableUnit, setSaleableUnit] = useState("pcs");
-  const [editingLot, setEditingLot] = useState<any>(null);
-  const [formError, setFormError] = useState("");
-  const [supplierId, setSupplierId] = useState(0);
+  const [payNow, setPayNow] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [paymentReference, setPaymentReference] = useState("");
 
   const resetForm = () => {
     setOpen(false);
+    setFormError("");
+    setSupplierId(0);
+    setCategory("raw_material");
+    setItemName("");
+    setUnit("kg");
     setQty("");
     setPrice("");
     setReference("");
-    setLotNumber("");
-    setExpiryDate("");
-    setSaleableName("");
-    setSaleableUnit("pcs");
-    setEditingLot(null);
-    setSupplierId(0);
-    setFormError("");
+    setPayNow(false);
+    setPaymentAmount("");
+    setPaymentMethod("CASH");
+    setPaymentReference("");
   };
 
   const handleAdd = async () => {
     const quantity = parseFloat(qty);
     const unitPrice = parseFloat(price);
-    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
-      setFormError("Enter a valid quantity and unit price.");
-      return;
+    if (!supplierId) { setFormError("Select a supplier."); return; }
+    if (!itemName.trim()) { setFormError("Enter item name."); return; }
+    if (!Number.isFinite(quantity) || quantity <= 0) { setFormError("Enter a valid quantity."); return; }
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) { setFormError("Enter a valid unit price."); return; }
+
+    const total = quantity * unitPrice;
+    let paymentAmt = 0;
+    if (payNow) {
+      paymentAmt = parseFloat(paymentAmount) || total;
+      if (paymentAmt > total + 0.01) { setFormError("Payment cannot exceed total amount."); return; }
     }
 
-    if (category !== "raw_material") {
-      if (!saleableName.trim() || !saleableUnit.trim()) {
-        setFormError("Enter a product name and unit.");
-        return;
-      }
-      try {
-        await addSaleableGood.mutateAsync({
-        name: saleableName.trim(),
-        qty: quantity,
-        unit: saleableUnit.trim(),
+    try {
+      await createPurchase.mutateAsync({
+        supplier_id: supplierId,
+        category,
+        item_name: itemName.trim(),
+        unit: unit.trim() || "kg",
+        quantity,
         unit_price: unitPrice,
-        category: category === "packing_material" ? "packing_material" : "saleable_good",
-        supplier_id: supplierId || undefined,
-        });
-        resetForm();
-      } catch (requestError: any) {
-        setFormError(requestError.response?.data?.detail || "Could not save purchase.");
-      }
-      return;
-    }
-
-    const selectedSupplier = suppliers.find((s: any) => s.id === supplierId);
-    const payload = {
-      ingredient_id: selectedIngredient,
-      supplier_id: supplierId || undefined,
-      qty: quantity,
-      unit_price: unitPrice,
-      supplier: selectedSupplier?.name || undefined,
-      reference: reference || undefined,
-      lot_number: lotNumber || undefined,
-      expiry_date: expiryDate || undefined,
-    };
-    if (!selectedIngredient) {
-      setFormError("Select an ingredient.");
-      return;
-    }
-    try {
-      if (editingLot) await updateLot.mutateAsync({ ...payload, id: editingLot.id });
-      else await addLot.mutateAsync(payload);
+        reference: reference || undefined,
+        payment_amount: payNow ? paymentAmt : undefined,
+        payment_method: paymentMethod,
+        payment_reference: paymentReference || undefined,
+      });
       resetForm();
-      refetchAll();
-    } catch (requestError: any) {
-      setFormError(requestError.response?.data?.detail || "Could not save purchase.");
+    } catch (e: any) {
+      setFormError(e.response?.data?.detail || "Could not save purchase.");
     }
   };
 
-  const editLot = (lot: any) => {
-    setEditingLot(lot);
-    setQty(String(lot.qty));
-    setPrice(String(lot.unit_price));
-    const matchSupplier = suppliers.find((s: any) => s.name === lot.supplier);
-    setSupplierId(matchSupplier?.id || 0);
-    setReference(lot.reference || "");
-    setLotNumber(lot.lot_number || "");
-    setExpiryDate(lot.expiry_date || "");
-    setCategory("raw_material");
-    setOpen(true);
-  };
+  const totalAmount = (parseFloat(qty) || 0) * (parseFloat(price) || 0);
 
-  const removeLot = async (lot: any) => {
-    if (window.confirm(`Delete purchase lot ${lot.id}?`)) {
-      await deleteLot.mutateAsync({ ingredient_id: lot.ingredient.id, id: lot.id });
-      refetchAll();
-    }
-  };
-
-  const handleVoiceResult = (resultJson: string) => {
-    try {
-      const parsed = JSON.parse(resultJson);
-      const shared = parsed.shared || {};
-      const items = parsed.items || [];
-      if (!items.length) return;
-
-      // Apply shared supplier to all items
-      if (shared.supplier) {
-        const matchSup = bestMatch(suppliers, shared.supplier);
-        if (matchSup) setSupplierId(matchSup.id);
-      }
-
-      if (items.length === 1) {
-        // Single item: open form for review
-        const item = items[0];
-        const matchIng = bestMatch(ingredients || [], item.name);
-        if (matchIng) setSelectedIngredient(matchIng.id);
-        setQty(item.qty ? String(item.qty) : "");
-        setPrice(item.price ? String(item.price) : "");
-        setCategory("raw_material");
-        setOpen(true);
-      } else {
-        // Multiple items: batch add all directly
-        setCategory("raw_material");
-        let added = 0;
-        for (const item of items) {
-          const matchIng = bestMatch(ingredients || [], item.name);
-          if (!matchIng) continue;
-          const qty = Number(item.qty);
-          const price = Number(item.price);
-          if (!qty || !price) continue;
-          addLot.mutate({
-            ingredient_id: matchIng.id,
-            supplier_id: supplierId || shared.supplier ? (bestMatch(suppliers, shared.supplier || "")?.id || undefined) : undefined,
-            qty, unit_price: price,
-            supplier: shared.supplier || undefined,
-          }, { onSuccess: () => added++ });
-        }
-        if (added > 0) refetchAll();
-      }
-    } catch { /* ignore parse errors */ }
-  };
+  const priceHistory = useMemo(() => {
+    const history: Record<string, { date: string; price: number }[]> = {};
+    purchases.forEach((p: any) => {
+      history[p.item_name] = history[p.item_name] || [];
+      history[p.item_name].push({
+        date: p.purchased_at?.slice(0, 10) || "",
+        price: p.unit_price,
+      });
+    });
+    return history;
+  }, [purchases]);
 
   const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
-
-  const supplierComparison = useMemo(() => {
-    if (!selectedIngredient || !allLots.length) return [];
-    const lotsForIngredient = allLots.filter((lot: any) => lot.ingredient.id === selectedIngredient);
-    const bySupplier: Record<string, { totalQty: number; totalCost: number; lots: number; avgPrice: number }> = {};
-    lotsForIngredient.forEach((lot: any) => {
-      const key = lot.supplier || "Unknown";
-      if (!bySupplier[key]) bySupplier[key] = { totalQty: 0, totalCost: 0, lots: 0, avgPrice: 0 };
-      bySupplier[key].totalQty += lot.qty;
-      bySupplier[key].totalCost += lot.qty * lot.unit_price;
-      bySupplier[key].lots += 1;
-    });
-    return Object.entries(bySupplier).map(([name, data]) => ({
-      name,
-      totalQty: data.totalQty,
-      avgPrice: data.totalQty > 0 ? data.totalCost / data.totalQty : 0,
-      lots: data.lots,
-    })).sort((a, b) => a.avgPrice - b.avgPrice);
-  }, [selectedIngredient, allLots]);
 
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="h4" sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Purchases</Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <VoiceInput onResult={handleVoiceResult} disabled={!ingredients?.length} label="Quick voice entry" />
-          <Button variant="contained" size="small" onClick={() => { setEditingLot(null); resetForm(); setOpen(true); }} disabled={category === "raw_material" && !ingredients?.length} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Add Purchase</Button>
-        </Box>
+        <Button variant="contained" size="small" onClick={() => { resetForm(); setOpen(true); }} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Add Purchase</Button>
       </Box>
 
-      <FormControl fullWidth size="small" margin="dense" sx={{ mb: 2 }}>
-        <InputLabel>Category</InputLabel>
-        <Select value={category} label="Category" onChange={(event) => setCategory(event.target.value as PurchaseCategory)}>
-          <MenuItem value="raw_material">Raw material</MenuItem>
-          <MenuItem value="saleable_good">Saleable good</MenuItem>
-          <MenuItem value="packing_material">Packing material</MenuItem>
-        </Select>
-      </FormControl>
-
-      {category === "raw_material" ? (
-        <>
-          <FormControl fullWidth size="small" margin="dense" sx={{ mb: 1 }}>
-            <InputLabel>Ingredient</InputLabel>
-            <Select value={selectedIngredient} label="Ingredient" onChange={(event) => setSelectedIngredient(event.target.value as number)}>
-              {ingredients?.map((ing: any) => <MenuItem key={ing.id} value={ing.id}>{ing.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-
-          {/* Supplier Price Comparison */}
-          {selectedIngredient > 0 && supplierComparison.length > 1 && (
-            <Card sx={{ mb: 2, bgcolor: "grey.50" }}>
-              <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Supplier Price Comparison</Typography>
-                <TableContainer><Table size="small"><TableHead><TableRow>
-                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell>
-                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Avg Price</TableCell>
-                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Total Qty</TableCell>
-                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Lots</TableCell>
-                </TableRow></TableHead><TableBody>
-                  {supplierComparison.map((s, i) => (
-                    <TableRow key={s.name}>
-                      <TableCell sx={{ ...cellSx, fontWeight: i === 0 ? 700 : 400 }}>{s.name} {i === 0 && "★"}</TableCell>
-                      <TableCell sx={{ ...cellSx, color: i === 0 ? "success.main" : "text.primary", fontWeight: i === 0 ? 700 : 400 }}>₹{s.avgPrice.toFixed(2)}</TableCell>
-                      <TableCell sx={cellSx}>{s.totalQty.toFixed(0)}</TableCell>
-                      <TableCell sx={cellSx}>{s.lots}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody></Table></TableContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {allLotsLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={24} /></Box> : allLots.length ? (
-              <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-                <Table size="small">
-                  <TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Price</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell></TableRow></TableHead>
-                  <TableBody>{allLots.map((lot: any) => (
-                    <TableRow key={lot.id}>
-                      <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{lot.ingredient.name}</TableCell><TableCell sx={cellSx}>{lot.qty}</TableCell><TableCell sx={cellSx}>₹{lot.unit_price}</TableCell><TableCell sx={cellSx}>{lot.supplier || "—"}</TableCell>
-                      <TableCell sx={cellSx}><Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={deleteLot.isPending || updateLot.isPending} onClick={() => { setSelectedIngredient(lot.ingredient.id); editLot(lot); }}>Edit</Button><Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} disabled={deleteLot.isPending || updateLot.isPending} onClick={() => removeLot(lot)}>{deleteLot.isPending ? <CircularProgress size={14} /> : "Del"}</Button></TableCell>
-                    </TableRow>
-                  ))}</TableBody>
-                </Table>
-              </TableContainer>
-            ) : <Typography sx={{ mt: 2, fontSize: "0.85rem", color: "text.secondary" }}>No raw-material purchases recorded.</Typography>}
-        </>
-      ) : (
+      {isLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={24} /></Box>
+      ) : purchases.length ? (
         <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
           <Table size="small">
-            <TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>{category === "packing_material" ? "Material" : "Item"}</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell></TableRow></TableHead>
-            <TableBody>{(category === "packing_material" ? packingMaterials : saleableGoods).length ? (category === "packing_material" ? packingMaterials : saleableGoods).map((item: any) => (
-              <TableRow key={item.id}><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{item.name}</TableCell><TableCell sx={cellSx}>{item.qty}</TableCell><TableCell sx={cellSx}>{item.unit}</TableCell><TableCell sx={cellSx}>₹{item.unit_price}</TableCell></TableRow>
-            )) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No purchases recorded.</TableCell></TableRow>}</TableBody>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Item</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Category</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Price</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Trend</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Total</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Reference</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {purchases.map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell sx={cellSx}>{formatDate(p.purchased_at)}</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{p.supplier_name || "—"}</TableCell>
+                  <TableCell sx={cellSx}>{p.item_name}</TableCell>
+                  <TableCell sx={cellSx}>{p.category}</TableCell>
+                  <TableCell sx={cellSx}>{p.quantity} {p.unit}</TableCell>
+                  <TableCell sx={cellSx}>₹{p.unit_price.toFixed(2)}</TableCell>
+                  <TableCell sx={cellSx}>
+                    <ResponsiveContainer width={80} height={24}>
+                      <LineChart data={(priceHistory[p.item_name] || []).slice(-5)}>
+                        <Line type="monotone" dataKey="price" stroke="#1976d2" strokeWidth={1.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>₹{p.total_amount.toFixed(2)}</TableCell>
+                  <TableCell sx={cellSx}>{p.reference || "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
           </Table>
         </TableContainer>
+      ) : (
+        <Typography sx={{ mt: 2, fontSize: "0.85rem", color: "text.secondary" }}>No purchases recorded yet.</Typography>
       )}
 
-      <Dialog open={open} onClose={resetForm}>
-        <DialogTitle>{category === "saleable_good" ? "Add Saleable Good Purchase" : category === "packing_material" ? "Add Packing Material Purchase" : editingLot ? "Edit Raw Material Purchase" : "Add Raw Material Purchase"}</DialogTitle>
+      <Dialog open={open} onClose={resetForm} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Purchase</DialogTitle>
         <DialogContent>
           {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
-          {category !== "raw_material" ? (
-            <>
-              <TextField margin="dense" label="Product name" fullWidth value={saleableName} onChange={(event) => setSaleableName(event.target.value)} />
-              <TextField margin="dense" label="Unit" fullWidth value={saleableUnit} onChange={(event) => setSaleableUnit(event.target.value)} />
-            </>
-          ) : (
-            <FormControl fullWidth margin="dense">
-              <InputLabel>Ingredient</InputLabel>
-              <Select value={selectedIngredient} label="Ingredient" onChange={(event) => setSelectedIngredient(event.target.value as number)}>
-                {ingredients?.map((ing: any) => <MenuItem key={ing.id} value={ing.id}>{ing.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          )}
           <Autocomplete
             options={suppliers}
             getOptionLabel={(option: any) => option.name}
@@ -321,17 +187,58 @@ export const Purchases = () => {
             fullWidth
             size="small"
           />
-          <TextField margin="dense" label="Quantity" type="number" fullWidth value={qty} onChange={(event) => setQty(event.target.value)} />
-          <TextField margin="dense" label="Unit Price (₹)" type="number" fullWidth value={price} onChange={(event) => setPrice(event.target.value)} />
-          {category === "raw_material" && (
-            <>
-              <TextField margin="dense" label="Invoice / reference number" fullWidth value={reference} onChange={(event) => setReference(event.target.value)} />
-              <TextField margin="dense" label="Lot number" fullWidth value={lotNumber} onChange={(event) => setLotNumber(event.target.value)} />
-              <TextField margin="dense" label="Expiry date" type="date" fullWidth value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
-            </>
+          <FormControl fullWidth margin="dense" size="small">
+            <InputLabel>Category</InputLabel>
+            <Select value={category} label="Category" onChange={(e) => setCategory(e.target.value)}>
+              <MenuItem value="raw_material">Raw material</MenuItem>
+              <MenuItem value="saleable_good">Saleable good</MenuItem>
+              <MenuItem value="packing_material">Packing material</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField margin="dense" label="Item name" fullWidth value={itemName} onChange={(e) => setItemName(e.target.value)} />
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <TextField margin="dense" label="Quantity" type="number" fullWidth value={qty} onChange={(e) => setQty(e.target.value)} />
+            <TextField margin="dense" label="Unit" fullWidth value={unit} onChange={(e) => setUnit(e.target.value)} sx={{ maxWidth: 120 }} />
+          </Box>
+          <TextField margin="dense" label="Unit Price (₹)" type="number" fullWidth value={price} onChange={(e) => setPrice(e.target.value)} />
+          {totalAmount > 0 && (
+            <Typography variant="body2" sx={{ mt: 1, fontWeight: 700, color: "primary.main" }}>Total: ₹{totalAmount.toFixed(2)}</Typography>
           )}
+          <TextField margin="dense" label="Invoice / reference" fullWidth value={reference} onChange={(e) => setReference(e.target.value)} />
+
+          <Box sx={{ mt: 2, p: 1.5, bgcolor: "grey.50", borderRadius: 1 }}>
+            <FormControlLabel
+              control={<Checkbox checked={payNow} onChange={(e) => {
+                setPayNow(e.target.checked);
+                if (e.target.checked && totalAmount > 0) setPaymentAmount(String(totalAmount.toFixed(2)));
+              }} />}
+              label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Record payment now</Typography>}
+            />
+            {payNow && (
+              <Box sx={{ mt: 1 }}>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <TextField margin="dense" label="Payment amount (₹)" type="number" fullWidth value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} size="small" />
+                  <FormControl sx={{ minWidth: 120 }} size="small" margin="dense">
+                    <InputLabel>Method</InputLabel>
+                    <Select value={paymentMethod} label="Method" onChange={(e) => setPaymentMethod(e.target.value)}>
+                      <MenuItem value="CASH">Cash</MenuItem>
+                      <MenuItem value="BANK_TRANSFER">Bank Transfer</MenuItem>
+                      <MenuItem value="UPI">UPI</MenuItem>
+                      <MenuItem value="CHEQUE">Cheque</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                <TextField margin="dense" label="Payment reference" fullWidth value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} size="small" />
+              </Box>
+            )}
+          </Box>
         </DialogContent>
-        <DialogActions><Button onClick={resetForm} disabled={addLot.isPending || updateLot.isPending || addSaleableGood.isPending}>Cancel</Button><Button onClick={handleAdd} variant="contained" disabled={addLot.isPending || updateLot.isPending || addSaleableGood.isPending}>{addLot.isPending || updateLot.isPending || addSaleableGood.isPending ? <CircularProgress size={20} color="inherit" /> : "Save"}</Button></DialogActions>
+        <DialogActions>
+          <Button onClick={resetForm} disabled={createPurchase.isPending}>Cancel</Button>
+          <Button onClick={handleAdd} variant="contained" disabled={createPurchase.isPending}>
+            {createPurchase.isPending ? <CircularProgress size={20} color="inherit" /> : "Save"}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

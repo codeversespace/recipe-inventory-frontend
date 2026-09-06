@@ -39,6 +39,24 @@ export const useAddSupplier = () => {
   });
 };
 
+export const useAllSupplierPurchases = () =>
+  useQuery<any[], Error>({
+    queryKey: ["supplierPurchases", "all"],
+    queryFn: async () => (await api.get("/suppliers/purchases/all")).data,
+    initialData: [],
+  });
+
+export const useCreateSupplierPurchase = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, any>({
+    mutationFn: (payload) => api.post("/suppliers/purchases", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
+};
+
 export const useAddSupplierPayment = () => {
   const qc = useQueryClient();
   return useMutation<any, Error, { supplierId: number; amount: number; method: string; reference?: string; notes?: string }>({
@@ -125,8 +143,8 @@ export const useUpdateIngredient = () => {
 
 export const useDeleteIngredient = () => {
   const qc = useQueryClient();
-  return useMutation<void, any, number>({
-    mutationFn: (id) => api.delete(`/ingredients/${id}`),
+  return useMutation<void, any, { id: number; force?: boolean }>({
+    mutationFn: ({ id, force }) => api.delete(`/ingredients/${id}`, { params: force ? { force: true } : {} }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
   });
 };
@@ -150,7 +168,7 @@ export const usePurchaseLots = (ingredientId?: number) =>
 export const useAllPurchaseLots = () =>
   useQuery<PurchaseLot[], Error>({
     queryKey: ["purchaseLots", "all"],
-    queryFn: async () => (await api.get<PurchaseLot[]>("/ingredients/lots/all")).data,
+    queryFn: async () => (await api.get<PurchaseLot[]>("/ingredients/lots/all", { params: { source: "purchase" } })).data,
     initialData: [],
   });
 
@@ -575,3 +593,106 @@ export const useUpdateOrderStatus = () => {
 
 export const useOrderDemand = () =>
   useQuery<any[], Error>({ queryKey: ["orderDemand"], queryFn: async () => (await api.get("/orders/demand")).data, initialData: [] });
+
+/* ------------------------------------------------------------------ */
+/* Processing                                                           */
+/* ------------------------------------------------------------------ */
+export const useProcessors = () =>
+  useQuery<any[], Error>({ queryKey: ["processors"], queryFn: async () => (await api.get("/processing/processors")).data, initialData: [] });
+
+export const useCreateProcessor = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { name: string; phone?: string; address?: string }>({
+    mutationFn: (payload) => api.post("/processing/processors", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["processors"] }),
+  });
+};
+
+export const useDeleteProcessor = () => {
+  const qc = useQueryClient();
+  return useMutation<void, Error, number>({
+    mutationFn: (id) => api.delete(`/processing/processors/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["processors"] }),
+  });
+};
+
+export const useProcessingOrders = (params?: { processor_id?: number; start_date?: string; end_date?: string }) =>
+  useQuery<any[], Error>({
+    queryKey: ["processingOrders", params],
+    queryFn: async () => (await api.get("/processing", { params })).data,
+    initialData: [],
+  });
+
+export const useCreateProcessingOrder = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { raw_ingredient_id: number; processor_id: number; quantity_sent: number; cost_per_expected_kg: number; notes?: string }>({
+    mutationFn: (payload) => api.post("/processing", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["processingOrders"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+};
+
+export const useReceiveProcessing = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { orderId: number; quantity_received: number }>({
+    mutationFn: ({ orderId, ...payload }) => api.post(`/processing/${orderId}/receive`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["processingOrders"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+};
+
+export const useProcessingPayment = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { orderId: number; amount: number; method?: string; reference?: string }>({
+    mutationFn: ({ orderId, ...payload }) => api.post(`/processing/${orderId}/payments`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["processingOrders"] }),
+  });
+};
+
+export const useCollectiveProcessingPayment = () => {
+  const qc = useQueryClient();
+  return useMutation<any[], Error, { processor_id: number; amount: number; method?: string; reference?: string }>({
+    mutationFn: (payload) => api.post("/processing/pay", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["processingOrders"] }),
+  });
+};
+
+export const useDeleteProcessingOrder = () => {
+  const qc = useQueryClient();
+  return useMutation<void, Error, number>({
+    mutationFn: (orderId) => api.delete(`/processing/${orderId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["processingOrders"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+    },
+  });
+};
+
+export const useProcessingPayments = () =>
+  useQuery<any[], Error>({
+    queryKey: ["processingOrders"],
+    queryFn: async () => (await api.get("/processing")).data,
+    initialData: [],
+    select: (orders: any[]) => {
+      const expenses: any[] = [];
+      for (const order of orders) {
+        for (const p of order.payments || []) {
+          expenses.push({
+            id: p.id,
+            date: p.paid_at,
+            amount: p.amount,
+            method: p.method,
+            reference: p.reference,
+            processor_name: order.processor_name,
+            raw_ingredient: order.raw_ingredient_name,
+            order_id: order.id,
+          });
+        }
+      }
+      return expenses.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    },
+  });

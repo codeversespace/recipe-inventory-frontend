@@ -16,6 +16,8 @@ import { Settings } from "./pages/Settings";
 import { PackTypes } from "./pages/PackTypes";
 import { Suppliers } from "./pages/Suppliers";
 import { Orders } from "./pages/Orders";
+import { Processing } from "./pages/Processing";
+import { ProductionScheduler } from "./pages/ProductionScheduler";
 import { Login } from "./pages/Login";
 import { useAuth } from "./auth/AuthContext";
 
@@ -58,6 +60,8 @@ function App() {
           <Route path="/packing" element={<RoleRoute roles={["super_admin", "admin", "manager", "packing"]}><Packing /></RoleRoute>} />
           <Route path="/payments" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "inventory"]}><Payments /></RoleRoute>} />
           <Route path="/orders" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "production"]}><Orders /></RoleRoute>} />
+          <Route path="/processing" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Processing /></RoleRoute>} />
+          <Route path="/production-scheduler" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><ProductionScheduler /></RoleRoute>} />
           <Route path="/pack-types" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><PackTypes /></RoleRoute>} />
           <Route path="/settings" element={<RoleRoute roles={["super_admin"]}><Settings /></RoleRoute>} />
         </Routes>

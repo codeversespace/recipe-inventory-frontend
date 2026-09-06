@@ -4,18 +4,22 @@ export interface Ingredient {
   name: string;
   base_unit: string;
   min_stock: number;
+  on_hand_qty?: number;
+  avg_unit_price?: number;
 }
 
 export interface PurchaseLot {
   id: number;
   ingredient: string;         // name of the ingredient (joined by the back‑end)
   qty: number;
+  purchased_qty: number;
   unit_price: number;
   received_at: string;       // ISO date string
   supplier?: string | null;
   reference?: string | null;
   lot_number?: string | null;
   expiry_date?: string | null;
+  source: string;
 }
 
 export interface Recipe {

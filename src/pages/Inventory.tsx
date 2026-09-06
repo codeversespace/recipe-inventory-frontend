@@ -1,36 +1,13 @@
 import { Alert, Box, Card, CardContent, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
-import { useInventory, useOrderDemand, useSaleableStock } from "../hooks/useApi";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from "recharts";
+import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials } from "../hooks/useApi";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
-
-const CustomBarTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <Card sx={{ p: 1, boxShadow: 3 }}>
-      <Typography variant="caption" sx={{ fontWeight: 700 }}>{label}</Typography>
-      {payload.map((entry: any, i: number) => (
-        <Typography key={i} variant="caption" sx={{ display: "block", color: entry.color }}>
-          {entry.name}: {entry.value} ({entry.payload?.unit || ""})
-        </Typography>
-      ))}
-    </Card>
-  );
-};
 
 export const Inventory = () => {
   const { data: saleableStock = [], isLoading, error } = useSaleableStock();
   const { data: rawMaterials = [], isLoading: rawMaterialsLoading, error: rawMaterialsError } = useInventory();
   const { data: orderDemand = [] } = useOrderDemand();
-
-  const stockBarData = rawMaterials.map((item: any) => ({
-    name: item.name.length > 12 ? item.name.slice(0, 12) + "..." : item.name,
-    fullName: item.name,
-    "On Hand": item.on_hand_qty || 0,
-    "Min Stock": item.min_stock || 0,
-    unit: item.base_unit,
-    isLow: item.is_low_stock,
-  }));
+  const { data: packingMaterials = [] } = usePackingMaterials();
 
   return (
     <Box>
@@ -57,6 +34,7 @@ export const Inventory = () => {
               <TableCell sx={{ ...cellSx, fontWeight: 700, display: { xs: "none", sm: "table-cell" } }}>Production Needed</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Price</TableCell>
+              <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Turnover</TableCell>
             </TableRow></TableHead>
             <TableBody>
               {saleableStock.length ? saleableStock.map((item: any) => {
@@ -82,11 +60,21 @@ export const Inventory = () => {
                     </TableCell>
                     <TableCell sx={cellSx}>{item.cost_per_unit > 0 ? `₹${item.cost_per_unit.toFixed(0)}` : "—"}</TableCell>
                     <TableCell sx={cellSx}>{item.unit_price > 0 ? `₹${item.unit_price.toFixed(0)}` : "—"}</TableCell>
+                    <TableCell sx={cellSx}>
+                      {(() => {
+                        if (item.cost_per_unit > 0 && item.unit_price > 0) {
+                          const margin = ((item.unit_price - item.cost_per_unit) / item.unit_price) * 100;
+                          const color = margin > 30 ? "success.main" : margin >= 15 ? "warning.main" : "error.main";
+                          return <Chip label={`${margin.toFixed(0)}% margin`} size="small" sx={{ fontSize: "0.65rem", height: 20, color, fontWeight: 600 }} />;
+                        }
+                        return "—";
+                      })()}
+                    </TableCell>
                   </TableRow>
                 );
               }) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ ...cellSx, py: 3 }}>No saleable goods in stock.</TableCell>
+                  <TableCell colSpan={8} align="center" sx={{ ...cellSx, py: 3 }}>No saleable goods in stock.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -108,34 +96,6 @@ export const Inventory = () => {
 
       {/* Raw Materials */}
       <Typography variant="h5" sx={{ mb: 1, fontSize: { xs: "1.1rem", sm: "1.25rem" }, fontWeight: 700 }}>Raw Materials</Typography>
-
-      {/* Stock Level Bar Chart */}
-      {!rawMaterialsLoading && stockBarData.length > 0 && (
-        <Card sx={{ mb: 2 }}>
-          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Stock Levels vs Minimum Threshold</Typography>
-            <ResponsiveContainer width="100%" height={Math.max(200, stockBarData.length * 30)}>
-              <BarChart
-                data={stockBarData}
-                layout="vertical"
-                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 10 }} />
-                <RechartsTooltip content={<CustomBarTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="On Hand" fill="#1976d2" radius={[0, 4, 4, 0]} barSize={12}>
-                  {stockBarData.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.isLow ? "#f57c00" : "#1976d2"} />
-                  ))}
-                </Bar>
-                <Bar dataKey="Min Stock" fill="#e0e0e0" radius={[0, 4, 4, 0]} barSize={12} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       {rawMaterialsLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box> : rawMaterialsError ? (
         <Typography color="error" sx={{ fontSize: "0.85rem" }}>{(rawMaterialsError as any).message}</Typography>
@@ -160,6 +120,45 @@ export const Inventory = () => {
           </Table>
         </TableContainer>
       )}
+
+      {(() => {
+        const reorderItems = rawMaterials.filter((item: any) => item.min_stock > 0 && item.on_hand_qty <= item.min_stock);
+        if (reorderItems.length === 0) return null;
+        return (
+          <Alert severity="warning" sx={{ mb: 3, mt: 2 }} icon={false}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Reorder Needed</Typography>
+            {reorderItems.map((item: any) => {
+              const suggestedQty = item.min_stock * 2 - item.on_hand_qty;
+              return (
+                <Typography key={item.id} variant="caption" sx={{ display: "block" }}>
+                  {item.name}: <strong>{item.on_hand_qty}</strong> / {item.min_stock} {item.base_unit} — reorder <strong>{suggestedQty.toFixed(1)}</strong> {item.base_unit}
+                </Typography>
+              );
+            })}
+          </Alert>
+        );
+      })()}
+
+      {/* Packing Materials */}
+      <Typography variant="h5" sx={{ mt: 3, mb: 1, fontSize: { xs: "1.1rem", sm: "1.25rem" }, fontWeight: 700 }}>Packing Materials</Typography>
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table size="small">
+          <TableHead><TableRow>
+            <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Material</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell>
+            <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {packingMaterials.length ? packingMaterials.map((item: any) => (
+              <TableRow key={item.id}>
+                <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{item.name}</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700, color: item.qty <= 0 ? "error.main" : "text.primary" }}>{item.qty}</TableCell>
+                <TableCell sx={cellSx}>{item.unit}</TableCell>
+                <TableCell sx={cellSx}>₹{item.unit_price?.toFixed(2) || "0.00"}</TableCell>
+              </TableRow>
+            )) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No packing materials recorded.</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };

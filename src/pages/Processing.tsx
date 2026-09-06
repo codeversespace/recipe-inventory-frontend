@@ -1,0 +1,442 @@
+import { Alert, Autocomplete, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import { useState } from "react";
+import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing } from "../hooks/useApi";
+import { formatDate } from "../utils/formatDate";
+
+export const Processing = () => {
+  const [processorFilter, setProcessorFilter] = useState<number | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const filterParams: any = {};
+  if (processorFilter) filterParams.processor_id = processorFilter;
+  if (dateFrom) filterParams.start_date = dateFrom;
+  if (dateTo) filterParams.end_date = dateTo;
+
+  const { data: orders = [], isLoading } = useProcessingOrders(filterParams);
+  const { data: ingredients = [] } = useIngredients();
+  const { data: processors = [] } = useProcessors();
+  const createOrder = useCreateProcessingOrder();
+  const receiveProcessing = useReceiveProcessing();
+  const addPayment = useProcessingPayment();
+  const deleteOrder = useDeleteProcessingOrder();
+  const createProcessor = useCreateProcessor();
+  const deleteProcessor = useDeleteProcessor();
+  const deleteIngredient = useDeleteIngredient();
+  const collectivePayment = useCollectiveProcessingPayment();
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [collectivePayOpen, setCollectivePayOpen] = useState(false);
+  const [collectiveProcId, setCollectiveProcId] = useState(0);
+  const [collectiveAmount, setCollectiveAmount] = useState("");
+  const [collectiveMethod, setCollectiveMethod] = useState("CASH");
+  const [collectiveRef, setCollectiveRef] = useState("");
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [receiveOpen, setReceiveOpen] = useState<number | null>(null);
+  const [payOpen, setPayOpen] = useState<number | null>(null);
+  const [processorOpen, setProcessorOpen] = useState(false);
+
+  const [rawId, setRawId] = useState(0);
+  const [selectedProcessorId, setSelectedProcessorId] = useState(0);
+  const [qtySent, setQtySent] = useState("");
+  const [costPerKg, setCostPerKg] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [qtyReceived, setQtyReceived] = useState("");
+
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("CASH");
+  const [payRef, setPayRef] = useState("");
+
+  const [newProcName, setNewProcName] = useState("");
+  const [newProcPhone, setNewProcPhone] = useState("");
+  const [newProcAddr, setNewProcAddr] = useState("");
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const detailOrder = orders.find((o: any) => o.id === detailId);
+
+  const resetCreate = () => { setRawId(0); setSelectedProcessorId(0); setQtySent(""); setCostPerKg(""); setNotes(""); setError(""); };
+
+  const saveOrder = async () => {
+    const raw = ingredients.find((i: any) => i.id === rawId);
+    if (!raw || !selectedProcessorId || !Number(qtySent) || Number(qtySent) <= 0 || !Number(costPerKg) || Number(costPerKg) < 0) {
+      setError("Fill all fields with valid values."); return;
+    }
+    if (Number(qtySent) > (raw.on_hand_qty || 0)) {
+      setError(`Insufficient stock. Available: ${raw.on_hand_qty} ${raw.base_unit}`); return;
+    }
+    try {
+      await createOrder.mutateAsync({ raw_ingredient_id: rawId, processor_id: selectedProcessorId, quantity_sent: Number(qtySent), cost_per_expected_kg: Number(costPerKg), notes: notes || undefined });
+      setCreateOpen(false); resetCreate(); setSuccess("Processing order created. Stock deducted.");
+    } catch (e: any) { setError(e.response?.data?.detail || "Could not create order."); }
+  };
+
+  const saveReceive = async () => {
+    if (!receiveOpen || !Number(qtyReceived) || Number(qtyReceived) <= 0) { setError("Enter a valid quantity received."); return; }
+    try {
+      await receiveProcessing.mutateAsync({ orderId: receiveOpen, quantity_received: Number(qtyReceived) });
+      setReceiveOpen(null); setQtyReceived(""); setSuccess("Received! Processed ingredient added to stock."); setDetailId(null);
+    } catch (e: any) { setError(e.response?.data?.detail || "Could not receive."); }
+  };
+
+  const savePayment = async () => {
+    if (!payOpen || !Number(payAmount) || Number(payAmount) <= 0) { setError("Enter a valid amount."); return; }
+    try {
+      await addPayment.mutateAsync({ orderId: payOpen, amount: Number(payAmount), method: payMethod, reference: payRef || undefined });
+      setPayOpen(null); setPayAmount(""); setPayRef(""); setPayMethod("CASH"); setSuccess("Payment recorded.");
+    } catch (e: any) { setError(e.response?.data?.detail || "Could not record payment."); }
+  };
+
+  const saveCollectivePayment = async () => {
+    if (!collectiveProcId || !Number(collectiveAmount) || Number(collectiveAmount) <= 0) { setError("Select processor and enter a valid amount."); return; }
+    try {
+      const result = await collectivePayment.mutateAsync({ processor_id: collectiveProcId, amount: Number(collectiveAmount), method: collectiveMethod, reference: collectiveRef || undefined });
+      setCollectivePayOpen(false); setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectiveMethod("CASH");
+      setSuccess(`Payment allocated across ${result?.length || 0} order(s).`);
+    } catch (e: any) { setError(e.response?.data?.detail || "Could not record payment."); }
+  };
+
+  const handleDelete = async (orderId: number) => {
+    if (!window.confirm("Delete this processing order?")) return;
+    try { await deleteOrder.mutateAsync(orderId); setSuccess("Order deleted. Stock restored."); } catch (e: any) { setError(e.response?.data?.detail || "Could not delete."); }
+  };
+
+  const saveProcessor = async () => {
+    if (!newProcName.trim()) { setError("Processor name required."); return; }
+    try {
+      await createProcessor.mutateAsync({ name: newProcName.trim(), phone: newProcPhone || undefined, address: newProcAddr || undefined });
+      setNewProcName(""); setNewProcPhone(""); setNewProcAddr(""); setProcessorOpen(false); setSuccess("Processor created.");
+    } catch (e: any) { setError(e.response?.data?.detail || "Could not create processor."); }
+  };
+
+  const handleDeleteProcessor = async (id: number, name: string) => {
+    if (!window.confirm(`Delete processor "${name}"?`)) return;
+    try { await deleteProcessor.mutateAsync(id); setSuccess("Processor deleted."); } catch (e: any) { setError(e.response?.data?.detail || "Could not delete processor."); }
+  };
+
+  const pending = orders.filter((o: any) => o.status === "PENDING");
+  const completed = orders.filter((o: any) => o.status === "COMPLETED");
+  const totalSent = orders.reduce((s: number, o: any) => s + o.quantity_sent, 0);
+  const totalReceived = orders.reduce((s: number, o: any) => s + (o.quantity_received || 0), 0);
+  const totalPaid = orders.reduce((s: number, o: any) => s + (o.total_paid || 0), 0);
+  const totalDue = orders.reduce((s: number, o: any) => s + (o.balance_due || 0), 0);
+  const headerSx = { fontWeight: 700, fontSize: { xs: "0.7rem" as const, sm: "0.8rem" as const } };
+  const cellSx = { fontSize: { xs: "0.7rem" as const, sm: "0.8rem" as const } };
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "2rem" } }}>Processing</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Track raw material processing (seed removal, peeling, etc.)</Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button variant="outlined" size="small" onClick={() => setProcessorOpen(true)} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>+ Processor</Button>
+          <Button variant="outlined" size="small" color="success" onClick={() => { setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectivePayOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>Pay Processor</Button>
+          <Button startIcon={<AddRoundedIcon />} variant="contained" size="small" onClick={() => { resetCreate(); setCreateOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>New Order</Button>
+        </Box>
+      </Box>
+
+      {/* Filters */}
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+        <Autocomplete
+          options={[{ id: 0, name: "All Processors" }, ...processors]}
+          getOptionLabel={(p: any) => p.name}
+          value={processors.find((p: any) => p.id === processorFilter) || { id: 0, name: "All Processors" }}
+          onChange={(_, v) => setProcessorFilter(v?.id || null)}
+          renderInput={(params) => <TextField {...params} label="Filter by processor" size="small" />}
+          sx={{ minWidth: 200 }}
+        />
+        <TextField label="From" type="date" size="small" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+        <TextField label="To" type="date" size="small" value={dateTo} onChange={(e) => setDateTo(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+      </Box>
+
+      {/* Summary */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(6, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
+        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{orders.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{pending.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{totalSent.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{totalReceived.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>₹{totalPaid.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>₹{totalDue.toFixed(0)}</Typography></CardContent></Card>
+      </Box>
+
+      {/* Orders Table */}
+      <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={headerSx}>#</TableCell>
+              <TableCell sx={headerSx}>Processor</TableCell>
+              <TableCell sx={{ ...headerSx, display: { xs: "none", sm: "table-cell" } }}>Raw ingredient</TableCell>
+              <TableCell sx={headerSx}>Sent</TableCell>
+              <TableCell sx={{ ...headerSx, display: { xs: "none", md: "table-cell" } }}>Received</TableCell>
+              <TableCell sx={{ ...headerSx, display: { xs: "none", md: "table-cell" } }}>Yield</TableCell>
+              <TableCell sx={headerSx}>Status</TableCell>
+              <TableCell sx={headerSx}>Balance</TableCell>
+              <TableCell sx={headerSx}></TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={9} align="center"><CircularProgress size={24} /></TableCell></TableRow>
+            ) : orders.length ? orders.map((order: any) => (
+              <TableRow key={order.id} hover sx={{ cursor: "pointer" }}>
+                <TableCell sx={{ ...cellSx, fontWeight: 600 }} onClick={() => setDetailId(order.id)}>#{order.id}</TableCell>
+                <TableCell sx={cellSx} onClick={() => setDetailId(order.id)}>{order.processor_name}</TableCell>
+                <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.raw_ingredient_name}</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }} onClick={() => setDetailId(order.id)}>{order.quantity_sent} kg</TableCell>
+                <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.quantity_received > 0 ? `${order.quantity_received} kg` : "—"}</TableCell>
+                <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.yield_pct > 0 ? `${order.yield_pct.toFixed(1)}%` : "—"}</TableCell>
+                <TableCell onClick={() => setDetailId(order.id)}>
+                  <Chip icon={order.status === "COMPLETED" ? <CheckCircleOutlineRoundedIcon sx={{ fontSize: "0.9rem !important" }} /> : <HourglassEmptyRoundedIcon sx={{ fontSize: "0.9rem !important" }} />} label={order.status} color={order.status === "COMPLETED" ? "success" : "warning"} size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                </TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }} onClick={() => setDetailId(order.id)}>₹{order.balance_due.toFixed(0)}</TableCell>
+                <TableCell>
+                  {order.status === "PENDING" && <Button size="small" color="error" onClick={() => handleDelete(order.id)} disabled={deleteOrder.isPending} sx={{ fontSize: "0.65rem", minWidth: "auto", px: 1 }}>Del</Button>}
+                </TableCell>
+              </TableRow>
+            )) : (
+              <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4, fontSize: "0.85rem", color: "text.secondary" }}>No processing orders found.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Create Dialog */}
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>New Processing Order</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <Autocomplete
+            options={processors}
+            getOptionLabel={(p: any) => p.name}
+            value={processors.find((p: any) => p.id === selectedProcessorId) || null}
+            onChange={(_, v) => setSelectedProcessorId(v?.id || 0)}
+            renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
+          />
+          <Autocomplete
+            options={ingredients.filter((i: any) => (i.on_hand_qty || 0) > 0)}
+            getOptionLabel={(i: any) => `${i.name} (${i.on_hand_qty || 0} ${i.base_unit})`}
+            value={ingredients.find((i: any) => i.id === rawId) || null}
+            onChange={(_, v) => setRawId(v?.id || 0)}
+            renderInput={(params) => <TextField {...params} margin="dense" label="Raw ingredient" />}
+          />
+          <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+            <TextField margin="dense" label="Quantity sent (kg)" type="number" fullWidth value={qtySent} onChange={(e) => setQtySent(e.target.value)} />
+            <TextField margin="dense" label="Cost per kg (₹)" type="number" fullWidth value={costPerKg} onChange={(e) => setCostPerKg(e.target.value)} />
+          </Box>
+          <TextField margin="dense" label="Notes" fullWidth multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveOrder} disabled={createOrder.isPending}>
+            {createOrder.isPending ? <CircularProgress size={20} /> : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {detailOrder && `#${detailOrder.id} — ${detailOrder.processor_name}`}
+        </DialogTitle>
+        <DialogContent>
+          {detailOrder && (
+            <>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, mb: 2 }}>
+                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                  <Typography variant="caption" color="text.secondary">Raw ingredient</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.raw_ingredient_name}</Typography>
+                </CardContent></Card>
+                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                  <Typography variant="caption" color="text.secondary">Quantity sent</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.quantity_sent} kg</Typography>
+                </CardContent></Card>
+                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                  <Typography variant="caption" color="text.secondary">Cost/kg</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>₹{detailOrder.cost_per_expected_kg.toFixed(2)}</Typography>
+                </CardContent></Card>
+                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                  <Typography variant="caption" color="text.secondary">Total cost</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>₹{detailOrder.total_cost.toFixed(0)}</Typography>
+                </CardContent></Card>
+                {detailOrder.quantity_received > 0 && (
+                  <>
+                    <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                      <Typography variant="caption" color="text.secondary">Received</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.quantity_received} kg</Typography>
+                    </CardContent></Card>
+                    <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                      <Typography variant="caption" color="text.secondary">Yield</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.yield_pct.toFixed(1)}%</Typography>
+                    </CardContent></Card>
+                    <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                      <Typography variant="caption" color="text.secondary">Cost/kg received</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>₹{detailOrder.cost_per_received_kg.toFixed(2)}</Typography>
+                    </CardContent></Card>
+                  </>
+                )}
+                <Card sx={{ bgcolor: detailOrder.balance_due > 0 ? "error.50" : "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
+                  <Typography variant="caption" color="text.secondary">Balance due</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: detailOrder.balance_due > 0 ? "error.main" : "success.main" }}>₹{detailOrder.balance_due.toFixed(0)}</Typography>
+                </CardContent></Card>
+              </Box>
+
+              {detailOrder.notes && <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Notes: {detailOrder.notes}</Typography>}
+
+              {detailOrder.payments.length > 0 && (
+                <>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Payments</Typography>
+                  <TableContainer component={Paper} sx={{ mb: 1 }}>
+                    <Table size="small">
+                      <TableHead><TableRow><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Date</TableCell><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Amount</TableCell><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Method</TableCell></TableRow></TableHead>
+                      <TableBody>{detailOrder.payments.map((p: any) => (
+                        <TableRow key={p.id}>
+                          <TableCell sx={{ fontSize: "0.8rem" }}>{formatDate(p.paid_at)}</TableCell>
+                          <TableCell sx={{ fontSize: "0.8rem", fontWeight: 700 }}>₹{p.amount.toFixed(0)}</TableCell>
+                          <TableCell sx={{ fontSize: "0.8rem" }}>{p.method}</TableCell>
+                        </TableRow>
+                      ))}</TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: "space-between" }}>
+          <Box>
+            {detailOrder?.status === "PENDING" && <Button size="small" variant="outlined" color="success" onClick={() => { setReceiveOpen(detailOrder.id); setDetailId(null); }}>Mark received</Button>}
+            {detailOrder && detailOrder.balance_due > 0 && <Button size="small" variant="outlined" onClick={() => { setPayOpen(detailOrder.id); setDetailId(null); }}>Pay</Button>}
+          </Box>
+          <Button onClick={() => setDetailId(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Receive Dialog */}
+      <Dialog open={!!receiveOpen} onClose={() => setReceiveOpen(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Receive processed ingredient</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Processed ingredient will be auto-created as "{detailOrder?.raw_ingredient_name} (Processed)"
+          </Typography>
+          <TextField margin="dense" label="Quantity received (kg)" type="number" fullWidth value={qtyReceived} onChange={(e) => setQtyReceived(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReceiveOpen(null)}>Cancel</Button>
+          <Button variant="contained" onClick={saveReceive} disabled={receiveProcessing.isPending}>
+            {receiveProcessing.isPending ? <CircularProgress size={20} /> : "Receive"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Payment Dialog */}
+      <Dialog open={!!payOpen} onClose={() => setPayOpen(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Record payment</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <TextField margin="dense" label="Amount (₹)" type="number" fullWidth value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+          <TextField margin="dense" label="Method" fullWidth value={payMethod} onChange={(e) => setPayMethod(e.target.value)} />
+          <TextField margin="dense" label="Reference" fullWidth value={payRef} onChange={(e) => setPayRef(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPayOpen(null)}>Cancel</Button>
+          <Button variant="contained" onClick={savePayment} disabled={addPayment.isPending}>
+            {addPayment.isPending ? <CircularProgress size={20} /> : "Pay"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Processor Dialog */}
+      <Dialog open={processorOpen} onClose={() => setProcessorOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Add Processor</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <TextField margin="dense" label="Name" fullWidth value={newProcName} onChange={(e) => setNewProcName(e.target.value)} />
+          <TextField margin="dense" label="Phone" fullWidth value={newProcPhone} onChange={(e) => setNewProcPhone(e.target.value)} />
+          <TextField margin="dense" label="Address" fullWidth value={newProcAddr} onChange={(e) => setNewProcAddr(e.target.value)} />
+          {processors.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="caption" color="text.secondary">Existing processors:</Typography>
+              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                {processors.map((p: any) => (
+                  <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2">{p.name} {p.phone ? `— ${p.phone}` : ""}</Typography>
+                    <IconButton size="small" color="error" onClick={() => handleDeleteProcessor(p.id, p.name)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          )}
+          {(() => {
+            const processed = ingredients.filter((i: any) => i.name.endsWith(" (Processed)"));
+            if (processed.length === 0) return null;
+            return (
+              <>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="caption" color="text.secondary">Processed ingredients (delete to re-process with correct cost):</Typography>
+                <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                  {processed.map((i: any) => (
+                    <Box key={i.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography variant="body2">{i.name} — {i.on_hand_qty} {i.base_unit}</Typography>
+                      <IconButton size="small" color="error" onClick={async () => {
+                        if (window.confirm(`Delete "${i.name}"? This cannot be undone.`)) {
+                          try { await deleteIngredient.mutateAsync({ id: i.id, force: true }); setSuccess("Deleted."); }
+                          catch (e: any) { setError(e.response?.data?.detail || "Could not delete."); }
+                        }
+                      }}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                    </Box>
+                  ))}
+                </Stack>
+              </>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProcessorOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={saveProcessor} disabled={createProcessor.isPending}>
+            {createProcessor.isPending ? <CircularProgress size={20} /> : "Add"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Collective Payment Dialog */}
+      <Dialog open={collectivePayOpen} onClose={() => setCollectivePayOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Pay Processor (collective)</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: "0.8rem" }}>
+            Allocate a lump-sum payment across all pending orders for this processor (oldest first).
+          </Typography>
+          <Autocomplete
+            options={processors}
+            getOptionLabel={(p: any) => p.name}
+            value={processors.find((p: any) => p.id === collectiveProcId) || null}
+            onChange={(_, v) => setCollectiveProcId(v?.id || 0)}
+            renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
+          />
+          <TextField margin="dense" label="Amount" type="number" fullWidth value={collectiveAmount} onChange={(e) => setCollectiveAmount(e.target.value)} />
+          <TextField margin="dense" label="Method" fullWidth value={collectiveMethod} onChange={(e) => setCollectiveMethod(e.target.value)} />
+          <TextField margin="dense" label="Reference" fullWidth value={collectiveRef} onChange={(e) => setCollectiveRef(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCollectivePayOpen(false)}>Cancel</Button>
+          <Button variant="contained" color="success" onClick={saveCollectivePayment} disabled={collectivePayment.isPending}>
+            {collectivePayment.isPending ? <CircularProgress size={20} /> : "Pay & Allocate"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
+      {error && !createOpen && !receiveOpen && !payOpen && !detailId && !processorOpen && !collectivePayOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}
+    </Box>
+  );
+};

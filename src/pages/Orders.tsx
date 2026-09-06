@@ -4,6 +4,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { useState } from "react";
 import { useCreateOrder, useCustomers, useDeleteOrder, useOrders, useSaleableStock, useUpdateOrderStatus } from "../hooks/useApi";
+import { formatDate } from "../utils/formatDate";
 
 export const Orders = () => {
   const { data: orders = [], isLoading } = useOrders();
@@ -107,7 +108,7 @@ export const Orders = () => {
               <TableRow key={order.id} hover sx={{ cursor: "pointer" }}>
                 <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, fontWeight: 600 }} onClick={() => setDetailId(order.id)}>#{order.id}</TableCell>
                 <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }} onClick={() => setDetailId(order.id)}>{order.customer_name}</TableCell>
-                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", sm: "table-cell" } }} onClick={() => setDetailId(order.id)}>{new Date(order.ordered_at).toLocaleDateString()}</TableCell>
+                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", sm: "table-cell" } }} onClick={() => setDetailId(order.id)}>{formatDate(order.ordered_at)}</TableCell>
                 <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", md: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.lines?.length || 0}</TableCell>
                 <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, fontWeight: 700 }} onClick={() => setDetailId(order.id)}>₹{order.total_amount.toFixed(0)}</TableCell>
                 <TableCell onClick={() => setDetailId(order.id)} sx={{ display: { xs: "none", sm: "table-cell" } }}>
@@ -253,7 +254,7 @@ export const Orders = () => {
 
               {/* Order Info */}
               <Box sx={{ display: "flex", gap: 2, color: "text.secondary", fontSize: "0.8rem" }}>
-                <Typography variant="body2">Ordered: {new Date(detailOrder.ordered_at).toLocaleDateString()}</Typography>
+                <Typography variant="body2">Ordered: {formatDate(detailOrder.ordered_at)}</Typography>
                 {detailOrder.expected_delivery && <Typography variant="body2">Expected: {detailOrder.expected_delivery}</Typography>}
                 {detailOrder.notes && <Typography variant="body2">Notes: {detailOrder.notes}</Typography>}
               </Box>

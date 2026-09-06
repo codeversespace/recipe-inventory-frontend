@@ -1,9 +1,10 @@
 import { Alert, Autocomplete, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
-import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useSuppliers, useSupplierPayments } from "../hooks/useApi";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, LineChart, Line, ReferenceLine } from "recharts";
+import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useProcessingPayments, useSuppliers, useSupplierPayments } from "../hooks/useApi";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { VoiceInput } from "../components/VoiceInput";
 import { bestMatch } from "../utils/fuzzy";
+import { formatDate } from "../utils/formatDate";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
 
@@ -27,6 +28,7 @@ export const Payments = () => {
   const { data: suppliers = [] } = useSuppliers();
   const customerPayment = useCustomerPayment();
   const addSupplierPayment = useAddSupplierPaymentFromPayments();
+  const { data: processingExpenses = [] } = useProcessingPayments();
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -46,7 +48,7 @@ export const Payments = () => {
 
   const dueSales = sales.filter((sale: any) => sale.amount_due > 0);
   const matchingSales = useMemo(() => sales.filter((sale: any) => `${sale.id} ${sale.reference || ""} ${sale.customer_name || "Walk-in"}`.toLowerCase().includes(search.toLowerCase())), [sales, search]);
-  const filtered = matchingSales.filter((sale: any) => sale.amount_due > 0);
+  const filtered = matchingSales;
   const totalDue = dueSales.reduce((sum: number, sale: any) => sum + sale.amount_due, 0);
   const filteredTotal = matchingSales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
   const filteredPaid = matchingSales.reduce((sum: number, sale: any) => sum + sale.amount_paid, 0);
@@ -128,21 +130,35 @@ export const Payments = () => {
       <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
         <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cash Flow</Typography>
         {cashFlowData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
-              <RechartsTooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Cash In" fill="#388e3c" radius={[4, 4, 0, 0]} barSize={16} />
-              <Bar dataKey="Cash Out" fill="#d32f2f" radius={[4, 4, 0, 0]} barSize={16} />
-              <ReferenceLine y={0} stroke="#999" />
-              <Line type="monotone" dataKey="Balance" stroke="#1976d2" strokeWidth={2} dot={false} />
-            </BarChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#388e3c" stopOpacity={0.3} />
+                    <stop offset="50%" stopColor="#388e3c" stopOpacity={0.05} />
+                    <stop offset="50%" stopColor="#d32f2f" stopOpacity={0.05} />
+                    <stop offset="100%" stopColor="#d32f2f" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <RechartsTooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="Balance" stroke="#1976d2" strokeWidth={2} fill="url(#balanceGradient)" dot={{ r: 3, fill: "#1976d2" }} />
+              </AreaChart>
+            </ResponsiveContainer>
+            <Box sx={{ display: "flex", gap: 2, mt: 0.5, justifyContent: "center" }}>
+              <Typography variant="caption" sx={{ color: "success.main", fontWeight: 600 }}>
+                In: ₹{cashFlowData.reduce((sum, d) => sum + (d["Cash In"] || 0), 0).toFixed(0)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "error.main", fontWeight: 600 }}>
+                Out: ₹{cashFlowData.reduce((sum, d) => sum + (d["Cash Out"] || 0), 0).toFixed(0)}
+              </Typography>
+            </Box>
+          </>
         ) : (
-          <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Box sx={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No payment data yet</Typography>
           </Box>
         )}
@@ -152,6 +168,7 @@ export const Payments = () => {
     <Tabs value={tab} onChange={(_, v) => { setTab(v); setSearch(""); }} sx={{ mb: 2, minHeight: 40, "& .MuiTab-root": { minHeight: 40, py: 0, fontSize: { xs: "0.75rem", sm: "0.875rem" } } }}>
       <Tab label="Customer" />
       <Tab label="Supplier" />
+      <Tab label="Expenses" />
     </Tabs>
 
     {tab === 0 && <>
@@ -159,7 +176,7 @@ export const Payments = () => {
         <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>{search ? "Filtered" : "Outstanding"}</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>₹{(search ? filteredTotal : dueSales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0)).toFixed(0)}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Paid</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700, color: "success.main" }}>₹{(search ? filteredPaid : sales.reduce((sum: number, sale: any) => sum + sale.amount_paid, 0)).toFixed(0)}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Due</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700, color: "error.main" }}>₹{(search ? filteredDue : totalDue).toFixed(0)}</Typography></CardContent></Card>
-        <Card><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Invoices</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>{search ? filtered.length : dueSales.length}</Typography></CardContent></Card>
+        <Card><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Invoices</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>{filtered.length}</Typography></CardContent></Card>
       </Box>
       <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
         <TextField size="small" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: "1 1 200px", "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
@@ -167,16 +184,17 @@ export const Payments = () => {
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setCustomerOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Receive</Button>
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
-        <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Invoice</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Customer</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Due</TableCell>
+        <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Invoice</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Customer</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Status</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Due</TableCell>
       </TableRow></TableHead><TableBody>{filtered.length ? filtered.map((sale: any) => <TableRow key={sale.id}>
         <TableCell sx={cellSx}>#{sale.id}{sale.reference ? ` ${sale.reference}` : ""}</TableCell>
         <TableCell sx={cellSx}>{sale.customer_name || "Walk-in"}</TableCell>
-        <TableCell sx={{ ...cellSx, fontWeight: 700, color: "error.main" }}>₹{sale.amount_due.toFixed(0)}</TableCell>
-      </TableRow>) : <TableRow><TableCell colSpan={3} align="center" sx={{ ...cellSx, py: 3 }}>No outstanding invoices.</TableCell></TableRow>}<TableRow sx={{ bgcolor: "action.hover" }}><TableCell colSpan={2} sx={{ ...cellSx, fontWeight: 700 }}>Total</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700, color: "error.main" }}>₹{filteredDue.toFixed(0)}</TableCell></TableRow></TableBody></Table></TableContainer>
+        <TableCell sx={cellSx}>{sale.payment_status}</TableCell>
+        <TableCell sx={{ ...cellSx, fontWeight: 700, color: sale.amount_due > 0 ? "error.main" : "success.main" }}>₹{sale.amount_due.toFixed(0)}</TableCell>
+      </TableRow>) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No invoices found.</TableCell></TableRow>}<TableRow sx={{ bgcolor: "action.hover" }}><TableCell colSpan={3} sx={{ ...cellSx, fontWeight: 700 }}>Total Due</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700, color: "error.main" }}>₹{filteredDue.toFixed(0)}</TableCell></TableRow></TableBody></Table></TableContainer>
       {historyOpen && <Card sx={{ mt: 2 }}><CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}><Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Payment history</Typography>{historyLoading ? <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>Loading...</Typography> : <TableContainer><Table size="small"><TableHead><TableRow>
         <TableCell sx={cellSx}>Date</TableCell><TableCell sx={cellSx}>Customer</TableCell><TableCell sx={cellSx}>Amount</TableCell><TableCell sx={cellSx}>Method</TableCell>
       </TableRow></TableHead><TableBody>{history.length ? history.map((payment: any) => <TableRow key={payment.id}>
-        <TableCell sx={cellSx}>{new Date(payment.paid_at).toLocaleDateString()}</TableCell>
+        <TableCell sx={cellSx}>{formatDate(payment.paid_at)}</TableCell>
         <TableCell sx={cellSx}>{payment.customer_name || "Walk-in"}</TableCell>
         <TableCell sx={cellSx}>₹{payment.amount.toFixed(0)}</TableCell>
         <TableCell sx={cellSx}>{payment.method}</TableCell>
@@ -198,12 +216,42 @@ export const Payments = () => {
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
         <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
       </TableRow></TableHead><TableBody>{filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any) => <TableRow key={payment.id}>
-        <TableCell sx={cellSx}>{new Date(payment.paid_at).toLocaleDateString()}</TableCell>
+        <TableCell sx={cellSx}>{formatDate(payment.paid_at)}</TableCell>
         <TableCell sx={cellSx}>{payment.supplier_name}</TableCell>
         <TableCell sx={cellSx}>₹{payment.amount.toFixed(0)}</TableCell>
         <TableCell sx={cellSx}>{payment.method}</TableCell>
       </TableRow>) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No supplier payments recorded.</TableCell></TableRow>}</TableBody></Table></TableContainer>
     </>}
+
+    {tab === 2 && (() => {
+      const filteredExpenses = search
+        ? processingExpenses.filter((e: any) => e.processor_name.toLowerCase().includes(search.toLowerCase()) || e.raw_ingredient.toLowerCase().includes(search.toLowerCase()))
+        : processingExpenses;
+      const totalExpenses = filteredExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+      return <>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)" }, gap: { xs: 1, sm: 2 }, mb: 2 }}>
+          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Total expenses</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>₹{totalExpenses.toFixed(0)}</Typography></CardContent></Card>
+          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Transactions</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{filteredExpenses.length}</Typography></CardContent></Card>
+          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Processors</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{new Set(filteredExpenses.map((e: any) => e.processor_name)).size}</Typography></CardContent></Card>
+        </Box>
+        <Box sx={{ mb: 2 }}>
+          <TextField size="small" placeholder="Search by processor or ingredient..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ width: "100%", maxWidth: 400, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
+        </Box>
+        <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Processor</TableCell>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
+        </TableRow></TableHead><TableBody>{filteredExpenses.length ? filteredExpenses.map((expense: any) => <TableRow key={expense.id}>
+          <TableCell sx={cellSx}>{formatDate(expense.date)}</TableCell>
+          <TableCell sx={cellSx}>{expense.processor_name}</TableCell>
+          <TableCell sx={cellSx}>{expense.raw_ingredient}</TableCell>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>₹{expense.amount.toFixed(0)}</TableCell>
+          <TableCell sx={cellSx}>{expense.method}</TableCell>
+        </TableRow>) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}>No processing expenses recorded.</TableCell></TableRow>}</TableBody></Table></TableContainer>
+      </>;
+    })()}
 
     <Dialog open={customerOpen} onClose={() => { setCustomerOpen(false); setError(""); }} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { mx: 1, width: "calc(100% - 16px)" } } }}>
       <DialogTitle sx={{ fontSize: "1rem", fontWeight: 700 }}>Receive payment</DialogTitle>

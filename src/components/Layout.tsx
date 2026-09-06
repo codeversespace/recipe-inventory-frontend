@@ -34,6 +34,10 @@ import {
   Settings as SettingsIcon,
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
+  Factory as ProductionIcon,
+  ViewQuilt as PackTypeIcon,
+  CalendarMonth as SchedulerIcon,
+  Science as ScienceIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -41,21 +45,23 @@ import { useAuth } from "../auth/AuthContext";
 const drawerWidth = 240;
 
 type Role = "super_admin" | "admin" | "manager" | "production" | "packing" | "inventory" | "sales" | "viewer";
-type NavItem = { text: string; icon: React.ReactNode; to?: string; roles: Role[]; children?: { text: string; to: string; roles: Role[] }[] };
+type NavItem = { text: string; icon: React.ReactNode; to?: string; roles: Role[]; section?: string; children?: { text: string; to: string; roles: Role[] }[] };
 const navItems: NavItem[] = [
-  { text: "Dashboard", icon: <DashboardIcon />, to: "/", roles: ["super_admin", "admin", "manager", "viewer"] },
-  { text: "Purchases", icon: <ShoppingCartIcon />, to: "/purchases", roles: ["super_admin", "admin", "manager", "inventory"] },
-  { text: "Suppliers", icon: <SupplierIcon />, to: "/suppliers", roles: ["super_admin", "admin", "manager", "inventory"] },
-  { text: "Recipes", icon: <ReceiptIcon />, to: "/recipes", roles: ["super_admin", "admin", "manager"] },
-  { text: "Production", icon: <AssessmentIcon />, to: "/production", roles: ["super_admin", "admin", "manager", "production"] },
-  { text: "Inventory", icon: <AssessmentIcon />, to: "/inventory", roles: ["super_admin", "admin", "manager", "inventory"] },
-  { text: "Customers", icon: <PeopleIcon />, to: "/customers", roles: ["super_admin", "admin", "manager", "sales"] },
-  { text: "Sales", icon: <ReceiptIcon />, to: "/sales", roles: ["super_admin", "admin", "manager", "sales"] },
-  { text: "Packing", icon: <InventoryIcon />, to: "/packing", roles: ["super_admin", "admin", "manager", "packing"] },
-  { text: "Payments", icon: <PaymentsIcon />, to: "/payments", roles: ["super_admin", "admin", "manager", "sales"] },
-  { text: "Orders", icon: <OrderIcon />, to: "/orders", roles: ["super_admin", "admin", "manager", "sales", "production"] },
-  { text: "Settings", icon: <SettingsIcon />, roles: ["super_admin", "admin", "manager"], children: [
-    { text: "Pack types", to: "/pack-types", roles: ["super_admin", "admin", "manager"] },
+  { text: "Dashboard", icon: <DashboardIcon />, to: "/", roles: ["super_admin", "admin", "manager", "viewer"], section: "Menu" },
+  { text: "Purchases", icon: <ShoppingCartIcon />, to: "/purchases", roles: ["super_admin", "admin", "manager", "inventory"], section: "Supply" },
+  { text: "Suppliers", icon: <SupplierIcon />, to: "/suppliers", roles: ["super_admin", "admin", "manager", "inventory"], section: "Supply" },
+  { text: "Inventory", icon: <InventoryIcon />, to: "/inventory", roles: ["super_admin", "admin", "manager", "inventory"], section: "Supply" },
+  { text: "Customers", icon: <PeopleIcon />, to: "/customers", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
+  { text: "Sales", icon: <ReceiptIcon />, to: "/sales", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
+  { text: "Orders", icon: <OrderIcon />, to: "/orders", roles: ["super_admin", "admin", "manager", "sales", "production"], section: "Sales" },
+  { text: "Payments", icon: <PaymentsIcon />, to: "/payments", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
+  { text: "Recipes", icon: <ReceiptIcon />, to: "/recipes", roles: ["super_admin", "admin", "manager"], section: "Production" },
+  { text: "Production", icon: <ProductionIcon />, to: "/production", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
+  { text: "Scheduler", icon: <SchedulerIcon />, to: "/production-scheduler", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
+  { text: "Processing", icon: <ScienceIcon />, to: "/processing", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
+  { text: "Packing", icon: <InventoryIcon />, to: "/packing", roles: ["super_admin", "admin", "manager", "packing"], section: "Production" },
+  { text: "Pack types", icon: <PackTypeIcon />, to: "/pack-types", roles: ["super_admin", "admin", "manager"], section: "Production" },
+  { text: "Admin", icon: <SettingsIcon />, roles: ["super_admin"], section: "Admin", children: [
     { text: "Admin settings", to: "/settings", roles: ["super_admin"] },
   ] },
 ];
@@ -100,7 +106,44 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Toolbar>
       <Divider />
       <List sx={{ px: 0.5 }}>
-        {visibleNavItems.map((item) => item.children ? <React.Fragment key={item.text}><ListItemButton onClick={() => setSettingsOpen((open) => !open)} sx={{ borderRadius: 2, mb: 0.5, minHeight: 44 }}><ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon><ListItemText primary={item.text} slotProps={{ primary: { sx: { fontSize: "0.9rem" } } }} />{settingsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}</ListItemButton>{settingsOpen && item.children.filter((child) => canAccess(child.roles)).map((child) => <ListItemButton key={child.to} selected={location.pathname === child.to} sx={{ pl: 7, borderRadius: 2, mb: 0.5, minHeight: 44 }} onClick={() => { navigate(child.to); setMobileOpen(false); }}><ListItemText primary={child.text} slotProps={{ primary: { sx: { fontSize: "0.85rem" } } }} /></ListItemButton>)}</React.Fragment> : <ListItemButton key={item.text} selected={location.pathname === item.to} sx={{ borderRadius: 2, mb: 0.5, minHeight: 44 }} onClick={() => { navigate(item.to || "/"); setMobileOpen(false); }}><ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon><ListItemText primary={item.text} slotProps={{ primary: { sx: { fontSize: "0.9rem" } } }} /></ListItemButton>)}
+        {(() => {
+          let lastSection = "";
+          return visibleNavItems.flatMap((item) => {
+            const elements: React.ReactNode[] = [];
+            if (item.section && item.section !== lastSection) {
+              lastSection = item.section;
+              elements.push(
+                <Typography key={`section-${item.section}`} variant="caption" sx={{ display: "block", px: 2, pt: 2, pb: 0.5, fontSize: "0.65rem", fontWeight: 700, color: "text.secondary", letterSpacing: 1, textTransform: "uppercase" }}>
+                  {item.section}
+                </Typography>
+              );
+            }
+            if (item.children) {
+              elements.push(
+                <React.Fragment key={item.text}>
+                  <ListItemButton onClick={() => setSettingsOpen((open) => !open)} sx={{ borderRadius: 2, mb: 0.5, minHeight: 40 }}>
+                    <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                    <ListItemText primary={item.text} slotProps={{ primary: { sx: { fontSize: "0.85rem" } } }} />
+                    {settingsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  </ListItemButton>
+                  {settingsOpen && item.children.filter((child) => canAccess(child.roles)).map((child) => (
+                    <ListItemButton key={child.to} selected={location.pathname === child.to} sx={{ pl: 7, borderRadius: 2, mb: 0.5, minHeight: 36 }} onClick={() => { navigate(child.to); setMobileOpen(false); }}>
+                      <ListItemText primary={child.text} slotProps={{ primary: { sx: { fontSize: "0.8rem" } } }} />
+                    </ListItemButton>
+                  ))}
+                </React.Fragment>
+              );
+            } else {
+              elements.push(
+                <ListItemButton key={item.text} selected={location.pathname === item.to} sx={{ borderRadius: 2, mb: 0.5, minHeight: 40 }} onClick={() => { navigate(item.to || "/"); setMobileOpen(false); }}>
+                  <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} slotProps={{ primary: { sx: { fontSize: "0.85rem" } } }} />
+                </ListItemButton>
+              );
+            }
+            return elements;
+          });
+        })()}
       </List>
       <Divider sx={{ my: 1 }} />
       <Box sx={{ px: 2, py: 1 }}>

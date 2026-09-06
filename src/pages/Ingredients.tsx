@@ -56,7 +56,7 @@ export const Ingredients = () => {
 
   const removeIngredient = async (ingredient: any) => {
     if (window.confirm(`Delete ${ingredient.name}?`)) {
-      try { await deleteIngredient.mutateAsync(ingredient.id); }
+      try { await deleteIngredient.mutateAsync({ id: ingredient.id }); }
       catch (requestError: any) { alert(requestError.response?.data?.detail || "Could not delete ingredient."); }
     }
   };
