@@ -46,27 +46,27 @@ function App() {
   if (!user) return <Login />;
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<RoleRoute roles={["super_admin", "admin", "manager", "viewer"]}><Dashboard /></RoleRoute>} />
-          <Route path="/purchases" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Purchases /></RoleRoute>} />
-          <Route path="/suppliers" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Suppliers /></RoleRoute>} />
-          <Route path="/recipes" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><Recipes /></RoleRoute>} />
-          <Route path="/production" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Production /></RoleRoute>} />
-          <Route path="/inventory" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Inventory /></RoleRoute>} />
-          <Route path="/customers" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
-          <Route path="/sales" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
-          <Route path="/customers/:id" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomerProfile /></RoleRoute>} />
-          <Route path="/packing" element={<RoleRoute roles={["super_admin", "admin", "manager", "packing"]}><Packing /></RoleRoute>} />
-          <Route path="/payments" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "inventory"]}><Payments /></RoleRoute>} />
-          <Route path="/orders" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "production"]}><Orders /></RoleRoute>} />
-          <Route path="/processing" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Processing /></RoleRoute>} />
-          <Route path="/production-scheduler" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><ProductionScheduler /></RoleRoute>} />
-          <Route path="/pack-types" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><PackTypes /></RoleRoute>} />
-          <Route path="/settings" element={<RoleRoute roles={["super_admin"]}><Settings /></RoleRoute>} />
-        </Routes>
-      </Layout>
-    </Router>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<RoleRoute roles={["super_admin", "admin", "manager", "viewer"]}><Dashboard /></RoleRoute>} />
+            <Route path="/purchases" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Purchases /></RoleRoute>} />
+            <Route path="/suppliers" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Suppliers /></RoleRoute>} />
+            <Route path="/recipes" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><Recipes /></RoleRoute>} />
+            <Route path="/production" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Production /></RoleRoute>} />
+            <Route path="/inventory" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Inventory /></RoleRoute>} />
+            <Route path="/customers" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
+            <Route path="/sales" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
+            <Route path="/customers/:id" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomerProfile /></RoleRoute>} />
+            <Route path="/packing" element={<RoleRoute roles={["super_admin", "admin", "manager", "packing"]}><Packing /></RoleRoute>} />
+            <Route path="/payments" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "inventory"]}><Payments /></RoleRoute>} />
+            <Route path="/orders" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales", "production"]}><Orders /></RoleRoute>} />
+            <Route path="/processing" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Processing /></RoleRoute>} />
+            <Route path="/production-scheduler" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><ProductionScheduler /></RoleRoute>} />
+            <Route path="/pack-types" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><PackTypes /></RoleRoute>} />
+            <Route path="/settings" element={<RoleRoute roles={["super_admin"]}><Settings /></RoleRoute>} />
+          </Routes>
+        </Layout>
+      </Router>
   );
 }
 

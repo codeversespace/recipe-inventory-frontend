@@ -6,6 +6,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { useState } from "react";
 import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
+import { formatMoney } from "../utils/formatNumber";
 
 export const Processing = () => {
   const [processorFilter, setProcessorFilter] = useState<number | null>(null);
@@ -162,8 +163,8 @@ export const Processing = () => {
         <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{pending.length}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{totalSent.toFixed(0)}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{totalReceived.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>₹{totalPaid.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>₹{totalDue.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>{formatMoney(totalPaid)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>{formatMoney(totalDue)}</Typography></CardContent></Card>
       </Box>
 
       {/* Orders Table */}
@@ -196,7 +197,7 @@ export const Processing = () => {
                 <TableCell onClick={() => setDetailId(order.id)}>
                   <Chip icon={order.status === "COMPLETED" ? <CheckCircleOutlineRoundedIcon sx={{ fontSize: "0.9rem !important" }} /> : <HourglassEmptyRoundedIcon sx={{ fontSize: "0.9rem !important" }} />} label={order.status} color={order.status === "COMPLETED" ? "success" : "warning"} size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
                 </TableCell>
-                <TableCell sx={{ ...cellSx, fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }} onClick={() => setDetailId(order.id)}>₹{order.balance_due.toFixed(0)}</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }} onClick={() => setDetailId(order.id)}>{formatMoney(order.balance_due)}</TableCell>
                 <TableCell>
                   {order.status === "PENDING" && <Button size="small" color="error" onClick={() => handleDelete(order.id)} disabled={deleteOrder.isPending} sx={{ fontSize: "0.65rem", minWidth: "auto", px: 1 }}>Del</Button>}
                 </TableCell>
@@ -260,11 +261,11 @@ export const Processing = () => {
                 </CardContent></Card>
                 <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Cost/kg</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>₹{detailOrder.cost_per_expected_kg.toFixed(2)}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(detailOrder.cost_per_expected_kg)}</Typography>
                 </CardContent></Card>
                 <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Total cost</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>₹{detailOrder.total_cost.toFixed(0)}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(detailOrder.total_cost)}</Typography>
                 </CardContent></Card>
                 {detailOrder.quantity_received > 0 && (
                   <>
@@ -278,13 +279,13 @@ export const Processing = () => {
                     </CardContent></Card>
                     <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                       <Typography variant="caption" color="text.secondary">Cost/kg received</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>₹{detailOrder.cost_per_received_kg.toFixed(2)}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(detailOrder.cost_per_received_kg)}</Typography>
                     </CardContent></Card>
                   </>
                 )}
                 <Card sx={{ bgcolor: detailOrder.balance_due > 0 ? "error.50" : "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Balance due</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: detailOrder.balance_due > 0 ? "error.main" : "success.main" }}>₹{detailOrder.balance_due.toFixed(0)}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: detailOrder.balance_due > 0 ? "error.main" : "success.main" }}>{formatMoney(detailOrder.balance_due)}</Typography>
                 </CardContent></Card>
               </Box>
 
@@ -299,7 +300,7 @@ export const Processing = () => {
                       <TableBody>{detailOrder.payments.map((p: any) => (
                         <TableRow key={p.id}>
                           <TableCell sx={{ fontSize: "0.8rem" }}>{formatDate(p.paid_at)}</TableCell>
-                          <TableCell sx={{ fontSize: "0.8rem", fontWeight: 700 }}>₹{p.amount.toFixed(0)}</TableCell>
+                          <TableCell sx={{ fontSize: "0.8rem", fontWeight: 700 }}>{formatMoney(p.amount)}</TableCell>
                           <TableCell sx={{ fontSize: "0.8rem" }}>{p.method}</TableCell>
                         </TableRow>
                       ))}</TableBody>

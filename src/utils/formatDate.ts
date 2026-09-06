@@ -2,8 +2,15 @@ export const formatDate = (dateStr: string | Date | null | undefined): string =>
   if (!dateStr) return "—";
   const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
   if (isNaN(d.getTime())) return "—";
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
+  // Always display in India timezone
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(d);
+  const day = parts.find((p) => p.type === "day")?.value || "01";
+  const month = parts.find((p) => p.type === "month")?.value || "01";
+  const year = parts.find((p) => p.type === "year")?.value || "2024";
   return `${day}/${month}/${year}`;
 };

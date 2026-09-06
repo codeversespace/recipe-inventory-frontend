@@ -8,8 +8,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "../hooks/useApi";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
-
-const money = (value: number) => `₹${(value || 0).toFixed(0)}`;
+import { formatMoney } from "../utils/formatNumber";
 
 const dateValue = (date: Date) => {
   const year = date.getFullYear();
@@ -49,7 +48,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <Typography variant="caption" sx={{ fontWeight: 700 }}>{label}</Typography>
       {payload.map((entry: any, i: number) => (
         <Typography key={i} variant="caption" sx={{ display: "block", color: entry.color }}>
-          {entry.name}: ₹{(entry.value || 0).toFixed(0)}
+          {entry.name}: {formatMoney(entry.value)}
         </Typography>
       ))}
     </Card>
@@ -120,16 +119,16 @@ export const Dashboard = () => {
       {/* KPI cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(5, 1fr)" }, gap: { xs: 1, sm: 2 } }}>
         {[
-          ["Revenue", money(data.revenue), "#e3f2fd", "Total sales value during the selected date range."],
-          ["Cost", money(data.cost), "#fff3e0", "Estimated cost of the products sold during the selected date range."],
-          ["Profit", money(data.profit), "#e8f5e9", "Revenue minus estimated product cost."],
+          ["Revenue", formatMoney(data.revenue), "#e3f2fd", "Total sales value during the selected date range."],
+          ["Cost", formatMoney(data.cost), "#fff3e0", "Estimated cost of the products sold during the selected date range."],
+          ["Profit", formatMoney(data.profit), "#e8f5e9", "Revenue minus estimated product cost."],
           ["Margin", `${(data.margin_pct || 0).toFixed(1)}%`, "#ede7f6", "Profit expressed as a percentage of revenue."],
-          ["Due", money(data.due), "#ffebee", "Amount still due from sales in the selected date range."],
-          ["Supplier Dues", money(data.supplier_dues), "#fff8e1", "Outstanding balance owed to suppliers."],
-          ["Cash In", money(data.cash_in), "#e8f5e9", "Customer payments received in the selected date range."],
-          ["Cash Out", money(data.cash_out), "#ffebee", "Supplier payments made in the selected date range."],
-          ["Advances", money(data.advance_balances_total), "#e3f2fd", "Total advance balances held from customers."],
-          ["Avg Batch", money(data.avg_batch_cost), "#f3e5f5", "Average production batch cost in the selected date range."],
+          ["Due", formatMoney(data.due), "#ffebee", "Amount still due from sales in the selected date range."],
+          ["Supplier Dues", formatMoney(data.supplier_dues), "#fff8e1", "Outstanding balance owed to suppliers."],
+          ["Cash In", formatMoney(data.cash_in), "#e8f5e9", "Customer payments received in the selected date range."],
+          ["Cash Out", formatMoney(data.cash_out), "#ffebee", "Supplier payments made in the selected date range."],
+          ["Advances", formatMoney(data.advance_balances_total), "#e3f2fd", "Total advance balances held from customers."],
+          ["Avg Batch", formatMoney(data.avg_batch_cost), "#f3e5f5", "Average production batch cost in the selected date range."],
         ].map(([label, value, bgcolor, description]) => (
           <Card key={label} sx={{ bgcolor }}>
             <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
@@ -191,7 +190,7 @@ export const Dashboard = () => {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: any) => `₹${Number(value).toFixed(0)}`} />
+                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} />
                   <Legend wrapperStyle={{ fontSize: 10 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -256,8 +255,8 @@ export const Dashboard = () => {
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
         <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Sales: {data.invoice_count} invoices | Paid: {money(data.paid)}</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {money(data.avg_batch_cost)}</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Sales: {data.invoice_count} invoices | Paid: {formatMoney(data.paid)}</Typography>
+          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {formatMoney(data.avg_batch_cost)}</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Finished stock: {data.packaged_stock_packs} packs</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" }, color: data.pending_orders_count > 0 ? "warning.main" : "text.secondary", fontWeight: data.pending_orders_count > 0 ? 700 : 400 }}>
@@ -288,7 +287,7 @@ export const Dashboard = () => {
           </TableRow></TableHead><TableBody>
             {data.top_products?.slice(0, 5).map((product: any) => <TableRow key={product.name}>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{product.name}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{product.quantity}</TableCell>
-              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(product.profit)}</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(product.profit)}</TableCell>
             </TableRow>)}
           </TableBody></Table></TableContainer>
         </CardContent>
@@ -312,9 +311,9 @@ export const Dashboard = () => {
                 onClick={() => navigate(`/customers/${customer.customer_id}`)}
               >
                 <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{customer.name}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(customer.revenue)}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{money(customer.cost)}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "success.main" : "error.main" }}>{money(customer.profit)}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.revenue)}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.cost)}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "success.main" : "error.main" }}>{formatMoney(customer.profit)}</TableCell>
               </TableRow>
             ))}
             {(!data.top_customers || data.top_customers.length === 0) && (

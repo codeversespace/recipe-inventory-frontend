@@ -1,5 +1,6 @@
 import { Alert, Box, Card, CardContent, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials } from "../hooks/useApi";
+import { formatMoney } from "../utils/formatNumber";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
 
@@ -58,8 +59,8 @@ export const Inventory = () => {
                         <Chip label="Sufficient" color="success" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
                       ) : "—"}
                     </TableCell>
-                    <TableCell sx={cellSx}>{item.cost_per_unit > 0 ? `₹${item.cost_per_unit.toFixed(0)}` : "—"}</TableCell>
-                    <TableCell sx={cellSx}>{item.unit_price > 0 ? `₹${item.unit_price.toFixed(0)}` : "—"}</TableCell>
+                    <TableCell sx={cellSx}>{item.cost_per_unit > 0 ? formatMoney(item.cost_per_unit) : "—"}</TableCell>
+                    <TableCell sx={cellSx}>{item.unit_price > 0 ? formatMoney(item.unit_price) : "—"}</TableCell>
                     <TableCell sx={cellSx}>
                       {(() => {
                         if (item.cost_per_unit > 0 && item.unit_price > 0) {
@@ -112,7 +113,7 @@ export const Inventory = () => {
                   <TableCell sx={cellSx}>{item.name}</TableCell>
                   <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{item.on_hand_qty}</TableCell>
                   <TableCell sx={cellSx}>{item.base_unit}</TableCell>
-                  <TableCell sx={cellSx}>₹{item.avg_unit_price.toFixed(0)}</TableCell>
+                  <TableCell sx={cellSx}>{formatMoney(item.avg_unit_price)}</TableCell>
                   <TableCell sx={{ ...cellSx, color: item.is_low_stock ? "error.main" : "text.secondary", fontWeight: item.is_low_stock ? 700 : 400 }}>{item.is_low_stock ? "Low" : "OK"}</TableCell>
                 </TableRow>
               )) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}>No raw materials recorded.</TableCell></TableRow>}
@@ -153,7 +154,7 @@ export const Inventory = () => {
                 <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{item.name}</TableCell>
                 <TableCell sx={{ ...cellSx, fontWeight: 700, color: item.qty <= 0 ? "error.main" : "text.primary" }}>{item.qty}</TableCell>
                 <TableCell sx={cellSx}>{item.unit}</TableCell>
-                <TableCell sx={cellSx}>₹{item.unit_price?.toFixed(2) || "0.00"}</TableCell>
+                <TableCell sx={cellSx}>{formatMoney(item.unit_price || 0)}</TableCell>
               </TableRow>
             )) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No packing materials recorded.</TableCell></TableRow>}
           </TableBody>

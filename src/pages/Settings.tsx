@@ -70,12 +70,22 @@ export const Settings = () => {
   };
 
   const clearDatabase = async () => {
-    if (!window.confirm("Delete all business data? User accounts will be preserved.")) return;
+    if (!window.confirm("DELETE ALL business data? This cannot be undone. User accounts will be preserved.")) return;
     try {
       await api.delete("/auth/database");
       window.location.reload();
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not clear database.");
+    }
+  };
+
+  const resetAllData = async () => {
+    if (!window.confirm("Reset all transactional data?\n\n• All sales, purchases, batches, orders & payments will be deleted\n• Items, suppliers, recipes & customers will be KEPT\n• All item quantities will be reset to zero\n\nThis cannot be undone.")) return;
+    try {
+      await api.delete("/auth/database/reset-all");
+      window.location.reload();
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not reset data.");
     }
   };
 
@@ -106,7 +116,8 @@ export const Settings = () => {
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button variant="outlined" onClick={downloadBackup}>Download full backup</Button>
             <Button variant="outlined" component="label">Restore database<input hidden type="file" accept=".db,.sqlite" onChange={restoreBackup} /></Button>
-            <Button color="error" variant="outlined" onClick={clearDatabase}>Delete all business data</Button>
+            <Button color="warning" variant="outlined" onClick={resetAllData}>Reset all data</Button>
+            <Button color="error" variant="outlined" onClick={clearDatabase}>Delete everything</Button>
           </Box>
         </CardContent>
       </Card>

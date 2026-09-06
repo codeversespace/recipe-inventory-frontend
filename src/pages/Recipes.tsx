@@ -1,5 +1,5 @@
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { useAddIngredient, useAddRecipe, useAddRecipeIngredient, useDeleteRecipe, useIngredients, useRecipes, useUpdateRecipe, useRecipeOverheads, useAddRecipeOverhead, useDeleteRecipeOverhead } from "../hooks/useApi";
+import { useAddRecipe, useAddRecipeIngredient, useDeleteRecipe, useIngredients, useRecipes, useUpdateRecipe, useRecipeOverheads, useAddRecipeOverhead, useDeleteRecipeOverhead } from "../hooks/useApi";
 import { useState } from "react";
 import { api } from "../api/client";
 
@@ -12,7 +12,6 @@ export const Recipes = () => {
   const addRecipe = useAddRecipe();
   const addRecipeIngredient = useAddRecipeIngredient();
   const addRecipeOverhead = useAddRecipeOverhead();
-  const addIngredient = useAddIngredient();
   const updateRecipe = useUpdateRecipe();
   const deleteRecipe = useDeleteRecipe();
   const [open, setOpen] = useState(false);
@@ -24,10 +23,6 @@ export const Recipes = () => {
   const [lines, setLines] = useState<Line[]>([]);
   const [formError, setFormError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [newIngredientOpen, setNewIngredientOpen] = useState(false);
-  const [newIngredientName, setNewIngredientName] = useState("");
-  const [newIngredientUnit, setNewIngredientUnit] = useState("");
-  const [newIngredientMinStock, setNewIngredientMinStock] = useState("0");
   const [loadingAction, setLoadingAction] = useState("");
   const [scaleOpen, setScaleOpen] = useState(false);
   const [scaleRecipe, setScaleRecipe] = useState<any>(null);
@@ -92,25 +87,6 @@ export const Recipes = () => {
   const removeRecipe = async (recipe: any) => {
     if (window.confirm(`Delete ${recipe.name}?`)) try { await deleteRecipe.mutateAsync(recipe.id); } catch (requestError: any) { alert(requestError.response?.data?.detail || "Could not delete recipe."); }
   };
-  const saveNewIngredient = async () => {
-    const minStock = Number(newIngredientMinStock);
-    if (!newIngredientName.trim() || !newIngredientUnit.trim() || !Number.isFinite(minStock) || minStock < 0) {
-      setFormError("Enter a valid ingredient name, unit, and minimum stock.");
-      return;
-    }
-    try {
-      const ingredient = await addIngredient.mutateAsync({ name: newIngredientName.trim(), base_unit: newIngredientUnit.trim(), min_stock: minStock });
-      setIngredientId(ingredient.id);
-      setNewIngredientName("");
-      setNewIngredientUnit("");
-      setNewIngredientMinStock("0");
-      setNewIngredientOpen(false);
-      setFormError("");
-    } catch (requestError: any) {
-      setFormError(requestError.response?.data?.detail || "Could not add ingredient.");
-    }
-  };
-
   const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
 
   const openScale = async (recipe: any) => {
@@ -141,7 +117,7 @@ export const Recipes = () => {
       <TextField margin="dense" label="Batch Unit (kg, L, pcs)" fullWidth value={batchUnit} onChange={(event) => setBatchUnit(event.target.value)} />
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Ingredients</Typography>
       {!ingredients.length && <Alert severity="info" sx={{ mt: 1 }}>Add ingredients first from the Ingredients page.</Alert>}
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small"><InputLabel>Ingredient</InputLabel><Select value={ingredientId} label="Ingredient" onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{ingredients.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!ingredients.length}>Add</Button><Button onClick={() => setNewIngredientOpen(true)} variant="text">New ingredient</Button></Box>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small"><InputLabel>Ingredient</InputLabel><Select value={ingredientId} label="Ingredient" onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{ingredients.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!ingredients.length}>Add</Button></Box>
       {lines.map((line) => <Box key={line.ingredientId} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{line.name}: {line.quantity} {line.unit}</Typography><Button size="small" color="error" onClick={() => setLines(lines.filter((item) => item.ingredientId !== line.ingredientId))}>Remove</Button></Box>)}
       {/* Overheads Section */}
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Overheads (labour, fuel, consumables)</Typography>
@@ -167,7 +143,6 @@ export const Recipes = () => {
       </Box>
       {overheads.map((oh, i) => <Box key={i} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{oh.name}: ₹{oh.cost_per_batch} ({oh.overhead_type})</Typography><Button size="small" color="error" onClick={() => setOverheads(overheads.filter((_, idx) => idx !== i))}>Remove</Button></Box>)}
     </DialogContent><DialogActions><Button onClick={close} disabled={addRecipe.isPending || addRecipeIngredient.isPending}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || addRecipeIngredient.isPending}>{addRecipe.isPending || addRecipeIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
-    <Dialog open={newIngredientOpen} onClose={() => setNewIngredientOpen(false)} maxWidth="xs" fullWidth><DialogTitle>New ingredient</DialogTitle><DialogContent>{formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}<TextField autoFocus margin="dense" label="Name" fullWidth value={newIngredientName} onChange={(event) => setNewIngredientName(event.target.value)} /><TextField margin="dense" label="Unit (kg, L, pcs)" fullWidth value={newIngredientUnit} onChange={(event) => setNewIngredientUnit(event.target.value)} /><TextField margin="dense" label="Minimum stock alert" type="number" fullWidth value={newIngredientMinStock} onChange={(event) => setNewIngredientMinStock(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setNewIngredientOpen(false)} disabled={addIngredient.isPending}>Cancel</Button><Button onClick={saveNewIngredient} variant="contained" disabled={addIngredient.isPending}>{addIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : "Add ingredient"}</Button></DialogActions></Dialog>
     {/* Scale Calculator Dialog */}
     <Dialog open={scaleOpen} onClose={() => setScaleOpen(false)} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>Scale Recipe: {scaleRecipe?.name}</DialogTitle>

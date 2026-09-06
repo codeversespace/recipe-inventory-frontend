@@ -30,18 +30,28 @@ import {
   useAllSupplierPurchases,
   useCreateSupplierPurchase,
   useSuppliers,
+  useIngredients,
+  useManualStock,
+  useAddIngredient,
 } from "../hooks/useApi";
 import { useState, useMemo } from "react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { formatDate } from "../utils/formatDate";
+import { formatMoney } from "../utils/formatNumber";
 
 export const Purchases = () => {
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchases = [], isLoading } = useAllSupplierPurchases();
   const createPurchase = useCreateSupplierPurchase();
+  const { data: ingredients = [] } = useIngredients();
+  const { data: manualStockItems = [] } = useManualStock();
+  const addIngredient = useAddIngredient();
 
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemUnit, setNewItemUnit] = useState("kg");
 
   const [supplierId, setSupplierId] = useState(0);
   const [category, setCategory] = useState("raw_material");
@@ -69,6 +79,37 @@ export const Purchases = () => {
     setPaymentAmount("");
     setPaymentMethod("CASH");
     setPaymentReference("");
+    setAddingNew(false);
+    setNewItemName("");
+    setNewItemUnit("kg");
+  };
+
+  const categoryItemOptions = useMemo(() => {
+    if (category === "raw_material") {
+      return ingredients.map((i: any) => i.name);
+    }
+    return manualStockItems
+      .filter((m: any) => m.category === category)
+      .map((m: any) => m.name);
+  }, [category, ingredients, manualStockItems]);
+
+  const handleAddNewItem = async () => {
+    if (!newItemName.trim()) { setFormError("Enter a new item name."); return; }
+    try {
+      const created = await addIngredient.mutateAsync({
+        name: newItemName.trim(),
+        base_unit: newItemUnit.trim() || "kg",
+        min_stock: 0,
+      });
+      setItemName(created.name);
+      setUnit(created.base_unit);
+      setAddingNew(false);
+      setNewItemName("");
+      setNewItemUnit("kg");
+      setFormError("");
+    } catch (e: any) {
+      setFormError(e.response?.data?.detail || "Could not add item.");
+    }
   };
 
   const handleAdd = async () => {
@@ -154,7 +195,7 @@ export const Purchases = () => {
                   <TableCell sx={cellSx}>{p.item_name}</TableCell>
                   <TableCell sx={cellSx}>{p.category}</TableCell>
                   <TableCell sx={cellSx}>{p.quantity} {p.unit}</TableCell>
-                  <TableCell sx={cellSx}>₹{p.unit_price.toFixed(2)}</TableCell>
+                  <TableCell sx={cellSx}>{formatMoney(p.unit_price)}</TableCell>
                   <TableCell sx={cellSx}>
                     <ResponsiveContainer width={80} height={24}>
                       <LineChart data={(priceHistory[p.item_name] || []).slice(-5)}>
@@ -162,7 +203,7 @@ export const Purchases = () => {
                       </LineChart>
                     </ResponsiveContainer>
                   </TableCell>
-                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>₹{p.total_amount.toFixed(2)}</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{formatMoney(p.total_amount)}</TableCell>
                   <TableCell sx={cellSx}>{p.reference || "—"}</TableCell>
                 </TableRow>
               ))}
@@ -189,20 +230,61 @@ export const Purchases = () => {
           />
           <FormControl fullWidth margin="dense" size="small">
             <InputLabel>Category</InputLabel>
-            <Select value={category} label="Category" onChange={(e) => setCategory(e.target.value)}>
+            <Select value={category} label="Category" onChange={(e) => { setCategory(e.target.value); setItemName(""); setAddingNew(false); }}>
               <MenuItem value="raw_material">Raw material</MenuItem>
               <MenuItem value="saleable_good">Saleable good</MenuItem>
               <MenuItem value="packing_material">Packing material</MenuItem>
             </Select>
           </FormControl>
-          <TextField margin="dense" label="Item name" fullWidth value={itemName} onChange={(e) => setItemName(e.target.value)} />
+          {addingNew ? (
+            <Box sx={{ mt: 1, p: 1.5, border: 1, borderColor: "divider", borderRadius: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>New item</Typography>
+              <TextField margin="dense" label="Item name" fullWidth size="small" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+              <TextField margin="dense" label="Unit" fullWidth size="small" value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)} sx={{ maxWidth: 120, mt: 1 }} />
+              <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                <Button size="small" onClick={() => { setAddingNew(false); setNewItemName(""); setNewItemUnit("kg"); }}>Cancel</Button>
+                <Button size="small" variant="contained" onClick={handleAddNewItem} disabled={addIngredient.isPending}>
+                  {addIngredient.isPending ? <CircularProgress size={16} color="inherit" /> : "Add item"}
+                </Button>
+              </Box>
+            </Box>
+          ) : (
+            <Autocomplete
+              options={[...categoryItemOptions, "__add_new__"]}
+              getOptionLabel={(option) => option === "__add_new__" ? "+ Add new item" : option}
+              renderOption={(props, option) => (
+                <li {...props} key={option} style={option === "__add_new__" ? { fontWeight: 700, color: "primary.main" } : {}}>
+                  {option === "__add_new__" ? "+ Add new item" : option}
+                </li>
+              )}
+              value={itemName || null}
+              onChange={(_, newValue) => {
+                if (newValue === "__add_new__") {
+                  setAddingNew(true);
+                  setItemName("");
+                } else {
+                  setItemName(newValue || "");
+                  const existing = categoryItemOptions.find((n) => n === newValue);
+                  if (existing && category === "raw_material") {
+                    const found = ingredients.find((i: any) => i.name === newValue);
+                    if (found) setUnit(found.base_unit);
+                  }
+                }
+              }}
+              freeSolo
+              onInputChange={(_, value) => setItemName(value || "")}
+              renderInput={(params) => <TextField {...params} margin="dense" label="Item name" placeholder="Search items..." />}
+              fullWidth
+              size="small"
+            />
+          )}
           <Box sx={{ display: "flex", gap: 1 }}>
             <TextField margin="dense" label="Quantity" type="number" fullWidth value={qty} onChange={(e) => setQty(e.target.value)} />
             <TextField margin="dense" label="Unit" fullWidth value={unit} onChange={(e) => setUnit(e.target.value)} sx={{ maxWidth: 120 }} />
           </Box>
           <TextField margin="dense" label="Unit Price (₹)" type="number" fullWidth value={price} onChange={(e) => setPrice(e.target.value)} />
           {totalAmount > 0 && (
-            <Typography variant="body2" sx={{ mt: 1, fontWeight: 700, color: "primary.main" }}>Total: ₹{totalAmount.toFixed(2)}</Typography>
+            <Typography variant="body2" sx={{ mt: 1, fontWeight: 700, color: "primary.main" }}>Total: {formatMoney(totalAmount)}</Typography>
           )}
           <TextField margin="dense" label="Invoice / reference" fullWidth value={reference} onChange={(e) => setReference(e.target.value)} />
 
