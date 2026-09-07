@@ -65,6 +65,8 @@ export const Recipes = () => {
       if (editingId) {
         const { data: existingLines } = await api.get(`/recipes/${recipe.id}/ingredients`);
         await Promise.all(existingLines.map((line: any) => api.delete(`/recipes/${recipe.id}/ingredients/${line.id}`)));
+        const { data: existingOverheads } = await api.get(`/recipes/${recipe.id}/overheads`);
+        await Promise.all(existingOverheads.map((oh: any) => api.delete(`/recipes/${recipe.id}/overheads/${oh.id}`)));
       }
       await Promise.all(lines.map((line) => addRecipeIngredient.mutateAsync({ recipe_id: recipe.id, ingredient_id: line.ingredientId, qty_per_batch: line.quantity, unit: line.unit })));
       for (const oh of overheads) {
