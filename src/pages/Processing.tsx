@@ -222,7 +222,7 @@ export const Processing = () => {
             renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
           />
           <Autocomplete
-            options={ingredients.filter((i: any) => (i.on_hand_qty || 0) > 0)}
+            options={ingredients}
             getOptionLabel={(i: any) => `${i.name} (${i.on_hand_qty || 0} ${i.base_unit})`}
             value={ingredients.find((i: any) => i.id === rawId) || null}
             onChange={(_, v) => setRawId(v?.id || 0)}
