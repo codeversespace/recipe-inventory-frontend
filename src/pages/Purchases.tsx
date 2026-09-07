@@ -29,6 +29,8 @@ import {
 import {
   useAllSupplierPurchases,
   useCreateSupplierPurchase,
+  useUpdateSupplierPurchase,
+  useDeleteSupplierPurchase,
   useSuppliers,
   useIngredients,
   useManualStock,
@@ -43,11 +45,14 @@ export const Purchases = () => {
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchases = [], isLoading } = useAllSupplierPurchases();
   const createPurchase = useCreateSupplierPurchase();
+  const updatePurchase = useUpdateSupplierPurchase();
+  const deletePurchase = useDeleteSupplierPurchase();
   const { data: ingredients = [] } = useIngredients();
   const { data: manualStockItems = [] } = useManualStock();
   const addIngredient = useAddIngredient();
 
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [formError, setFormError] = useState("");
   const [addingNew, setAddingNew] = useState(false);
   const [newItemName, setNewItemName] = useState("");
@@ -59,6 +64,7 @@ export const Purchases = () => {
   const [unit, setUnit] = useState("kg");
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
+  const [sellingPrice, setSellingPrice] = useState("");
   const [reference, setReference] = useState("");
   const [payNow, setPayNow] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -67,6 +73,7 @@ export const Purchases = () => {
 
   const resetForm = () => {
     setOpen(false);
+    setEditingId(null);
     setFormError("");
     setSupplierId(0);
     setCategory("raw_material");
@@ -74,6 +81,7 @@ export const Purchases = () => {
     setUnit("kg");
     setQty("");
     setPrice("");
+    setSellingPrice("");
     setReference("");
     setPayNow(false);
     setPaymentAmount("");
@@ -100,6 +108,7 @@ export const Purchases = () => {
         name: newItemName.trim(),
         base_unit: newItemUnit.trim() || "kg",
         min_stock: 0,
+        category,
       });
       setItemName(created.name);
       setUnit(created.base_unit);
@@ -128,22 +137,62 @@ export const Purchases = () => {
     }
 
     try {
-      await createPurchase.mutateAsync({
-        supplier_id: supplierId,
-        category,
-        item_name: itemName.trim(),
-        unit: unit.trim() || "kg",
-        quantity,
-        unit_price: unitPrice,
-        reference: reference || undefined,
-        payment_amount: payNow ? paymentAmt : undefined,
-        payment_method: paymentMethod,
-        payment_reference: paymentReference || undefined,
-      });
+      if (editingId) {
+        await updatePurchase.mutateAsync({
+          id: editingId,
+          data: {
+            supplier_id: supplierId,
+            category,
+            item_name: itemName.trim(),
+            unit: unit.trim() || "kg",
+            quantity,
+            unit_price: unitPrice,
+            selling_price: category === "saleable_good" && sellingPrice ? parseFloat(sellingPrice) : undefined,
+            reference: reference || undefined,
+          },
+        });
+      } else {
+        await createPurchase.mutateAsync({
+          supplier_id: supplierId,
+          category,
+          item_name: itemName.trim(),
+          unit: unit.trim() || "kg",
+          quantity,
+          unit_price: unitPrice,
+          selling_price: category === "saleable_good" && sellingPrice ? parseFloat(sellingPrice) : undefined,
+          reference: reference || undefined,
+          payment_amount: payNow ? paymentAmt : undefined,
+          payment_method: paymentMethod,
+          payment_reference: paymentReference || undefined,
+        });
+      }
       resetForm();
     } catch (e: any) {
       setFormError(e.response?.data?.detail || "Could not save purchase.");
     }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Delete this purchase record? Inventory will be adjusted.")) return;
+    try {
+      await deletePurchase.mutateAsync(id);
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Could not delete purchase.");
+    }
+  };
+
+  const handleEdit = (p: any) => {
+    setEditingId(p.id);
+    setSupplierId(p.supplier_id);
+    setCategory(p.category);
+    setItemName(p.item_name);
+    setUnit(p.unit);
+    setQty(String(p.quantity));
+    setPrice(String(p.unit_price));
+    setSellingPrice(p.selling_price ? String(p.selling_price) : "");
+    setReference(p.reference || "");
+    setPayNow(false);
+    setOpen(true);
   };
 
   const totalAmount = (parseFloat(qty) || 0) * (parseFloat(price) || 0);
@@ -185,6 +234,7 @@ export const Purchases = () => {
                 <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Trend</TableCell>
                 <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Total</TableCell>
                 <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Reference</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -205,6 +255,10 @@ export const Purchases = () => {
                   </TableCell>
                   <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{formatMoney(p.total_amount)}</TableCell>
                   <TableCell sx={cellSx}>{p.reference || "—"}</TableCell>
+                  <TableCell sx={cellSx}>
+                    <Button size="small" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} onClick={() => handleEdit(p)}>Edit</Button>
+                    <Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} onClick={() => handleDelete(p.id)} disabled={deletePurchase.isPending}>Del</Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -215,7 +269,7 @@ export const Purchases = () => {
       )}
 
       <Dialog open={open} onClose={resetForm} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Purchase</DialogTitle>
+        <DialogTitle>{editingId ? "Edit Purchase" : "Add Purchase"}</DialogTitle>
         <DialogContent>
           {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
           <Autocomplete
@@ -283,11 +337,15 @@ export const Purchases = () => {
             <TextField margin="dense" label="Unit" fullWidth value={unit} onChange={(e) => setUnit(e.target.value)} sx={{ maxWidth: 120 }} />
           </Box>
           <TextField margin="dense" label="Unit Price (₹)" type="number" fullWidth value={price} onChange={(e) => setPrice(e.target.value)} />
+          {category === "saleable_good" && (
+            <TextField margin="dense" label="Selling Price (₹)" type="number" fullWidth value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} helperText="Price at which this item will be sold" />
+          )}
           {totalAmount > 0 && (
             <Typography variant="body2" sx={{ mt: 1, fontWeight: 700, color: "primary.main" }}>Total: {formatMoney(totalAmount)}</Typography>
           )}
           <TextField margin="dense" label="Invoice / reference" fullWidth value={reference} onChange={(e) => setReference(e.target.value)} />
 
+          {!editingId && (
           <Box sx={{ mt: 2, p: 1.5, bgcolor: "grey.50", borderRadius: 1 }}>
             <FormControlLabel
               control={<Checkbox checked={payNow} onChange={(e) => {
@@ -314,6 +372,7 @@ export const Purchases = () => {
               </Box>
             )}
           </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={resetForm} disabled={createPurchase.isPending}>Cancel</Button>

@@ -9,6 +9,7 @@ type OverheadLine = { name: string; cost_per_batch: number; overhead_type: strin
 export const Recipes = () => {
   const { data: recipes = [], isLoading, error } = useRecipes();
   const { data: ingredients = [] } = useIngredients();
+  const rawMaterials = ingredients.filter((i: any) => i.category === "raw_material");
   const addRecipe = useAddRecipe();
   const addRecipeIngredient = useAddRecipeIngredient();
   const addRecipeOverhead = useAddRecipeOverhead();
@@ -118,8 +119,8 @@ export const Recipes = () => {
       <TextField margin="dense" label="Batch Qty" fullWidth value={batchQty} onChange={(event) => setBatchQty(event.target.value)} />
       <TextField margin="dense" label="Batch Unit (kg, L, pcs)" fullWidth value={batchUnit} onChange={(event) => setBatchUnit(event.target.value)} />
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Ingredients</Typography>
-      {!ingredients.length && <Alert severity="info" sx={{ mt: 1 }}>Add ingredients first from the Ingredients page.</Alert>}
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small"><InputLabel>Ingredient</InputLabel><Select value={ingredientId} label="Ingredient" onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{ingredients.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!ingredients.length}>Add</Button></Box>
+      {!rawMaterials.length && <Alert severity="info" sx={{ mt: 1 }}>Add raw materials first from the Ingredients page.</Alert>}
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small"><InputLabel>Ingredient</InputLabel><Select value={ingredientId} label="Ingredient" onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{rawMaterials.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!rawMaterials.length}>Add</Button></Box>
       {lines.map((line) => <Box key={line.ingredientId} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{line.name}: {line.quantity} {line.unit}</Typography><Button size="small" color="error" onClick={() => setLines(lines.filter((item) => item.ingredientId !== line.ingredientId))}>Remove</Button></Box>)}
       {/* Overheads Section */}
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Overheads (labour, fuel, consumables)</Typography>

@@ -6,6 +6,7 @@ export interface Ingredient {
   min_stock: number;
   on_hand_qty?: number;
   avg_unit_price?: number;
+  category?: string;
 }
 
 export interface PurchaseLot {

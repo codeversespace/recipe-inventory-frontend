@@ -57,6 +57,28 @@ export const useCreateSupplierPurchase = () => {
   });
 };
 
+export const useUpdateSupplierPurchase = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { id: number; data: any }>({
+    mutationFn: ({ id, data }) => api.put(`/suppliers/purchases/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
+};
+
+export const useDeleteSupplierPurchase = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, number>({
+    mutationFn: (id) => api.delete(`/suppliers/purchases/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
+};
+
 export const useAddSupplierPayment = () => {
   const qc = useQueryClient();
   return useMutation<any, Error, { supplierId: number; amount: number; method: string; reference?: string; notes?: string }>({
@@ -127,7 +149,7 @@ export const useIngredients = () =>
 
 export const useAddIngredient = () => {
   const qc = useQueryClient();
-  return useMutation<Ingredient, Error, { name: string; base_unit: string; min_stock: number }>({
+  return useMutation<Ingredient, Error, { name: string; base_unit: string; min_stock: number; category?: string }>({
     mutationFn: async (payload) => (await api.post<Ingredient>("/ingredients", payload)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
   });
