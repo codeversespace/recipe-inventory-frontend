@@ -518,6 +518,30 @@ export const usePackagedStock = () =>
 export const useSaleableStock = () =>
   useQuery<any[], Error>({ queryKey: ["saleableStock"], queryFn: async () => (await api.get("/packing/saleable")).data, initialData: [] });
 
+export const useDeleteManualStockItem = () => {
+  const qc = useQueryClient();
+  return useMutation<void, any, number>({
+    mutationFn: (id) => api.delete(`/packing/manual-stock/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
+};
+
+export const useDeleteStockItem = () => {
+  const qc = useQueryClient();
+  return useMutation<void, any, number>({
+    mutationFn: (id) => api.delete(`/packing/stock/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+    },
+  });
+};
+
 export const useAddPackType = () => {
   const qc = useQueryClient();
   return useMutation<any, Error, { name: string; size_grams: number; selling_price?: number | null; materials: { material_id: number; qty_per_pack: number }[] }>({

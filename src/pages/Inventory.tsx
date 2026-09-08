@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
-import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useDeleteIngredient } from "../hooks/useApi";
+import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem } from "../hooks/useApi";
 import { formatMoney } from "../utils/formatNumber";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
@@ -10,11 +10,31 @@ export const Inventory = () => {
   const { data: orderDemand = [] } = useOrderDemand();
   const { data: packingMaterials = [] } = usePackingMaterials();
   const deleteIngredient = useDeleteIngredient();
+  const deleteManualStock = useDeleteManualStockItem();
+  const deleteStockItem = useDeleteStockItem();
 
   const handleDeleteIngredient = async (id: number, name: string) => {
     if (!window.confirm(`Delete "${name}" and all its purchase history? This cannot be undone.`)) return;
     try {
       await deleteIngredient.mutateAsync({ id, force: true });
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Could not delete item.");
+    }
+  };
+
+  const handleDeleteSaleable = async (id: number, name: string) => {
+    if (!window.confirm(`Delete saleable item "${name}" and all its purchase history? This cannot be undone.`)) return;
+    try {
+      await deleteStockItem.mutateAsync(id);
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Could not delete item.");
+    }
+  };
+
+  const handleDeletePacking = async (id: number, name: string) => {
+    if (!window.confirm(`Delete packing material "${name}" and all its purchase history? This cannot be undone.`)) return;
+    try {
+      await deleteManualStock.mutateAsync(id);
     } catch (e: any) {
       alert(e.response?.data?.detail || "Could not delete item.");
     }
@@ -46,6 +66,7 @@ export const Inventory = () => {
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Price</TableCell>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Turnover</TableCell>
+              <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell>
             </TableRow></TableHead>
             <TableBody>
               {saleableStock.length ? saleableStock.map((item: any) => {
@@ -81,11 +102,16 @@ export const Inventory = () => {
                         return "—";
                       })()}
                     </TableCell>
+                    <TableCell sx={cellSx}>
+                      <Button size="small" color="error" variant="outlined" onClick={() => handleDeleteSaleable(item.id, item.name)}>
+                        Del
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               }) : (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ ...cellSx, py: 3 }}>No saleable goods in stock.</TableCell>
+                  <TableCell colSpan={9} align="center" sx={{ ...cellSx, py: 3 }}>No saleable goods in stock.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -158,6 +184,7 @@ export const Inventory = () => {
           <TableHead><TableRow>
             <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Material</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell>
             <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell>
+            <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell>
           </TableRow></TableHead>
           <TableBody>
             {packingMaterials.length ? packingMaterials.map((item: any) => (
@@ -166,8 +193,13 @@ export const Inventory = () => {
                 <TableCell sx={{ ...cellSx, fontWeight: 700, color: item.qty <= 0 ? "error.main" : "text.primary" }}>{item.qty}</TableCell>
                 <TableCell sx={cellSx}>{item.unit}</TableCell>
                 <TableCell sx={cellSx}>{formatMoney(item.unit_price || 0)}</TableCell>
+                <TableCell sx={cellSx}>
+                  <Button size="small" color="error" variant="outlined" onClick={() => handleDeletePacking(item.id, item.name)}>
+                    Del
+                  </Button>
+                </TableCell>
               </TableRow>
-            )) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No packing materials recorded.</TableCell></TableRow>}
+            )) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}>No packing materials recorded.</TableCell></TableRow>}
           </TableBody>
         </Table>
       </TableContainer>
