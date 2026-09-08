@@ -75,6 +75,7 @@ export const useDeleteSupplierPurchase = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier"] });
     },
   });
 };
@@ -167,7 +168,10 @@ export const useDeleteIngredient = () => {
   const qc = useQueryClient();
   return useMutation<void, any, { id: number; force?: boolean }>({
     mutationFn: ({ id, force }) => api.delete(`/ingredients/${id}`, { params: force ? { force: true } : {} }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+    },
   });
 };
 

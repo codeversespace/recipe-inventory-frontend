@@ -1,5 +1,5 @@
-import { Alert, Box, Card, CardContent, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
-import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials } from "../hooks/useApi";
+import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useDeleteIngredient } from "../hooks/useApi";
 import { formatMoney } from "../utils/formatNumber";
 
 const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
@@ -9,6 +9,16 @@ export const Inventory = () => {
   const { data: rawMaterials = [], isLoading: rawMaterialsLoading, error: rawMaterialsError } = useInventory();
   const { data: orderDemand = [] } = useOrderDemand();
   const { data: packingMaterials = [] } = usePackingMaterials();
+  const deleteIngredient = useDeleteIngredient();
+
+  const handleDeleteIngredient = async (id: number, name: string) => {
+    if (!window.confirm(`Delete "${name}" and all its purchase history? This cannot be undone.`)) return;
+    try {
+      await deleteIngredient.mutateAsync({ id, force: true });
+    } catch (e: any) {
+      alert(e.response?.data?.detail || "Could not delete item.");
+    }
+  };
 
   return (
     <Box>
@@ -105,7 +115,7 @@ export const Inventory = () => {
           <Table size="small">
             <TableHead><TableRow>
               <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell>
-              <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Avg cost</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Status</TableCell>
+              <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Avg cost</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Status</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Actions</TableCell>
             </TableRow></TableHead>
             <TableBody>
               {rawMaterials.length ? rawMaterials.map((item: any) => (
@@ -115,8 +125,9 @@ export const Inventory = () => {
                   <TableCell sx={cellSx}>{item.base_unit}</TableCell>
                   <TableCell sx={cellSx}>{formatMoney(item.avg_unit_price)}</TableCell>
                   <TableCell sx={{ ...cellSx, color: item.is_low_stock ? "error.main" : "text.secondary", fontWeight: item.is_low_stock ? 700 : 400 }}>{item.is_low_stock ? "Low" : "OK"}</TableCell>
+                  <TableCell sx={cellSx}><Button size="small" color="error" sx={{ fontSize: "0.7rem", minWidth: "auto", px: 1 }} onClick={() => handleDeleteIngredient(item.id, item.name)} disabled={deleteIngredient.isPending}>Del</Button></TableCell>
                 </TableRow>
-              )) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}>No raw materials recorded.</TableCell></TableRow>}
+              )) : <TableRow><TableCell colSpan={6} align="center" sx={{ ...cellSx, py: 3 }}>No raw materials recorded.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </TableContainer>
