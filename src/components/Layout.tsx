@@ -38,6 +38,8 @@ import {
   ViewQuilt as PackTypeIcon,
   CalendarMonth as SchedulerIcon,
   Science as ScienceIcon,
+  MenuBook as RecipesIcon,
+  Archive as PackingIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -54,25 +56,57 @@ const navItems: NavItem[] = [
   { text: "Customers", icon: <PeopleIcon />, to: "/customers", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
   { text: "Sales", icon: <ReceiptIcon />, to: "/sales", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
   { text: "Orders", icon: <OrderIcon />, to: "/orders", roles: ["super_admin", "admin", "manager", "sales", "production"], section: "Sales" },
-  { text: "Payments", icon: <PaymentsIcon />, to: "/payments", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
-  { text: "Recipes", icon: <ReceiptIcon />, to: "/recipes", roles: ["super_admin", "admin", "manager"], section: "Production" },
+  { text: "Payments", icon: <PaymentsIcon />, to: "/payments", roles: ["super_admin", "admin", "manager", "sales", "inventory"], section: "Sales" },
+  { text: "Recipes", icon: <RecipesIcon />, to: "/recipes", roles: ["super_admin", "admin", "manager"], section: "Production" },
   { text: "Production", icon: <ProductionIcon />, to: "/production", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
   { text: "Scheduler", icon: <SchedulerIcon />, to: "/production-scheduler", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
   { text: "Processing", icon: <ScienceIcon />, to: "/processing", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
-  { text: "Packing", icon: <InventoryIcon />, to: "/packing", roles: ["super_admin", "admin", "manager", "packing"], section: "Production" },
+  { text: "Packing", icon: <PackingIcon />, to: "/packing", roles: ["super_admin", "admin", "manager", "packing"], section: "Production" },
   { text: "Pack types", icon: <PackTypeIcon />, to: "/pack-types", roles: ["super_admin", "admin", "manager"], section: "Production" },
   { text: "Admin", icon: <SettingsIcon />, roles: ["super_admin"], section: "Admin", children: [
     { text: "Admin settings", to: "/settings", roles: ["super_admin"] },
   ] },
 ];
 
-const bottomNavItems = [
-  { label: "Home", icon: <DashboardIcon />, to: "/" },
-  { label: "Stock", icon: <InventoryIcon />, to: "/inventory" },
-  { label: "Sales", icon: <ReceiptIcon />, to: "/sales" },
-  { label: "Pay", icon: <PaymentsIcon />, to: "/payments" },
-  { label: "More", icon: <MenuIcon />, to: "__drawer__" },
-];
+type BottomTab = { label: string; icon: React.ReactNode; to: string };
+const MORE_TAB: BottomTab = { label: "More", icon: <MenuIcon />, to: "__drawer__" };
+
+/** Max 4 primary destinations + More, derived from the role's real permissions. */
+const roleBottomNav = (role: Role | undefined): BottomTab[] => {
+  switch (role) {
+    case "inventory":
+      return [
+        { label: "Purchases", icon: <ShoppingCartIcon />, to: "/purchases" },
+        { label: "Suppliers", icon: <SupplierIcon />, to: "/suppliers" },
+        { label: "Stock", icon: <InventoryIcon />, to: "/inventory" },
+        { label: "Pay", icon: <PaymentsIcon />, to: "/payments" },
+      ];
+    case "sales":
+      return [
+        { label: "Sales", icon: <ReceiptIcon />, to: "/sales" },
+        { label: "Customers", icon: <PeopleIcon />, to: "/customers" },
+        { label: "Orders", icon: <OrderIcon />, to: "/orders" },
+        { label: "Pay", icon: <PaymentsIcon />, to: "/payments" },
+      ];
+    case "production":
+      return [
+        { label: "Produce", icon: <ProductionIcon />, to: "/production" },
+        { label: "Orders", icon: <OrderIcon />, to: "/orders" },
+        { label: "Process", icon: <ScienceIcon />, to: "/processing" },
+      ];
+    case "packing":
+      return [{ label: "Packing", icon: <PackingIcon />, to: "/packing" }];
+    case "viewer":
+      return [{ label: "Home", icon: <DashboardIcon />, to: "/" }];
+    default:
+      return [
+        { label: "Home", icon: <DashboardIcon />, to: "/" },
+        { label: "Purchases", icon: <ShoppingCartIcon />, to: "/purchases" },
+        { label: "Stock", icon: <InventoryIcon />, to: "/inventory" },
+        { label: "Sales", icon: <ReceiptIcon />, to: "/sales" },
+      ];
+  }
+};
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -152,7 +186,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </div>
   );
 
-  const currentBottomNav = bottomNavItems.findIndex((item) => item.to !== "__drawer__" && location.pathname === item.to);
+  const bottomNavItems = [...roleBottomNav(user?.role as Role | undefined), MORE_TAB];
+  const currentBottomNav = bottomNavItems.find((item) => item.to !== "__drawer__" && location.pathname === item.to);
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -217,7 +252,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minWidth: 0,
           overflowX: "hidden",
-          pb: { xs: "72px", sm: 3 },
+          pb: { xs: "calc(72px + env(safe-area-inset-bottom))", sm: 3 },
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 52, sm: 64 } }} />
@@ -229,7 +264,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: (theme) => theme.zIndex.drawer + 2, borderTop: 1, borderColor: "divider" }} elevation={3}>
           <BottomNavigation
             showLabels
-            value={currentBottomNav >= 0 ? currentBottomNav : 0}
+            value={currentBottomNav ? currentBottomNav.to : false}
             onChange={handleBottomNavChange}
             sx={{ height: 64, "& .MuiBottomNavigationAction-root": { minWidth: "auto", py: 1, fontSize: "0.65rem", "&.Mui-selected": { color: "primary.main" } } }}
           >

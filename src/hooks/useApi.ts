@@ -51,8 +51,17 @@ export const useCreateSupplierPurchase = () => {
   return useMutation<any, Error, any>({
     mutationFn: (payload) => api.post("/suppliers/purchases", payload),
     onSuccess: () => {
+      // Purchase affects: purchase lists, supplier balances, item dropdowns,
+      // all inventory views and dashboard KPIs.
       qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["manualStock"] });
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -64,6 +73,13 @@ export const useUpdateSupplierPurchase = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["manualStock"] });
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -76,6 +92,12 @@ export const useDeleteSupplierPurchase = () => {
       qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["supplier"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["manualStock"] });
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -84,7 +106,13 @@ export const useAddSupplierPayment = () => {
   const qc = useQueryClient();
   return useMutation<any, Error, { supplierId: number; amount: number; method: string; reference?: string; notes?: string }>({
     mutationFn: ({ supplierId, ...payload }) => api.post(`/suppliers/${supplierId}/payments`, payload),
-    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: ["supplier", variables.supplierId] }),
+    onSuccess: () => {
+      // Same endpoint as useAddSupplierPaymentFromPayments — same invalidation.
+      qc.invalidateQueries({ queryKey: ["supplierPayments"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 };
 
@@ -130,7 +158,10 @@ export const useResetAuthPassword = () => {
   const qc = useQueryClient();
   return useMutation<any, Error, { id: number; password: string }>({
     mutationFn: ({ id, password }) => api.post(`/auth/users/${id}/reset-password`, { password }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["authActivities"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["authUsers"] });
+      qc.invalidateQueries({ queryKey: ["authActivities"] });
+    },
   });
 };
 
@@ -152,7 +183,10 @@ export const useAddIngredient = () => {
   const qc = useQueryClient();
   return useMutation<Ingredient, Error, { name: string; base_unit: string; min_stock: number; category?: string }>({
     mutationFn: async (payload) => (await api.post<Ingredient>("/ingredients", payload)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+    },
   });
 };
 
@@ -160,7 +194,10 @@ export const useUpdateIngredient = () => {
   const qc = useQueryClient();
   return useMutation<any, any, { id: number; name: string; base_unit: string; min_stock: number }>({
     mutationFn: ({ id, ...payload }) => api.put(`/ingredients/${id}`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+    },
   });
 };
 
@@ -333,6 +370,8 @@ export const useProduceBatch = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["batches"] });
       qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["readyToPack"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -345,6 +384,9 @@ export const useUpdateBatch = () => {
       qc.invalidateQueries({ queryKey: ["batches"] });
       qc.invalidateQueries({ queryKey: ["batchDetail", vars.id] });
       qc.invalidateQueries({ queryKey: ["finishedInventory"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["readyToPack"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -399,17 +441,23 @@ export const useCustomers = () =>
 
 export const useAddCustomer = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string; credit_limit: number; advance_balance?: number }>({
+  return useMutation<any, Error, { name: string; phone?: string; email?: string; address?: string; credit_limit: number }>({
     mutationFn: (payload) => api.post("/customers", payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["customerProfile"] });
+    },
   });
 };
 
 export const useUpdateCustomer = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string; credit_limit: number; advance_balance?: number }>({
+  return useMutation<any, Error, { id: number; name: string; phone?: string; email?: string; address?: string; credit_limit: number }>({
     mutationFn: ({ id, ...payload }) => api.put(`/customers/${id}`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["customerProfile"] });
+    },
   });
 };
 
@@ -445,6 +493,7 @@ export const useAddSale = () => {
       qc.invalidateQueries({ queryKey: ["paymentHistory"] });
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -478,6 +527,7 @@ export const useCustomerPayment = () => {
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["customerProfile"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -523,10 +573,12 @@ export const useDeleteManualStockItem = () => {
   return useMutation<void, any, number>({
     mutationFn: (id) => api.delete(`/packing/manual-stock/${id}`),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manualStock"] });
       qc.invalidateQueries({ queryKey: ["packingMaterials"] });
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
       qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -536,8 +588,15 @@ export const useDeleteStockItem = () => {
   return useMutation<void, any, number>({
     mutationFn: (id) => api.delete(`/packing/stock/${id}`),
     onSuccess: () => {
+      // Backend also removes the linked ManualStockItem and its
+      // SupplierPurchases/payments.
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
       qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["manualStock"] });
+      qc.invalidateQueries({ queryKey: ["supplierPurchases"] });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
+      qc.invalidateQueries({ queryKey: ["supplier"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -583,6 +642,8 @@ export const usePackBatch = () => {
       qc.invalidateQueries({ queryKey: ["finishedInventory"] });
       qc.invalidateQueries({ queryKey: ["packagedStock"] });
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -601,6 +662,7 @@ export const useAddSupplierPaymentFromPayments = () => {
       qc.invalidateQueries({ queryKey: ["supplierPayments"] });
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       qc.invalidateQueries({ queryKey: ["supplier"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -618,6 +680,8 @@ export const useCreateOrder = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["orderDemand"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -626,7 +690,11 @@ export const useDeleteOrder = () => {
   const qc = useQueryClient();
   return useMutation<void, Error, number>({
     mutationFn: (orderId) => api.delete(`/orders/${orderId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["orderDemand"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 };
 
@@ -637,6 +705,7 @@ export const useUpdateOrderStatus = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["orderDemand"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 };
@@ -680,6 +749,7 @@ export const useCreateProcessingOrder = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["processingOrders"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
     },
   });
 };
@@ -691,6 +761,7 @@ export const useReceiveProcessing = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["processingOrders"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
     },
   });
 };
@@ -718,13 +789,14 @@ export const useDeleteProcessingOrder = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["processingOrders"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
     },
   });
 };
 
 export const useProcessingPayments = () =>
   useQuery<any[], Error>({
-    queryKey: ["processingOrders"],
+    queryKey: ["processingPayments"],
     queryFn: async () => (await api.get("/processing")).data,
     initialData: [],
     select: (orders: any[]) => {

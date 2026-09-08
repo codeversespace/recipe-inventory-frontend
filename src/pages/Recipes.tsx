@@ -8,7 +8,7 @@ type OverheadLine = { name: string; cost_per_batch: number; overhead_type: strin
 
 export const Recipes = () => {
   const { data: recipes = [], isLoading, error } = useRecipes();
-  const { data: ingredients = [] } = useIngredients();
+  const { data: ingredients = [], isLoading: ingredientsLoading } = useIngredients();
   const rawMaterials = ingredients.filter((i: any) => i.category === "raw_material");
   const addRecipe = useAddRecipe();
   const addRecipeIngredient = useAddRecipeIngredient();
@@ -119,8 +119,8 @@ export const Recipes = () => {
       <TextField margin="dense" label="Batch Qty" fullWidth value={batchQty} onChange={(event) => setBatchQty(event.target.value)} />
       <TextField margin="dense" label="Batch Unit (kg, L, pcs)" fullWidth value={batchUnit} onChange={(event) => setBatchUnit(event.target.value)} />
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Ingredients</Typography>
-      {!rawMaterials.length && <Alert severity="info" sx={{ mt: 1 }}>Add raw materials first from the Ingredients page.</Alert>}
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small"><InputLabel>Ingredient</InputLabel><Select value={ingredientId} label="Ingredient" onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{rawMaterials.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!rawMaterials.length}>Add</Button></Box>
+      {!ingredientsLoading && !rawMaterials.length && <Alert severity="info" sx={{ mt: 1 }}>Add raw materials first from the Ingredients page.</Alert>}
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small" disabled={ingredientsLoading}><InputLabel>{ingredientsLoading ? "Loading ingredients..." : "Ingredient"}</InputLabel><Select value={ingredientId} label={ingredientsLoading ? "Loading ingredients..." : "Ingredient"} onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{rawMaterials.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!rawMaterials.length}>Add</Button></Box>
       {lines.map((line) => <Box key={line.ingredientId} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{line.name}: {line.quantity} {line.unit}</Typography><Button size="small" color="error" onClick={() => setLines(lines.filter((item) => item.ingredientId !== line.ingredientId))}>Remove</Button></Box>)}
       {/* Overheads Section */}
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Overheads (labour, fuel, consumables)</Typography>
@@ -145,7 +145,7 @@ export const Recipes = () => {
         }} variant="outlined" size="small">Add</Button>
       </Box>
       {overheads.map((oh, i) => <Box key={i} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{oh.name}: ₹{oh.cost_per_batch} ({oh.overhead_type})</Typography><Button size="small" color="error" onClick={() => setOverheads(overheads.filter((_, idx) => idx !== i))}>Remove</Button></Box>)}
-    </DialogContent><DialogActions><Button onClick={close} disabled={addRecipe.isPending || addRecipeIngredient.isPending}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || addRecipeIngredient.isPending}>{addRecipe.isPending || addRecipeIngredient.isPending ? <CircularProgress size={20} color="inherit" /> : editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
+    </DialogContent><DialogActions><Button onClick={close} disabled={addRecipe.isPending || updateRecipe.isPending || addRecipeIngredient.isPending || addRecipeOverhead.isPending}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || updateRecipe.isPending || addRecipeIngredient.isPending || addRecipeOverhead.isPending}>{(addRecipe.isPending || updateRecipe.isPending || addRecipeIngredient.isPending || addRecipeOverhead.isPending) ? <CircularProgress size={20} color="inherit" /> : editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
     {/* Scale Calculator Dialog */}
     <Dialog open={scaleOpen} onClose={() => setScaleOpen(false)} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ fontWeight: 700 }}>Scale Recipe: {scaleRecipe?.name}</DialogTitle>

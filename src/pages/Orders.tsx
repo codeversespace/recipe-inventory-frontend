@@ -8,8 +8,8 @@ import { formatDate } from "../utils/formatDate";
 
 export const Orders = () => {
   const { data: orders = [], isLoading } = useOrders();
-  const { data: customers = [] } = useCustomers();
-  const { data: stock = [] } = useSaleableStock();
+  const { data: customers = [], isLoading: customersLoading } = useCustomers();
+  const { data: stock = [], isLoading: stockLoading } = useSaleableStock();
   const createOrder = useCreateOrder();
   const deleteOrder = useDeleteOrder();
   const updateStatus = useUpdateOrderStatus();
@@ -80,10 +80,10 @@ export const Orders = () => {
 
       {/* Summary Cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 1, sm: 2 }, mb: 2 }}>
-        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Total Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700 }}>{orders.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "warning.main" }}>{orders.filter((o: any) => o.status === "PENDING").length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Stock Shortages</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "error.main" }}>{orders.filter(hasShortage).length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Confirmed</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "success.main" }}>{orders.filter((o: any) => o.status === "CONFIRMED").length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Total Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700 }}>{isLoading ? <CircularProgress size={18} /> : orders.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "warning.main" }}>{isLoading ? <CircularProgress size={18} /> : orders.filter((o: any) => o.status === "PENDING").length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Stock Shortages</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "error.main" }}>{isLoading ? <CircularProgress size={18} /> : orders.filter(hasShortage).length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Confirmed</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "success.main" }}>{isLoading ? <CircularProgress size={18} /> : orders.filter((o: any) => o.status === "CONFIRMED").length}</Typography></CardContent></Card>
       </Box>
 
       {/* Orders Table */}
@@ -142,7 +142,9 @@ export const Orders = () => {
             getOptionLabel={(c: any) => c.name}
             value={customers.find((c: any) => c.id === customerId) || null}
             onChange={(_, v) => setCustomerId(v?.id || 0)}
-            renderInput={(params) => <TextField {...params} margin="dense" label="Customer" />}
+            loading={customersLoading}
+            disabled={customersLoading}
+            renderInput={(params) => <TextField {...params} margin="dense" label={customersLoading ? "Loading customers..." : "Customer"} />}
           />
           <TextField margin="dense" label="Expected delivery date" type="date" fullWidth value={expectedDelivery} onChange={(e) => setExpectedDelivery(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField margin="dense" label="Notes" fullWidth multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -155,7 +157,9 @@ export const Orders = () => {
               getOptionLabel={(s: any) => `${s.name} (${s.qty} ${s.unit} in stock)`}
               value={stock.find((s: any) => s.id === selectedStock) || null}
               onChange={(_, v) => { setSelectedStock(v?.id || 0); setLinePrice(v?.unit_price > 0 ? String(v.unit_price) : ""); }}
-              renderInput={(params) => <TextField {...params} size="small" label="Product" />}
+              loading={stockLoading}
+              disabled={stockLoading}
+              renderInput={(params) => <TextField {...params} size="small" label={stockLoading ? "Loading products..." : "Product"} />}
             />
             <TextField size="small" label="Qty" type="number" value={lineQty} onChange={(e) => setLineQty(e.target.value)} sx={{ width: 80 }} />
             <TextField size="small" label="Price (₹)" type="number" value={linePrice} onChange={(e) => setLinePrice(e.target.value)} sx={{ width: 100 }} />

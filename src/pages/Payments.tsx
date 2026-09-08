@@ -1,4 +1,4 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useProcessingPayments, useSuppliers, useSupplierPayments } from "../hooks/useApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
@@ -24,12 +24,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const Payments = () => {
-  const { data: sales = [] } = usePaymentsSales();
-  const { data: customers = [] } = useCustomers();
-  const { data: suppliers = [] } = useSuppliers();
+  const { data: sales = [], isLoading: salesLoading } = usePaymentsSales();
+  const { data: customers = [], isLoading: customersLoading } = useCustomers();
+  const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const customerPayment = useCustomerPayment();
   const addSupplierPayment = useAddSupplierPaymentFromPayments();
-  const { data: processingExpenses = [] } = useProcessingPayments();
+  const { data: processingExpenses = [], isLoading: expensesLoading } = useProcessingPayments();
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -43,9 +43,9 @@ export const Payments = () => {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [paymentResult, setPaymentResult] = useState<any>(null);
-  const { data: allHistory = [] } = usePaymentHistory(true);
+  const { data: allHistory = [], isLoading: allHistoryLoading } = usePaymentHistory(true);
   const { data: history = [], isFetching: historyLoading } = usePaymentHistory(historyOpen);
-  const { data: supplierHistory = [] } = useSupplierPayments();
+  const { data: supplierHistory = [], isLoading: supplierHistoryLoading } = useSupplierPayments();
 
   const dueSales = sales.filter((sale: any) => sale.amount_due > 0);
   const matchingSales = useMemo(() => sales.filter((sale: any) => `${sale.id} ${sale.reference || ""} ${sale.customer_name || "Walk-in"}`.toLowerCase().includes(search.toLowerCase())), [sales, search]);
@@ -130,7 +130,11 @@ export const Payments = () => {
     <Card sx={{ mb: 2 }}>
       <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
         <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cash Flow</Typography>
-        {cashFlowData.length > 0 ? (
+        {(allHistoryLoading || supplierHistoryLoading) ? (
+          <Box sx={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : cashFlowData.length > 0 ? (
           <>
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -177,7 +181,7 @@ export const Payments = () => {
         <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>{search ? "Filtered" : "Outstanding"}</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>{formatMoney(search ? filteredTotal : dueSales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0))}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Paid</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700, color: "success.main" }}>{formatMoney(search ? filteredPaid : sales.reduce((sum: number, sale: any) => sum + sale.amount_paid, 0))}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Due</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700, color: "error.main" }}>{formatMoney(search ? filteredDue : totalDue)}</Typography></CardContent></Card>
-        <Card><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Invoices</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>{filtered.length}</Typography></CardContent></Card>
+        <Card><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Invoices</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, fontWeight: 700 }}>{salesLoading ? <CircularProgress size={16} /> : filtered.length}</Typography></CardContent></Card>
       </Box>
       <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
         <TextField size="small" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ flex: "1 1 200px", "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
@@ -186,7 +190,7 @@ export const Payments = () => {
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
         <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Invoice</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Customer</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Status</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Due</TableCell>
-      </TableRow></TableHead><TableBody>{filtered.length ? filtered.map((sale: any) => <TableRow key={sale.id}>
+      </TableRow></TableHead><TableBody>{salesLoading ? <TableRow><TableCell colSpan={4} align="center"><CircularProgress size={24} /></TableCell></TableRow> : filtered.length ? filtered.map((sale: any) => <TableRow key={sale.id}>
         <TableCell sx={cellSx}>#{sale.id}{sale.reference ? ` ${sale.reference}` : ""}</TableCell>
         <TableCell sx={cellSx}>{sale.customer_name || "Walk-in"}</TableCell>
         <TableCell sx={cellSx}>{sale.payment_status}</TableCell>
@@ -216,7 +220,7 @@ export const Payments = () => {
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
         <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
-      </TableRow></TableHead><TableBody>{filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any) => <TableRow key={payment.id}>
+      </TableRow></TableHead><TableBody>{supplierHistoryLoading ? <TableRow><TableCell colSpan={4} align="center"><CircularProgress size={24} /></TableCell></TableRow> : filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any) => <TableRow key={payment.id}>
         <TableCell sx={cellSx}>{formatDate(payment.paid_at)}</TableCell>
         <TableCell sx={cellSx}>{payment.supplier_name}</TableCell>
         <TableCell sx={cellSx}>{formatMoney(payment.amount)}</TableCell>
@@ -244,7 +248,7 @@ export const Payments = () => {
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
-        </TableRow></TableHead><TableBody>{filteredExpenses.length ? filteredExpenses.map((expense: any) => <TableRow key={expense.id}>
+        </TableRow></TableHead><TableBody>{expensesLoading ? <TableRow><TableCell colSpan={5} align="center"><CircularProgress size={24} /></TableCell></TableRow> : filteredExpenses.length ? filteredExpenses.map((expense: any) => <TableRow key={expense.id}>
           <TableCell sx={cellSx}>{formatDate(expense.date)}</TableCell>
           <TableCell sx={cellSx}>{expense.processor_name}</TableCell>
           <TableCell sx={cellSx}>{expense.raw_ingredient}</TableCell>
@@ -258,7 +262,7 @@ export const Payments = () => {
       <DialogTitle sx={{ fontSize: "1rem", fontWeight: 700 }}>Receive payment</DialogTitle>
       <DialogContent sx={{ p: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 1, fontSize: "0.8rem" }}>{error}</Alert>}
-        <Autocomplete options={customers} getOptionLabel={(item: any) => item.name} value={customer} onChange={(_, item) => { setCustomer(item); setPaymentResult(null); }} renderInput={(params) => <TextField {...params} label="Customer" size="small" margin="dense" />} />
+        <Autocomplete options={customers} getOptionLabel={(item: any) => item.name} value={customer} onChange={(_, item) => { setCustomer(item); setPaymentResult(null); }} loading={customersLoading} disabled={customersLoading} renderInput={(params) => <TextField {...params} label={customersLoading ? "Loading customers..." : "Customer"} size="small" margin="dense" />} />
         {customer && (customer.advance_balance || 0) > 0 && <Alert severity="info" sx={{ mt: 1, fontSize: "0.8rem" }}>Current advance balance: {formatMoney(customer.advance_balance || 0)}</Alert>}
         {paymentResult && <Alert severity="success" sx={{ mt: 1, fontSize: "0.8rem" }} onClose={() => setPaymentResult(null)}>
           Paid {formatMoney(paymentResult.total_paid || 0)}{paymentResult.invoices_paid?.length > 0 ? ` → cleared ${paymentResult.invoices_paid.length} invoice(s)` : ""}{(paymentResult.advance_created || 0) > 0 ? ` · ${formatMoney(paymentResult.advance_created)} added to advance (new balance: ${formatMoney(paymentResult.new_advance_balance)})` : ""}
@@ -274,7 +278,7 @@ export const Payments = () => {
       <DialogTitle sx={{ fontSize: "1rem", fontWeight: 700 }}>Supplier payment</DialogTitle>
       <DialogContent sx={{ p: 2 }}>
         {error && <Alert severity="error" sx={{ mb: 1, fontSize: "0.8rem" }}>{error}</Alert>}
-        <Autocomplete options={suppliers} getOptionLabel={(item: any) => item.name} value={supplier} onChange={(_, item) => setSupplier(item)} renderInput={(params) => <TextField {...params} label="Supplier" size="small" margin="dense" />} />
+        <Autocomplete options={suppliers} getOptionLabel={(item: any) => item.name} value={supplier} onChange={(_, item) => setSupplier(item)} loading={suppliersLoading} disabled={suppliersLoading} renderInput={(params) => <TextField {...params} label={suppliersLoading ? "Loading suppliers..." : "Supplier"} size="small" margin="dense" />} />
         <TextField fullWidth margin="dense" size="small" label="Amount" type="number" value={amount} onChange={(event) => setAmount(event.target.value)} />
         <Select fullWidth size="small" value={method} onChange={(event) => setMethod(event.target.value)} sx={{ mt: 1 }}><MenuItem value="CASH">Cash</MenuItem><MenuItem value="UPI">UPI</MenuItem><MenuItem value="BANK">Bank</MenuItem><MenuItem value="CHEQUE">Cheque</MenuItem></Select>
         <TextField fullWidth margin="dense" size="small" label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />

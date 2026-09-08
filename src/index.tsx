@@ -12,7 +12,13 @@ const theme = createTheme({
   palette: { primary: { main: "#0f766e" }, secondary: { main: "#f97316" }, background: { default: "#f6f8fb", paper: "#ffffff" } },
   shape: { borderRadius: 12 },
   typography: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", h4: { letterSpacing: "-0.04em" }, button: { fontWeight: 700, textTransform: "none" } },
-  components: { MuiPaper: { styleOverrides: { root: { boxShadow: "0 2px 12px rgba(15, 23, 42, .06)" } } }, MuiTableCell: { styleOverrides: { head: { fontWeight: 750, color: "#475569", background: "#f8fafc" } } } },
+  components: {
+    MuiPaper: { styleOverrides: { root: { boxShadow: "0 2px 12px rgba(15, 23, 42, .06)" } } },
+    MuiTableCell: { styleOverrides: { head: { fontWeight: 750, color: "#475569", background: "#f8fafc" } } },
+    MuiButton: { styleOverrides: { root: { borderRadius: 8 } } },
+    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8 } } },
+    MuiChip: { styleOverrides: { root: { borderRadius: 6 } } },
+  },
 });
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

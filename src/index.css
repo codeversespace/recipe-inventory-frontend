@@ -91,3 +91,27 @@ html, body, #root { min-height: 100%; }
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
+
+/* Design-system baseline: tabular numerals for financial/quantity data */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* Visible keyboard focus (mouse users unaffected via :focus-visible) */
+:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* iPhone safe-area helper */
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+@media (max-width: 600px) {
+  /* Touch targets: 44px effective boxes, icons stay ~20px */
+  .MuiIconButton-root { padding: 10px !important; }
+  .MuiIconButton-sizeSmall { padding: 10px !important; }
+  .MuiButton-root { min-height: 44px; }
+  .MuiButton-contained { min-height: 44px; }
+  .MuiButton-sizeSmall { min-height: 40px; padding: 6px 12px !important; }
+  .MuiBottomNavigation-root { padding-bottom: env(safe-area-inset-bottom); }
+  .MuiCheckbox-root, .MuiRadio-root, .MuiSwitch-root { padding: 10px !important; }
+}

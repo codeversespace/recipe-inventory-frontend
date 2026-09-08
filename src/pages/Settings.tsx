@@ -1,14 +1,17 @@
-import { Alert, Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { ChangeEvent, useState } from "react";
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import { ChangeEvent, Fragment, useState } from "react";
 import { useAuthActivities, useAuthRoles, useAuthUsers, useCreateAuthUser, useResetAuthPassword, useUpdateAuthUser } from "../hooks/useApi";
+import { ConfirmDialog, EmptyState, PageHeader, TableSkeleton } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
 
 export const Settings = () => {
   const { user } = useAuth();
-  const { data: users = [] } = useAuthUsers(user?.role === "super_admin");
-  const { data: roles = [] } = useAuthRoles(user?.role === "super_admin");
-  const { data: activities = [] } = useAuthActivities(user?.role === "super_admin");
+  const { data: users = [], isLoading: usersLoading } = useAuthUsers(user?.role === "super_admin");
+  const { data: roles = [], isLoading: rolesLoading } = useAuthRoles(user?.role === "super_admin");
+  const { data: activities = [], isLoading: activitiesLoading } = useAuthActivities(user?.role === "super_admin");
   const createUser = useCreateAuthUser();
   const updateUser = useUpdateAuthUser();
   const resetPassword = useResetAuthPassword();
@@ -21,6 +24,22 @@ export const Settings = () => {
   const [resetUserId, setResetUserId] = useState<number | null>(null);
   const [resetValue, setResetValue] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState<null | "backup" | "restore" | "clear" | "reset" | "toggle">(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  const toggleActive = async (managedUser: any) => {
+    if (busy) return;
+    setBusy("toggle");
+    setTogglingId(managedUser.id);
+    try {
+      await updateUser.mutateAsync({ id: managedUser.id, is_active: !managedUser.is_active });
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not update user.");
+    } finally {
+      setBusy(null);
+      setTogglingId(null);
+    }
+  };
 
   const createManagedUser = async () => {
     try {
@@ -47,18 +66,27 @@ export const Settings = () => {
   };
 
   const downloadBackup = async () => {
-    const response = await api.get("/backup/download", { responseType: "blob" });
-    const url = URL.createObjectURL(response.data);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "recipe-inventory-backup.db";
-    link.click();
-    URL.revokeObjectURL(url);
+    if (busy) return;
+    setBusy("backup");
+    try {
+      const response = await api.get("/backup/download", { responseType: "blob" });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "recipe-inventory-backup.db";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not download backup.");
+    } finally {
+      setBusy(null);
+    }
   };
 
   const restoreBackup = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || busy) return;
+    setBusy("restore");
     try {
       const form = new FormData();
       form.append("file", file);
@@ -66,33 +94,42 @@ export const Settings = () => {
       window.location.reload();
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not restore database.");
+      setBusy(null);
     }
   };
 
   const clearDatabase = async () => {
-    if (!window.confirm("DELETE ALL business data? This cannot be undone. User accounts will be preserved.")) return;
+    if (busy) return;
+    setBusy("clear");
     try {
-      await api.delete("/auth/database");
+      await api.delete("/auth/database", { params: { confirm: "DELETE" } });
       window.location.reload();
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not clear database.");
+      setBusy(null);
     }
   };
 
   const resetAllData = async () => {
-    if (!window.confirm("Reset all transactional data?\n\n• All sales, purchases, batches, orders & payments will be deleted\n• Items, suppliers, recipes & customers will be KEPT\n• All item quantities will be reset to zero\n\nThis cannot be undone.")) return;
+    if (busy) return;
+    setBusy("reset");
     try {
-      await api.delete("/auth/database/reset-all");
+      await api.delete("/auth/database/reset-all", { params: { confirm: "RESET" } });
       window.location.reload();
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not reset data.");
+      setBusy(null);
     }
   };
+  const [confirmAction, setConfirmAction] = useState<null | "clear" | "reset">(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>Super-admin Settings</Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>Manage users, access roles, database backups, and activity.</Typography>
+      <PageHeader
+        title="Super-admin Settings"
+        subtitle="Manage users, access roles, database backups, and activity."
+      />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Card sx={{ maxWidth: 1100 }}>
         <CardContent>
@@ -101,30 +138,50 @@ export const Settings = () => {
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 3 }}>
             <TextField size="small" label="Username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} />
             <TextField size="small" label="Initial password" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-            <FormControl size="small" sx={{ minWidth: 190 }}><InputLabel>Role</InputLabel><Select value={newRole} label="Role" onChange={(event) => setNewRole(event.target.value)}>{roles.map((role: any) => <MenuItem key={role.value} value={role.value}>{role.label}</MenuItem>)}</Select></FormControl>
+            <FormControl size="small" sx={{ minWidth: 190 }} disabled={rolesLoading}><InputLabel>{rolesLoading ? "Loading roles..." : "Role"}</InputLabel><Select value={newRole} label={rolesLoading ? "Loading roles..." : "Role"} onChange={(event) => setNewRole(event.target.value)}>{roles.map((role: any) => <MenuItem key={role.value} value={role.value}>{role.label}</MenuItem>)}</Select></FormControl>
             <Button variant="contained" onClick={createManagedUser} disabled={createUser.isPending || !newUsername || newPassword.length < 8}>Create user</Button>
           </Box>
-          <Table size="small">
-            <TableHead><TableRow><TableCell>Username</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell><TableCell>Last login</TableCell><TableCell>Last activity</TableCell><TableCell>Password</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
-            <TableBody>{users.map((managedUser: any) => <TableRow key={managedUser.id}><TableCell>{managedUser.username}</TableCell><TableCell>{roles.find((role: any) => role.value === managedUser.role)?.label || managedUser.role}</TableCell><TableCell>{managedUser.is_active ? "Active" : "Inactive"}</TableCell><TableCell>{managedUser.last_login_at ? new Date(managedUser.last_login_at).toLocaleString() : "Never"}</TableCell><TableCell>{managedUser.last_activity_at ? new Date(managedUser.last_activity_at).toLocaleString() : "Never"}</TableCell><TableCell>Hidden</TableCell><TableCell><Button size="small" onClick={() => setResetUserId(managedUser.id)}>Reset password</Button>{managedUser.id !== user?.id && <Button size="small" onClick={() => updateUser.mutate({ id: managedUser.id, is_active: !managedUser.is_active })}>{managedUser.is_active ? "Deactivate" : "Activate"}</Button>}</TableCell></TableRow>)}</TableBody>
+          <TableContainer sx={{ overflowX: "auto" }}>
+          <Table size="small" sx={{ minWidth: 560 }}>
+            <TableHead><TableRow><TableCell sx={{ display: { xs: "table-cell", md: "none" }, width: 44 }} /><TableCell>Username</TableCell><TableCell>Role</TableCell><TableCell>Status</TableCell><TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Last login</TableCell><TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Last activity</TableCell><TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Password</TableCell><TableCell>Actions</TableCell></TableRow></TableHead>
+            <TableBody>{usersLoading ? <TableSkeleton rows={4} colSpan={8} /> : users.length ? users.map((managedUser: any) => (
+            <Fragment key={managedUser.id}>
+              <TableRow key={managedUser.id}><TableCell sx={{ display: { xs: "table-cell", md: "none" } }}><IconButton size="small" aria-label={expandedId === managedUser.id ? "Hide details" : "Show details"} onClick={() => setExpandedId(expandedId === managedUser.id ? null : managedUser.id)}>{expandedId === managedUser.id ? <KeyboardArrowUpRoundedIcon /> : <KeyboardArrowDownRoundedIcon />}</IconButton></TableCell><TableCell>{managedUser.username}</TableCell><TableCell>{roles.find((role: any) => role.value === managedUser.role)?.label || managedUser.role}</TableCell><TableCell>{managedUser.is_active ? "Active" : "Inactive"}</TableCell><TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{managedUser.last_login_at ? new Date(managedUser.last_login_at).toLocaleString() : "Never"}</TableCell><TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{managedUser.last_activity_at ? new Date(managedUser.last_activity_at).toLocaleString() : "Never"}</TableCell><TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Hidden</TableCell><TableCell><Button size="small" onClick={() => setResetUserId(managedUser.id)}>Reset password</Button>{managedUser.id !== user?.id && <Button size="small" onClick={() => toggleActive(managedUser)} disabled={busy === "toggle" && togglingId === managedUser.id}>{busy === "toggle" && togglingId === managedUser.id ? <CircularProgress size={14} /> : (managedUser.is_active ? "Deactivate" : "Activate")}</Button>}</TableCell></TableRow>
+              <TableRow key={`${managedUser.id}-details`}><TableCell colSpan={8} sx={{ display: expandedId === managedUser.id ? { xs: "table-cell", md: "none" } : "none", py: 0, borderBottom: expandedId === managedUser.id ? undefined : 0 }}><Collapse in={expandedId === managedUser.id} timeout="auto" unmountOnExit><Box sx={{ py: 1 }}><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Last login: {managedUser.last_login_at ? new Date(managedUser.last_login_at).toLocaleString() : "Never"}</Typography><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Last activity: {managedUser.last_activity_at ? new Date(managedUser.last_activity_at).toLocaleString() : "Never"}</Typography></Box></Collapse></TableCell></TableRow>
+            </Fragment>)) : <TableRow><TableCell colSpan={8} align="center"><EmptyState title="No users found." /></TableCell></TableRow>}</TableBody>
           </Table>
+          </TableContainer>
         </CardContent>
       </Card>
       <Card sx={{ maxWidth: 1100, mt: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>Database administration</Typography>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <Button variant="outlined" onClick={downloadBackup}>Download full backup</Button>
-            <Button variant="outlined" component="label">Restore database<input hidden type="file" accept=".db,.sqlite" onChange={restoreBackup} /></Button>
-            <Button color="warning" variant="outlined" onClick={resetAllData}>Reset all data</Button>
-            <Button color="error" variant="outlined" onClick={clearDatabase}>Delete everything</Button>
+            <Button variant="outlined" onClick={downloadBackup} disabled={busy !== null}>{busy === "backup" ? <CircularProgress size={18} /> : "Download full backup"}</Button>
+            <Button variant="outlined" component="label" disabled={busy !== null}>{busy === "restore" ? <CircularProgress size={18} /> : "Restore database"}<input hidden type="file" accept=".db,.sqlite" onChange={restoreBackup} /></Button>
+            <Button color="warning" variant="outlined" onClick={() => setConfirmAction("reset")} disabled={busy !== null}>Reset all data</Button>
+            <Button color="error" variant="outlined" onClick={() => setConfirmAction("clear")} disabled={busy !== null}>Delete everything</Button>
           </Box>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={confirmAction === "clear" ? "Delete all business data?" : "Reset all transactional data?"}
+        message={
+          confirmAction === "clear"
+            ? "All business data will be permanently deleted. User accounts will be preserved. This cannot be undone."
+            : "All sales, purchases, batches, orders and payments will be deleted. Items, suppliers, recipes and customers will be kept, and all quantities reset to zero. This cannot be undone."
+        }
+        confirmLabel={confirmAction === "clear" ? "Delete everything" : "Reset all data"}
+        danger
+        pending={busy === "clear" || busy === "reset"}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => { if (confirmAction === "clear") clearDatabase(); else if (confirmAction === "reset") resetAllData(); }}
+      />
       <Card sx={{ maxWidth: 1100, mt: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>User activity</Typography>
-          <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Time</TableCell><TableCell>User</TableCell><TableCell>Action</TableCell><TableCell>Details</TableCell></TableRow></TableHead><TableBody>{visibleActivities.map((activity: any) => <TableRow key={activity.id}><TableCell>{new Date(activity.created_at).toLocaleString()}</TableCell><TableCell>{activity.username}</TableCell><TableCell>{activity.action}</TableCell><TableCell>{activity.details || "—"}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
+          <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Time</TableCell><TableCell>User</TableCell><TableCell>Action</TableCell><TableCell>Details</TableCell></TableRow></TableHead><TableBody>{activitiesLoading ? <TableSkeleton rows={4} colSpan={4} /> : visibleActivities.length ? visibleActivities.map((activity: any) => <TableRow key={activity.id}><TableCell>{new Date(activity.created_at).toLocaleString()}</TableCell><TableCell>{activity.username}</TableCell><TableCell>{activity.action}</TableCell><TableCell>{activity.details || "—"}</TableCell></TableRow>) : <TableRow><TableCell colSpan={4} align="center"><EmptyState title="No activity recorded." /></TableCell></TableRow>}</TableBody></Table></TableContainer>
           {hasMoreActivities && <Box sx={{ mt: 1, textAlign: "center" }}><Button size="small" onClick={() => setShowCount((c) => Math.min(c + 20, activities.length))} sx={{ fontSize: "0.75rem" }}>Show more ({activities.length - showCount} remaining)</Button></Box>}
         </CardContent>
       </Card>

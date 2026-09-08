@@ -10,6 +10,7 @@ export const Login = () => {
   const [pending, setPending] = useState(false);
 
   const submit = async () => {
+    if (pending) return;
     setPending(true);
     setError("");
     try {

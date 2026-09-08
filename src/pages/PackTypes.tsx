@@ -1,12 +1,13 @@
-import { Alert, Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, FormControl, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useState } from "react";
 import { useAddPackType, usePackTypes, usePackingMaterials, useUpdatePackType } from "../hooks/useApi";
+import { EmptyState, PageHeader, TableSkeleton } from "../components/ui";
 
 type MaterialLine = { material_id: number; qty_per_pack: string };
 
 export const PackTypes = () => {
-  const { data: packTypes = [] } = usePackTypes();
-  const { data: materials = [] } = usePackingMaterials();
+  const { data: packTypes = [], isLoading: typesLoading } = usePackTypes();
+  const { data: materials = [], isLoading: materialsLoading } = usePackingMaterials();
   const addPackType = useAddPackType();
   const updatePackType = useUpdatePackType();
   const [name, setName] = useState("");
@@ -80,36 +81,38 @@ export const PackTypes = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>Pack Types</Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Define pack size, required packing materials, and selling price. Packaging cost is calculated from current packing-material costs.
-      </Typography>
+      <PageHeader
+        title="Pack Types"
+        subtitle="Define pack size, required packing materials, and selling price. Packaging cost is calculated from current packing-material costs."
+      />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Card sx={{ maxWidth: 1100 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>{editingId ? "Edit pack type" : "Add pack type"}</Typography>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
-            <TextField size="small" label="Name" value={name} onChange={(event) => setName(event.target.value)} />
-            <TextField size="small" label="Size (grams)" type="number" value={size} onChange={(event) => setSize(event.target.value)} />
-            <TextField size="small" label="Selling price per pack (₹)" type="number" value={sellingPrice} onChange={(event) => setSellingPrice(event.target.value)} />
+            <TextField size="small" label="Name" value={name} onChange={(event) => setName(event.target.value)} sx={{ flex: "1 1 200px" }} />
+            <TextField size="small" label="Size (grams)" type="number" value={size} onChange={(event) => setSize(event.target.value)} sx={{ flex: "1 1 140px" }} />
+            <TextField size="small" label="Selling price per pack (₹)" type="number" value={sellingPrice} onChange={(event) => setSellingPrice(event.target.value)} sx={{ flex: "1 1 180px" }} />
           </Box>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mb: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 240 }}>
-              <InputLabel>Packing material</InputLabel>
-              <Select value={materialId} label="Packing material" onChange={(event) => setMaterialId(String(event.target.value))}>
+            <FormControl size="small" sx={{ minWidth: 240 }} disabled={materialsLoading}>
+              <InputLabel>{materialsLoading ? "Loading materials..." : "Packing material"}</InputLabel>
+              <Select value={materialId} label={materialsLoading ? "Loading materials..." : "Packing material"} onChange={(event) => setMaterialId(String(event.target.value))}>
                 {materials.map((material: any) => <MenuItem key={material.id} value={material.id}>{material.name} ({material.unit}) · ₹{material.unit_price.toFixed(2)}</MenuItem>)}
               </Select>
             </FormControl>
             <TextField size="small" label="Quantity per pack" type="number" value={materialQty} onChange={(event) => setMaterialQty(event.target.value)} />
             <Button variant="outlined" onClick={addMaterial}>Add material</Button>
           </Box>
-          <Table size="small" sx={{ mb: 2 }}>
+          <TableContainer sx={{ overflowX: "auto" }}>
+          <Table size="small" sx={{ mb: 2, minWidth: 480 }}>
             <TableHead><TableRow><TableCell>Material</TableCell><TableCell>Quantity per pack</TableCell><TableCell>Current cost</TableCell><TableCell /></TableRow></TableHead>
             <TableBody>{materialLines.length ? materialLines.map((line) => {
               const material = materials.find((item: any) => item.id === line.material_id);
               return <TableRow key={line.material_id}><TableCell>{materialName(line.material_id)}</TableCell><TableCell>{line.qty_per_pack} {material?.unit || ""}</TableCell><TableCell>₹{((material?.unit_price || 0) * Number(line.qty_per_pack)).toFixed(2)}</TableCell><TableCell><Button size="small" color="error" onClick={() => setMaterialLines(materialLines.filter((item) => item.material_id !== line.material_id))}>Remove</Button></TableCell></TableRow>;
-            }) : <TableRow><TableCell colSpan={4} align="center">No packing materials configured.</TableCell></TableRow>}</TableBody>
+            }) : <TableRow><TableCell colSpan={4} align="center"><EmptyState title="No packing materials configured." message="Add a material above to define this pack type." /></TableCell></TableRow>}</TableBody>
           </Table>
+          </TableContainer>
           <Box sx={{ display: "flex", gap: 1 }}>
             <Button variant="contained" onClick={submit} disabled={addPackType.isPending || updatePackType.isPending}>{editingId ? "Save changes" : "Add pack type"}</Button>
             {editingId && <Button onClick={reset}>Cancel</Button>}
@@ -119,10 +122,12 @@ export const PackTypes = () => {
       <Card sx={{ maxWidth: 1100, mt: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>Configured pack types</Typography>
-          <Table size="small">
+          <TableContainer sx={{ overflowX: "auto" }}>
+          <Table size="small" sx={{ minWidth: 640 }}>
             <TableHead><TableRow><TableCell>Name</TableCell><TableCell>Size</TableCell><TableCell>Packaging cost</TableCell><TableCell>Selling price</TableCell><TableCell>Materials</TableCell><TableCell /></TableRow></TableHead>
-            <TableBody>{packTypes.map((item: any) => <TableRow key={item.id}><TableCell>{item.name}</TableCell><TableCell>{item.size_grams} g</TableCell><TableCell>₹{item.cost_per_pack.toFixed(2)}</TableCell><TableCell>{item.selling_price == null ? "Not set" : `₹${item.selling_price.toFixed(2)}`}</TableCell><TableCell>{(item.materials || []).map((material: any) => `${material.material_name} × ${material.qty_per_pack}`).join(", ") || "None"}</TableCell><TableCell><Button size="small" onClick={() => edit(item)}>Edit</Button></TableCell></TableRow>)}</TableBody>
+            <TableBody>{typesLoading ? <TableSkeleton rows={3} colSpan={6} /> : packTypes.length ? packTypes.map((item: any) => <TableRow key={item.id}><TableCell>{item.name}</TableCell><TableCell>{item.size_grams} g</TableCell><TableCell>₹{item.cost_per_pack.toFixed(2)}</TableCell><TableCell>{item.selling_price == null ? "Not set" : `₹${item.selling_price.toFixed(2)}`}</TableCell><TableCell>{(item.materials || []).map((material: any) => `${material.material_name} × ${material.qty_per_pack}`).join(", ") || "None"}</TableCell><TableCell><Button size="small" onClick={() => edit(item)}>Edit</Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} align="center"><EmptyState title="No pack types configured." message="Define your first pack type above." /></TableCell></TableRow>}</TableBody>
           </Table>
+          </TableContainer>
         </CardContent>
       </Card>
       <Card sx={{ maxWidth: 1100, mt: 3 }}>
@@ -131,10 +136,12 @@ export const PackTypes = () => {
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             Packing materials are consumed when packs are produced and are never saleable inventory.
           </Typography>
-          <Table size="small">
+          <TableContainer sx={{ overflowX: "auto" }}>
+          <Table size="small" sx={{ minWidth: 520 }}>
             <TableHead><TableRow><TableCell>Material</TableCell><TableCell>Available quantity</TableCell><TableCell>Unit</TableCell><TableCell>Average unit cost</TableCell><TableCell>Stock value</TableCell></TableRow></TableHead>
-            <TableBody>{materials.length ? materials.map((material: any) => <TableRow key={material.id}><TableCell>{material.name}</TableCell><TableCell>{material.qty}</TableCell><TableCell>{material.unit}</TableCell><TableCell>₹{material.unit_price.toFixed(2)}</TableCell><TableCell>₹{(material.qty * material.unit_price).toFixed(2)}</TableCell></TableRow>) : <TableRow><TableCell colSpan={5} align="center">No packing materials purchased.</TableCell></TableRow>}</TableBody>
+            <TableBody>{materialsLoading ? <TableSkeleton rows={3} colSpan={5} /> : materials.length ? materials.map((material: any) => <TableRow key={material.id}><TableCell>{material.name}</TableCell><TableCell>{material.qty}</TableCell><TableCell>{material.unit}</TableCell><TableCell>₹{material.unit_price.toFixed(2)}</TableCell><TableCell>₹{(material.qty * material.unit_price).toFixed(2)}</TableCell></TableRow>) : <TableRow><TableCell colSpan={5} align="center"><EmptyState title="No packing materials purchased." message="Record a packing-material purchase to stock items here." /></TableCell></TableRow>}</TableBody>
           </Table>
+          </TableContainer>
         </CardContent>
       </Card>
     </Box>

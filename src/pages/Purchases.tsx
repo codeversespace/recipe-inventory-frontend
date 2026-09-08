@@ -35,6 +35,7 @@ import {
   useIngredients,
   useManualStock,
   useAddIngredient,
+  useAddManualStock,
 } from "../hooks/useApi";
 import { useState, useMemo } from "react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
@@ -42,14 +43,15 @@ import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 
 export const Purchases = () => {
-  const { data: suppliers = [] } = useSuppliers();
+  const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: purchases = [], isLoading } = useAllSupplierPurchases();
   const createPurchase = useCreateSupplierPurchase();
   const updatePurchase = useUpdateSupplierPurchase();
   const deletePurchase = useDeleteSupplierPurchase();
-  const { data: ingredients = [] } = useIngredients();
-  const { data: manualStockItems = [] } = useManualStock();
+  const { data: ingredients = [], isLoading: ingredientsLoading } = useIngredients();
+  const { data: manualStockItems = [], isLoading: manualStockLoading } = useManualStock();
   const addIngredient = useAddIngredient();
+  const addManualStock = useAddManualStock();
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -94,7 +96,9 @@ export const Purchases = () => {
 
   const categoryItemOptions = useMemo(() => {
     if (category === "raw_material") {
-      return ingredients.map((i: any) => i.name);
+      return ingredients
+        .filter((i: any) => i.category === "raw_material")
+        .map((i: any) => i.name);
     }
     return manualStockItems
       .filter((m: any) => m.category === category)
@@ -104,14 +108,29 @@ export const Purchases = () => {
   const handleAddNewItem = async () => {
     if (!newItemName.trim()) { setFormError("Enter a new item name."); return; }
     try {
-      const created = await addIngredient.mutateAsync({
-        name: newItemName.trim(),
-        base_unit: newItemUnit.trim() || "kg",
-        min_stock: 0,
-        category,
-      });
-      setItemName(created.name);
-      setUnit(created.base_unit);
+      if (category === "raw_material") {
+        const created = await addIngredient.mutateAsync({
+          name: newItemName.trim(),
+          base_unit: newItemUnit.trim() || "kg",
+          min_stock: 0,
+          category,
+        });
+        setItemName(created.name);
+        setUnit(created.base_unit);
+      } else {
+        // Packing materials and saleable goods live in ManualStockItem, which is
+        // what the category dropdown reads. Creating an Ingredient here would
+        // pollute the raw-material list and stay invisible in this dropdown.
+        const { data: created } = await addManualStock.mutateAsync({
+          name: newItemName.trim(),
+          unit: newItemUnit.trim() || "pcs",
+          qty: 0,
+          unit_price: 0,
+          category: category as "saleable_good" | "packing_material",
+        });
+        setItemName(created.name);
+        setUnit(created.unit);
+      }
       setAddingNew(false);
       setNewItemName("");
       setNewItemUnit("kg");
@@ -277,7 +296,9 @@ export const Purchases = () => {
             getOptionLabel={(option: any) => option.name}
             value={suppliers.find((s: any) => s.id === supplierId) || null}
             onChange={(_, newValue) => setSupplierId(newValue?.id || 0)}
-            renderInput={(params) => <TextField {...params} margin="dense" label="Supplier" placeholder="Search suppliers..." />}
+            loading={suppliersLoading}
+            disabled={suppliersLoading}
+            renderInput={(params) => <TextField {...params} margin="dense" label={suppliersLoading ? "Loading suppliers..." : "Supplier"} placeholder="Search suppliers..." />}
             isOptionEqualToValue={(option: any, value: any) => option.id === value?.id}
             fullWidth
             size="small"
@@ -297,8 +318,8 @@ export const Purchases = () => {
               <TextField margin="dense" label="Unit" fullWidth size="small" value={newItemUnit} onChange={(e) => setNewItemUnit(e.target.value)} sx={{ maxWidth: 120, mt: 1 }} />
               <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
                 <Button size="small" onClick={() => { setAddingNew(false); setNewItemName(""); setNewItemUnit("kg"); }}>Cancel</Button>
-                <Button size="small" variant="contained" onClick={handleAddNewItem} disabled={addIngredient.isPending}>
-                  {addIngredient.isPending ? <CircularProgress size={16} color="inherit" /> : "Add item"}
+                <Button size="small" variant="contained" onClick={handleAddNewItem} disabled={addIngredient.isPending || addManualStock.isPending}>
+                  {(addIngredient.isPending || addManualStock.isPending) ? <CircularProgress size={16} color="inherit" /> : "Add item"}
                 </Button>
               </Box>
             </Box>
@@ -312,6 +333,8 @@ export const Purchases = () => {
                 </li>
               )}
               value={itemName || null}
+              loading={ingredientsLoading || manualStockLoading}
+              disabled={ingredientsLoading || manualStockLoading}
               onChange={(_, newValue) => {
                 if (newValue === "__add_new__") {
                   setAddingNew(true);
@@ -322,12 +345,15 @@ export const Purchases = () => {
                   if (existing && category === "raw_material") {
                     const found = ingredients.find((i: any) => i.name === newValue);
                     if (found) setUnit(found.base_unit);
+                  } else if (existing) {
+                    const found = manualStockItems.find((m: any) => m.name === newValue && m.category === category);
+                    if (found) setUnit(found.unit);
                   }
                 }
               }}
               freeSolo
               onInputChange={(_, value) => setItemName(value || "")}
-              renderInput={(params) => <TextField {...params} margin="dense" label="Item name" placeholder="Search items..." />}
+              renderInput={(params) => <TextField {...params} margin="dense" label={(ingredientsLoading || manualStockLoading) ? "Loading items..." : "Item name"} placeholder="Search items..." />}
               fullWidth
               size="small"
             />
@@ -375,9 +401,9 @@ export const Purchases = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={resetForm} disabled={createPurchase.isPending}>Cancel</Button>
-          <Button onClick={handleAdd} variant="contained" disabled={createPurchase.isPending}>
-            {createPurchase.isPending ? <CircularProgress size={20} color="inherit" /> : "Save"}
+          <Button onClick={resetForm} disabled={createPurchase.isPending || updatePurchase.isPending}>Cancel</Button>
+          <Button onClick={handleAdd} variant="contained" disabled={createPurchase.isPending || updatePurchase.isPending}>
+            {(createPurchase.isPending || updatePurchase.isPending) ? <CircularProgress size={20} color="inherit" /> : "Save"}
           </Button>
         </DialogActions>
       </Dialog>

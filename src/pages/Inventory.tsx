@@ -7,8 +7,8 @@ const cellSx = { py: 0.75, px: 1, fontSize: { xs: "0.7rem", sm: "0.8rem" } };
 export const Inventory = () => {
   const { data: saleableStock = [], isLoading, error } = useSaleableStock();
   const { data: rawMaterials = [], isLoading: rawMaterialsLoading, error: rawMaterialsError } = useInventory();
-  const { data: orderDemand = [] } = useOrderDemand();
-  const { data: packingMaterials = [] } = usePackingMaterials();
+  const { data: orderDemand = [], isLoading: orderDemandLoading } = useOrderDemand();
+  const { data: packingMaterials = [], isLoading: packingLoading } = usePackingMaterials();
   const deleteIngredient = useDeleteIngredient();
   const deleteManualStock = useDeleteManualStockItem();
   const deleteStockItem = useDeleteStockItem();
@@ -79,12 +79,16 @@ export const Inventory = () => {
                     <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{item.qty}</TableCell>
                     <TableCell sx={cellSx}>{item.unit}</TableCell>
                     <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }}>
-                      {pendingQty > 0 ? (
+                      {orderDemandLoading ? (
+                        <CircularProgress size={14} />
+                      ) : pendingQty > 0 ? (
                         <Chip label={`${pendingQty} ${item.unit}`} color="info" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
                       ) : "—"}
                     </TableCell>
                     <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }}>
-                      {shortage > 0 ? (
+                      {orderDemandLoading ? (
+                        <CircularProgress size={14} />
+                      ) : shortage > 0 ? (
                         <Chip label={`${shortage} ${item.unit}`} color="error" size="small" sx={{ fontSize: "0.65rem", height: 20, fontWeight: 700 }} />
                       ) : pendingQty > 0 ? (
                         <Chip label="Sufficient" color="success" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
@@ -103,7 +107,7 @@ export const Inventory = () => {
                       })()}
                     </TableCell>
                     <TableCell sx={cellSx}>
-                      <Button size="small" color="error" variant="outlined" onClick={() => handleDeleteSaleable(item.id, item.name)}>
+                      <Button size="small" color="error" variant="outlined" onClick={() => handleDeleteSaleable(item.id, item.name)} disabled={deleteStockItem.isPending}>
                         Del
                       </Button>
                     </TableCell>
@@ -179,6 +183,9 @@ export const Inventory = () => {
 
       {/* Packing Materials */}
       <Typography variant="h5" sx={{ mt: 3, mb: 1, fontSize: { xs: "1.1rem", sm: "1.25rem" }, fontWeight: 700 }}>Packing Materials</Typography>
+      {packingLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box>
+      ) : (
       <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
         <Table size="small">
           <TableHead><TableRow>
@@ -194,7 +201,7 @@ export const Inventory = () => {
                 <TableCell sx={cellSx}>{item.unit}</TableCell>
                 <TableCell sx={cellSx}>{formatMoney(item.unit_price || 0)}</TableCell>
                 <TableCell sx={cellSx}>
-                  <Button size="small" color="error" variant="outlined" onClick={() => handleDeletePacking(item.id, item.name)}>
+                  <Button size="small" color="error" variant="outlined" onClick={() => handleDeletePacking(item.id, item.name)} disabled={deleteManualStock.isPending}>
                     Del
                   </Button>
                 </TableCell>
@@ -203,6 +210,7 @@ export const Inventory = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      )}
     </Box>
   );
 };

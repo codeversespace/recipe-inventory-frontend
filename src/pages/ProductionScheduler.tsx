@@ -54,19 +54,19 @@ export const ProductionScheduler = () => {
         <Card sx={{ flex: 1, background: "linear-gradient(135deg, #1976d2, #42a5f5)", color: "white" }}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
             <Typography variant="overline" sx={{ opacity: 0.8, fontSize: "0.65rem" }}>Pending Orders</Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{pendingOrders}</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{isLoading ? <CircularProgress size={20} sx={{ color: "white" }} /> : pendingOrders}</Typography>
           </CardContent>
         </Card>
         <Card sx={{ flex: 1, background: "linear-gradient(135deg, #f57c00, #ffb74d)", color: "white" }}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
             <Typography variant="overline" sx={{ opacity: 0.8, fontSize: "0.65rem" }}>Total Demand (units)</Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{totalDemand}</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{isLoading ? <CircularProgress size={20} sx={{ color: "white" }} /> : totalDemand}</Typography>
           </CardContent>
         </Card>
         <Card sx={{ flex: 1, background: "linear-gradient(135deg, #d32f2f, #ef5350)", color: "white" }}>
           <CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
             <Typography variant="overline" sx={{ opacity: 0.8, fontSize: "0.65rem" }}>Shortage (units)</Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{shortage}</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{isLoading ? <CircularProgress size={20} sx={{ color: "white" }} /> : shortage}</Typography>
           </CardContent>
         </Card>
       </Box>
@@ -124,7 +124,7 @@ export const ProductionScheduler = () => {
         <CardContent>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Quick Forecast</Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>Based on last 30 days</Typography>
-          {suggestions.slice(0, 5).map((item, index) => (
+          {isLoading ? <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={20} /></Box> : suggestions.slice(0, 5).map((item, index) => (
             <Box key={index} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderBottom: "1px solid", borderColor: "divider" }}>
               <Typography variant="body2" sx={{ fontWeight: 500 }}>{item.recipe_name}</Typography>
               <Typography variant="body2" color="text.secondary">{item.demand} units</Typography>

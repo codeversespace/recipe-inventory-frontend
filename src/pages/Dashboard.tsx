@@ -61,7 +61,7 @@ export const Dashboard = () => {
   const [preset, setPreset] = useState("last7");
   const [startDate, setStartDate] = useState(initialRange.start);
   const [endDate, setEndDate] = useState(initialRange.end);
-  const { data, isLoading, isError } = useDashboard(startDate, endDate);
+  const { data, isLoading, isFetching, isError } = useDashboard(startDate, endDate);
 
   if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>;
   if (isError) return <Typography color="error">Unable to load dashboard data.</Typography>;
@@ -91,7 +91,10 @@ export const Dashboard = () => {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 2, fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Dashboard</Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+        <Typography variant="h4" sx={{ fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Dashboard</Typography>
+        {isFetching && <CircularProgress size={18} />}
+      </Box>
 
       {/* Date range presets - scrollable on mobile */}
       <Box sx={{ mb: 2, overflowX: "auto", pb: 0.5 }}>

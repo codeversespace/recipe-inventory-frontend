@@ -23,7 +23,7 @@ import { VoiceInput } from "../components/VoiceInput";
 
 export const Ingredients = () => {
   const { data:ingredients = [], isLoading, error } = useIngredients();
-  const { data: inventory = [] } = useInventory();
+  const { data: inventory = [], isLoading: inventoryLoading } = useInventory();
   const addIngredient = useAddIngredient();
   const updateIngredient = useUpdateIngredient();
   const deleteIngredient = useDeleteIngredient();
@@ -103,18 +103,21 @@ export const Ingredients = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {ingredients?.map((ing: any) => (
+              {ingredients?.map((ing: any) => {
+                const stock = inventory.find((item: any) => item.id === ing.id);
+                return (
                 <TableRow key={ing.id}>
                   <TableCell>{ing.id}</TableCell>
                   <TableCell>{ing.name}</TableCell>
                   <TableCell>{ing.base_unit}</TableCell>
-                  <TableCell>{inventory.find((item: any) => item.id === ing.id)?.on_hand_qty ?? 0}</TableCell>
-                  <TableCell>₹{(inventory.find((item: any) => item.id === ing.id)?.avg_unit_price ?? 0).toFixed(2)}</TableCell>
+                  <TableCell>{inventoryLoading || !stock ? <CircularProgress size={14} /> : stock.on_hand_qty}</TableCell>
+                  <TableCell>{inventoryLoading || !stock ? <CircularProgress size={14} /> : `₹${(stock.avg_unit_price ?? 0).toFixed(2)}`}</TableCell>
                   <TableCell>{ing.min_stock ?? 0}</TableCell>
-                  <TableCell><Typography color={inventory.find((item: any) => item.id === ing.id)?.is_low_stock ? "error" : "success.main"}>{inventory.find((item: any) => item.id === ing.id)?.is_low_stock ? "Low stock" : "OK"}</Typography></TableCell>
-                  <TableCell><Button size="small" onClick={() => editIngredient(ing)}>Edit</Button><Button size="small" color="error" onClick={() => removeIngredient(ing)}>Delete</Button></TableCell>
+                  <TableCell>{inventoryLoading || !stock ? <CircularProgress size={14} /> : <Typography color={stock.is_low_stock ? "error" : "success.main"}>{stock.is_low_stock ? "Low stock" : "OK"}</Typography>}</TableCell>
+                  <TableCell><Button size="small" onClick={() => editIngredient(ing)}>Edit</Button><Button size="small" color="error" onClick={() => removeIngredient(ing)} disabled={deleteIngredient.isPending}>Delete</Button></TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -150,8 +153,8 @@ export const Ingredients = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained">
-            {editingId ? "Update" : "Save"}
+          <Button onClick={handleSave} variant="contained" disabled={addIngredient.isPending || updateIngredient.isPending}>
+            {(addIngredient.isPending || updateIngredient.isPending) ? <CircularProgress size={20} color="inherit" /> : (editingId ? "Update" : "Save")}
           </Button>
         </DialogActions>
       </Dialog>

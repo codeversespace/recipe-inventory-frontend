@@ -3,7 +3,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
@@ -12,14 +12,17 @@ export const Processing = () => {
   const [processorFilter, setProcessorFilter] = useState<number | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const filterParams: any = {};
-  if (processorFilter) filterParams.processor_id = processorFilter;
-  if (dateFrom) filterParams.start_date = dateFrom;
-  if (dateTo) filterParams.end_date = dateTo;
+  const filterParams: any = useMemo(() => {
+    const params: any = {};
+    if (processorFilter) params.processor_id = processorFilter;
+    if (dateFrom) params.start_date = dateFrom;
+    if (dateTo) params.end_date = dateTo;
+    return params;
+  }, [processorFilter, dateFrom, dateTo]);
 
   const { data: orders = [], isLoading } = useProcessingOrders(filterParams);
-  const { data: ingredients = [] } = useIngredients();
-  const { data: processors = [] } = useProcessors();
+  const { data: ingredients = [], isLoading: ingredientsLoading } = useIngredients();
+  const { data: processors = [], isLoading: processorsLoading } = useProcessors();
   const createOrder = useCreateProcessingOrder();
   const receiveProcessing = useReceiveProcessing();
   const addPayment = useProcessingPayment();
@@ -159,12 +162,12 @@ export const Processing = () => {
 
       {/* Summary */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(6, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
-        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{orders.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{pending.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{totalSent.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{totalReceived.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>{formatMoney(totalPaid)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>{formatMoney(totalDue)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : orders.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{isLoading ? <CircularProgress size={16} /> : pending.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : totalSent.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{isLoading ? <CircularProgress size={16} /> : totalReceived.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalPaid)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalDue)}</Typography></CardContent></Card>
       </Box>
 
       {/* Orders Table */}
@@ -219,14 +222,18 @@ export const Processing = () => {
             getOptionLabel={(p: any) => p.name}
             value={processors.find((p: any) => p.id === selectedProcessorId) || null}
             onChange={(_, v) => setSelectedProcessorId(v?.id || 0)}
-            renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
+            loading={processorsLoading}
+            disabled={processorsLoading}
+            renderInput={(params) => <TextField {...params} margin="dense" label={processorsLoading ? "Loading processors..." : "Processor"} />}
           />
           <Autocomplete
             options={ingredients}
             getOptionLabel={(i: any) => `${i.name} (${i.on_hand_qty || 0} ${i.base_unit})`}
             value={ingredients.find((i: any) => i.id === rawId) || null}
             onChange={(_, v) => setRawId(v?.id || 0)}
-            renderInput={(params) => <TextField {...params} margin="dense" label="Raw ingredient" />}
+            loading={ingredientsLoading}
+            disabled={ingredientsLoading}
+            renderInput={(params) => <TextField {...params} margin="dense" label={ingredientsLoading ? "Loading ingredients..." : "Raw ingredient"} />}
           />
           <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
             <TextField margin="dense" label="Quantity sent (kg)" type="number" fullWidth value={qtySent} onChange={(e) => setQtySent(e.target.value)} />
@@ -388,7 +395,7 @@ export const Processing = () => {
                   {processed.map((i: any) => (
                     <Box key={i.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Typography variant="body2">{i.name} — {i.on_hand_qty} {i.base_unit}</Typography>
-                      <IconButton size="small" color="error" onClick={async () => {
+                      <IconButton size="small" color="error" disabled={deleteIngredient.isPending} onClick={async () => {
                         if (window.confirm(`Delete "${i.name}"? This cannot be undone.`)) {
                           try { await deleteIngredient.mutateAsync({ id: i.id, force: true }); setSuccess("Deleted."); }
                           catch (e: any) { setError(e.response?.data?.detail || "Could not delete."); }

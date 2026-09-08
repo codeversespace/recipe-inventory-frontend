@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 
 type User = {
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -50,8 +52,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     logout: () => {
       localStorage.removeItem("access_token");
       setUser(null);
+      // Drop all cached business data so the next login cannot see it.
+      queryClient.clear();
     },
-  }), [user, loading]);
+  }), [user, loading, queryClient]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
