@@ -423,6 +423,23 @@ export const useBatches = (limit = 20) =>
     initialData: [],
   });
 
+export const useProductionBatches = (recipeId?: number, page = 1, pageSize = 10) =>
+  useQuery<any, Error>({
+    queryKey: ["productionBatches", recipeId || 0, page, pageSize],
+    queryFn: async () => {
+      const { data } = await api.get("/production/batches", {
+        params: {
+          ...(recipeId ? { recipe_id: recipeId } : {}),
+          page,
+          page_size: pageSize,
+        },
+      });
+      return data;
+    },
+    enabled: !!recipeId,
+    placeholderData: (prev: any) => prev ?? { items: [], total: 0, page, page_size: pageSize },
+  });
+
 /* ------------------------------------------------------------------ */
 /* Inventory                                                            */
 /* ------------------------------------------------------------------ */
@@ -484,7 +501,7 @@ export const useSales = () =>
 
 export const useAddSale = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; payment_method?: string; payment_reference?: string; use_advance?: boolean; lines: { recipe_id?: number; stock_item_id?: number; quantity: number; unit_price?: number }[] }>({
+  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; payment_method?: string; payment_reference?: string; use_advance?: boolean; lines: { recipe_id?: number; stock_item_id?: number; quantity: number; unit_price?: number; allocations?: { batch_id: number; quantity: number }[] }[] }>({
     mutationFn: (payload) => api.post("/sales", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales"] });
@@ -494,9 +511,18 @@ export const useAddSale = () => {
       qc.invalidateQueries({ queryKey: ["saleableStock"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["stockBatches"] });
+      qc.invalidateQueries({ queryKey: ["batchDetail"] });
     },
   });
 };
+
+export const useStockBatches = (stockItemId: number) =>
+  useQuery<any, Error>({
+    queryKey: ["stockBatches", stockItemId],
+    queryFn: async () => (await api.get(`/sales/stock-items/${stockItemId}/batches`)).data,
+    enabled: !!stockItemId,
+  });
 
 export const useRecordPayment = () => {
   const qc = useQueryClient();

@@ -43,15 +43,20 @@ html, body, #root { min-height: 100%; }
 
   /* Text fields - compact */
   .MuiTextField-root { margin-bottom: 4px; }
-  .MuiInputBase-root { font-size: 0.85rem !important; }
+  /* Prevent iOS Safari auto-zoom on focus: editable text must be >= 16px.
+     Labels/helper text keep their compact sizes below. */
+  .MuiInputBase-input,
+  .MuiSelect-select,
+  input,
+  textarea,
+  select { font-size: 16px !important; }
   .MuiInputLabel-root { font-size: 0.8rem !important; }
 
   /* Tables - compact rows */
   .MuiTableCell-root { padding: 6px 8px !important; font-size: 0.75rem !important; }
   .MuiTableHead-root .MuiTableCell-root { font-weight: 700 !important; }
 
-  /* Select */
-  .MuiSelect-select { font-size: 0.85rem !important; }
+  /* Select value text covered by the 16px input rule above. */
 
   /* Bottom navigation */
   .MuiBottomNavigation-root { height: 60px !important; }

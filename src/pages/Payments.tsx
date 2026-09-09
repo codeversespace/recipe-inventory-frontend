@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useProcessingPayments, useSuppliers, useSupplierPayments } from "../hooks/useApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { VoiceInput } from "../components/VoiceInput";
+import { EmptyState, PageHeader, TableSkeleton } from "../components/ui";
 import { bestMatch } from "../utils/fuzzy";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
@@ -123,8 +124,10 @@ export const Payments = () => {
   }, [allHistory, supplierHistory]);
 
   return <Box>
-    <Typography variant="h4" sx={{ mb: 1, fontSize: { xs: "1.5rem", sm: "2rem" }, fontWeight: 700 }}>Payments</Typography>
-    <Typography color="text.secondary" sx={{ mb: 2, fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Unified module for customer and supplier payments.</Typography>
+    <PageHeader
+      title="Payments"
+      subtitle="Unified module for customer and supplier payments."
+    />
 
     {/* Cash Flow Chart */}
     <Card sx={{ mb: 2 }}>
@@ -190,12 +193,12 @@ export const Payments = () => {
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
         <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Invoice</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Customer</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Status</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Due</TableCell>
-      </TableRow></TableHead><TableBody>{salesLoading ? <TableRow><TableCell colSpan={4} align="center"><CircularProgress size={24} /></TableCell></TableRow> : filtered.length ? filtered.map((sale: any) => <TableRow key={sale.id}>
+      </TableRow></TableHead><TableBody>{salesLoading ? <TableSkeleton rows={4} colSpan={4} /> : filtered.length ? filtered.map((sale: any) => <TableRow key={sale.id}>
         <TableCell sx={cellSx}>#{sale.id}{sale.reference ? ` ${sale.reference}` : ""}</TableCell>
         <TableCell sx={cellSx}>{sale.customer_name || "Walk-in"}</TableCell>
         <TableCell sx={cellSx}>{sale.payment_status}</TableCell>
-        <TableCell sx={{ ...cellSx, fontWeight: 700, color: sale.amount_due > 0 ? "error.main" : "success.main" }}>{formatMoney(sale.amount_due)}</TableCell>
-      </TableRow>) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No invoices found.</TableCell></TableRow>}<TableRow sx={{ bgcolor: "action.hover" }}><TableCell colSpan={3} sx={{ ...cellSx, fontWeight: 700 }}>Total Due</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700, color: "error.main" }}>{formatMoney(filteredDue)}</TableCell></TableRow></TableBody></Table></TableContainer>
+        <TableCell sx={{ ...cellSx, fontWeight: 700, color: sale.amount_due > 0 ? "error.main" : "success.main" }} className="tnum">{formatMoney(sale.amount_due)}</TableCell>
+      </TableRow>) : <TableRow><TableCell colSpan={4} align="center"><EmptyState title="No invoices found." message="Sales with pending dues will appear here." /></TableCell></TableRow>}<TableRow sx={{ bgcolor: "action.hover" }}><TableCell colSpan={3} sx={{ ...cellSx, fontWeight: 700 }}>Total Due</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700, color: "error.main" }} className="tnum">{formatMoney(filteredDue)}</TableCell></TableRow></TableBody></Table></TableContainer>
       {historyOpen && <Card sx={{ mt: 2 }}><CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}><Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Payment history</Typography>{historyLoading ? <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>Loading...</Typography> : <TableContainer><Table size="small"><TableHead><TableRow>
         <TableCell sx={cellSx}>Date</TableCell><TableCell sx={cellSx}>Customer</TableCell><TableCell sx={cellSx}>Amount</TableCell><TableCell sx={cellSx}>Method</TableCell>
       </TableRow></TableHead><TableBody>{history.length ? history.map((payment: any) => <TableRow key={payment.id}>
@@ -220,12 +223,12 @@ export const Payments = () => {
       </Box>
       <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
         <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Supplier</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
-      </TableRow></TableHead><TableBody>{supplierHistoryLoading ? <TableRow><TableCell colSpan={4} align="center"><CircularProgress size={24} /></TableCell></TableRow> : filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any) => <TableRow key={payment.id}>
+      </TableRow></TableHead><TableBody>{supplierHistoryLoading ? <TableSkeleton rows={4} colSpan={4} /> : filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any) => <TableRow key={payment.id}>
         <TableCell sx={cellSx}>{formatDate(payment.paid_at)}</TableCell>
         <TableCell sx={cellSx}>{payment.supplier_name}</TableCell>
-        <TableCell sx={cellSx}>{formatMoney(payment.amount)}</TableCell>
+        <TableCell sx={cellSx} className="tnum">{formatMoney(payment.amount)}</TableCell>
         <TableCell sx={cellSx}>{payment.method}</TableCell>
-      </TableRow>) : <TableRow><TableCell colSpan={4} align="center" sx={{ ...cellSx, py: 3 }}>No supplier payments recorded.</TableCell></TableRow>}</TableBody></Table></TableContainer>
+      </TableRow>) : <TableRow><TableCell colSpan={4} align="center"><EmptyState title="No supplier payments recorded." message="Recorded supplier payments will appear here." /></TableCell></TableRow>}</TableBody></Table></TableContainer>
     </>}
 
     {tab === 2 && (() => {
@@ -242,19 +245,19 @@ export const Payments = () => {
         <Box sx={{ mb: 2 }}>
           <TextField size="small" placeholder="Search by processor or ingredient..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ width: "100%", maxWidth: 400, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
         </Box>
-        <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+        <TableContainer sx={{ overflowX: "auto" }}><Table size="small" sx={{ minWidth: 480 }}><TableHead><TableRow>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Processor</TableCell>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell>
           <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
-        </TableRow></TableHead><TableBody>{expensesLoading ? <TableRow><TableCell colSpan={5} align="center"><CircularProgress size={24} /></TableCell></TableRow> : filteredExpenses.length ? filteredExpenses.map((expense: any) => <TableRow key={expense.id}>
+        </TableRow></TableHead><TableBody>{expensesLoading ? <TableSkeleton rows={4} colSpan={5} /> : filteredExpenses.length ? filteredExpenses.map((expense: any) => <TableRow key={expense.id}>
           <TableCell sx={cellSx}>{formatDate(expense.date)}</TableCell>
           <TableCell sx={cellSx}>{expense.processor_name}</TableCell>
           <TableCell sx={cellSx}>{expense.raw_ingredient}</TableCell>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>{formatMoney(expense.amount)}</TableCell>
+          <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">{formatMoney(expense.amount)}</TableCell>
           <TableCell sx={cellSx}>{expense.method}</TableCell>
-        </TableRow>) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}>No processing expenses recorded.</TableCell></TableRow>}</TableBody></Table></TableContainer>
+        </TableRow>) : <TableRow><TableCell colSpan={5} align="center"><EmptyState title="No processing expenses recorded." message="Processor payments will appear here." /></TableCell></TableRow>}</TableBody></Table></TableContainer>
       </>;
     })()}
 

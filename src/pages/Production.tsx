@@ -1,6 +1,7 @@
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { useBatchDetail, useBatches, useCostPreview, useProduceBatch, useRecipes, useUpdateBatch } from "../hooks/useApi";
+import { EmptyState, ErrorState, FormActions, FormSection, PageHeader, TableSkeleton } from "../components/ui";
 import { useState } from "react";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { VoiceInput } from "../components/VoiceInput";
@@ -22,7 +23,9 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export const Production = () => {
   const { data: recipes = [], isLoading: recipesLoading } = useRecipes();
-  const { data: batches = [], isLoading: batchesLoading } = useBatches(50);
+  const { data: batches = [], isLoading: batchesLoading, error: batchesError, refetch: refetchBatches } = useBatches(50);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const produce = useProduceBatch();
   const updateBatch = useUpdateBatch();
   const [open, setOpen] = useState(false);
@@ -88,29 +91,74 @@ export const Production = () => {
   };
 
   return <Box>
-    <Box sx={{ display: "flex", alignItems: { xs: "stretch", sm: "center" }, flexDirection: { xs: "column", sm: "row" }, justifyContent: "space-between", gap: 1.5, mb: 2 }}>
-      <Box><Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "2rem" } }}>Production</Typography><Typography color="text.secondary" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Record batches and review recent output.</Typography></Box>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-        <VoiceInput onResult={handleProdVoice} disabled={!recipes.length} label="Quick voice batch" variant="production" />
-        <Button startIcon={<AddRoundedIcon />} variant="contained" size="small" onClick={() => setOpen(true)} disabled={!recipes.length} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Record batch</Button>
-      </Box>
-    </Box>
-    <Card sx={{ mb: 2, background: "linear-gradient(135deg, #0f766e, #0891b2)", color: "white" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}><Typography variant="overline" sx={{ opacity: .8, fontSize: "0.65rem" }}>Production history</Typography><Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{batchesLoading ? <CircularProgress size={22} sx={{ color: "white" }} /> : `${batches.length} batches recorded`}</Typography></CardContent></Card>
+    <PageHeader
+      title="Production"
+      subtitle="Record batches and review recent output."
+      actions={
+        <>
+          <VoiceInput onResult={handleProdVoice} disabled={!recipes.length} label="Quick voice batch" variant="production" />
+          <Button startIcon={<AddRoundedIcon />} variant="contained" onClick={() => setOpen(true)} disabled={!recipes.length}>Record batch</Button>
+        </>
+      }
+    />
+    <Card sx={{ mb: 2, background: "primary.main", color: "white" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}><Typography variant="overline" sx={{ opacity: .8, fontSize: "0.65rem" }}>Production history</Typography><Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.5rem" } }}>{batchesLoading ? <CircularProgress size={22} sx={{ color: "white" }} /> : `${batches.length} batches recorded`}</Typography></CardContent></Card>
+    <Box sx={{ display: { xs: "none", sm: "block" } }}>
     <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-      <Table size="small"><TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>#</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Recipe</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost/Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Profit</TableCell></TableRow></TableHead><TableBody>
-        {batchesLoading ? <TableRow><TableCell colSpan={7} align="center"><CircularProgress size={24} /></TableCell></TableRow> : batches.length ? batches.map((batch: any) => <TableRow key={batch.id} hover onClick={() => setDetailId(batch.id)} sx={{ cursor: "pointer" }}><TableCell sx={cellSx}>{batch.id}</TableCell><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{batch.recipe_name}</TableCell><TableCell sx={cellSx}>{formatDate(batch.produced_at)}</TableCell><TableCell sx={cellSx}>{batch.produced_qty}</TableCell><TableCell sx={cellSx}>{formatMoney(batch.total_cost)}</TableCell><TableCell sx={cellSx}>{formatMoney(batch.total_cost / batch.produced_qty)}</TableCell><TableCell sx={{ ...cellSx, color: (batch.profit ?? 0) >= 0 ? "success.main" : "error.main", fontWeight: 700 }}>{batch.profit == null ? "—" : formatMoney(batch.profit)}</TableCell></TableRow>) : <TableRow><TableCell colSpan={7} align="center" sx={{ ...cellSx, py: 3 }}>No production batches recorded yet.</TableCell></TableRow>}
+      <Table size="small" sx={{ minWidth: 720 }}><TableHead><TableRow><TableCell sx={{ ...cellSx, fontWeight: 700 }}>#</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Recipe</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Cost/Unit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Profit</TableCell><TableCell sx={{ ...cellSx, fontWeight: 700 }}>Details</TableCell></TableRow></TableHead><TableBody>
+        {batchesLoading ? <TableSkeleton rows={5} colSpan={8} /> : batchesError ? <TableRow><TableCell colSpan={8} align="center"><ErrorState message={(batchesError as any).message} onRetry={() => refetchBatches()} /></TableCell></TableRow> : batches.length ? batches.map((batch: any) => <TableRow key={batch.id} hover><TableCell sx={cellSx}>{batch.id}</TableCell><TableCell sx={{ ...cellSx, fontWeight: 600 }}>{batch.recipe_name}</TableCell><TableCell sx={cellSx}>{formatDate(batch.produced_at)}</TableCell><TableCell sx={cellSx} className="tnum">{batch.produced_qty}</TableCell><TableCell sx={cellSx} className="tnum">{formatMoney(batch.total_cost)}</TableCell><TableCell sx={cellSx} className="tnum">{formatMoney(batch.total_cost / batch.produced_qty)}</TableCell><TableCell sx={{ ...cellSx, color: (batch.profit ?? 0) >= 0 ? "success.main" : "error.main", fontWeight: 700 }} className="tnum">{batch.profit == null ? "—" : formatMoney(batch.profit)}</TableCell><TableCell sx={cellSx}><Button size="small" onClick={() => setDetailId(batch.id)} aria-label={`View batch ${batch.id}`}>View</Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={8} align="center" sx={{ ...cellSx, py: 3 }}><EmptyState title="No production batches recorded yet." message="Record your first batch to track production costs." actionLabel="Record batch" onAction={() => setOpen(true)} /></TableCell></TableRow>}
       </TableBody></Table>
     </TableContainer>
-    <Dialog open={open} onClose={close} maxWidth="sm" fullWidth><DialogTitle sx={{ fontWeight: 750 }}>Record a batch</DialogTitle><DialogContent>
-      {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
+    </Box>
+    <Box sx={{ display: { xs: "block", sm: "none" } }}>
+      {batchesLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box>
+      ) : batchesError ? (
+        <ErrorState message={(batchesError as any).message} onRetry={() => refetchBatches()} />
+      ) : batches.length ? (
+        <Stack spacing={1.5}>
+          {batches.map((batch: any) => (
+            <Card key={batch.id} variant="outlined">
+              <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{batch.recipe_name}</Typography>
+                    <Typography variant="caption" color="text.secondary">Batch #{batch.id} · {formatDate(batch.produced_at)}</Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: "nowrap", color: (batch.profit ?? 0) >= 0 ? "success.main" : "error.main" }} className="tnum">
+                    {batch.profit == null ? "—" : formatMoney(batch.profit)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", gap: 2, mt: 1 }} className="tnum">
+                  <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Quantity</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{batch.produced_qty}</Typography></Box>
+                  <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Cost</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{formatMoney(batch.total_cost)}</Typography></Box>
+                  <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Cost / unit</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{formatMoney(batch.total_cost / batch.produced_qty)}</Typography></Box>
+                </Box>
+                <Button fullWidth variant="outlined" onClick={() => setDetailId(batch.id)} aria-label={`View batch ${batch.id}`} sx={{ mt: 1.5, minHeight: 44 }}>
+                  View details
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+        <EmptyState title="No production batches recorded yet." message="Record your first batch to track production costs." actionLabel="Record batch" onAction={() => setOpen(true)} />
+      )}
+    </Box>
+    <Dialog open={open} onClose={close} fullScreen={isMobile} maxWidth="sm" fullWidth><DialogTitle sx={{ fontWeight: 750 }}>Record a batch</DialogTitle><DialogContent sx={{ pb: 1 }}>
+      <FormSection title="Recipe">
       <FormControl fullWidth margin="dense" disabled={recipesLoading}><InputLabel>{recipesLoading ? "Loading recipes..." : "Recipe"}</InputLabel><Select value={recipeId} label={recipesLoading ? "Loading recipes..." : "Recipe"} onChange={(event) => { const id = Number(event.target.value); setRecipeId(id); if (scaleMode === "batches") { const recipe = recipes.find((item: any) => item.id === id); if (recipe) setProducedQty(String(Number(batchCount) * recipe.batch_qty)); } }}>{recipes.map((recipe: any) => <MenuItem key={recipe.id} value={recipe.id}>{recipe.name}</MenuItem>)}</Select></FormControl>
+      </FormSection>
+      <FormSection title="Quantity">
       <FormControl fullWidth margin="dense"><InputLabel>Scale by</InputLabel><Select value={scaleMode} label="Scale by" onChange={(event) => setScaleMode(event.target.value as "output" | "batches")}><MenuItem value="output">Desired output quantity</MenuItem><MenuItem value="batches">Number of batches</MenuItem></Select></FormControl>
-      {scaleMode === "output" ? <TextField margin="dense" label="Desired output quantity" type="number" fullWidth value={producedQty} onChange={(event) => setProducedQty(event.target.value)} /> : <TextField margin="dense" label="Number of batches" type="number" fullWidth value={batchCount} onChange={(event) => { const count = event.target.value; setBatchCount(count); const recipe = recipes.find((item: any) => item.id === recipeId); if (recipe) setProducedQty(String(Number(count) * recipe.batch_qty)); }} slotProps={{ htmlInput: { min: 0, step: "any" } }} />}
+      {scaleMode === "output" ? <TextField margin="dense" label="Desired output quantity" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={producedQty} onChange={(event) => setProducedQty(event.target.value)} /> : <TextField margin="dense" label="Number of batches" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={batchCount} onChange={(event) => { const count = event.target.value; setBatchCount(count); const recipe = recipes.find((item: any) => item.id === recipeId); if (recipe) setProducedQty(String(Number(count) * recipe.batch_qty)); }} />}
+      </FormSection>
+      <FormSection title="Costing">
       <FormControl fullWidth margin="dense"><InputLabel>Costing method</InputLabel><Select value={method} label="Costing method" onChange={(event) => setMethod(event.target.value as any)}><MenuItem value="FIFO">FIFO</MenuItem><MenuItem value="LIFO">LIFO</MenuItem><MenuItem value="AVG">Weighted average</MenuItem></Select></FormControl>
+      </FormSection>
       {previewLoading && <CircularProgress size={20} sx={{ mt: 2 }} />}
       {preview && <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "action.hover" }}><Typography sx={{ fontWeight: 700 }}>Live cost preview</Typography><Typography variant="body2">Scale: {preview.batch_multiplier}× · Estimated cost: {formatMoney(preview.estimated_total_cost)}{preview.estimated_profit != null ? ` · Estimated profit: ${formatMoney(preview.estimated_profit)}` : ""}{preview.estimated_margin_pct != null ? ` · Margin: ${preview.estimated_margin_pct.toFixed(2)}%` : ""}</Typography>{preview.lines.map((line: any) => <Typography key={line.ingredient_id} variant="caption" sx={{ display: "block" }} color={line.is_short ? "error.main" : "text.secondary"}>{line.ingredient_name}: need {line.needed_qty} {line.unit} ({formatMoney(line.estimated_cost)}), in stock {line.on_hand_qty}{line.is_short ? " — insufficient" : ""}</Typography>)}{preview.overheads && preview.overheads.length > 0 && <Typography variant="caption" sx={{ display: "block", mt: 1, fontWeight: 600 }} color="text.secondary">Overheads: {formatMoney(preview.estimated_overhead_cost)}</Typography>}{preview.lines.some((line: any) => line.is_short) && <Alert severity="error" sx={{ mt: 1 }}>Insufficient stock. Add the missing ingredients before recording this batch.</Alert>}</Box>}
-    </DialogContent><DialogActions sx={{ p: 2 }}><Button onClick={close}>Cancel</Button><Button variant="contained" onClick={submit} disabled={produce.isPending || !!preview?.lines.some((line: any) => line.is_short)}>{produce.isPending ? <CircularProgress size={22} /> : "Record batch"}</Button></DialogActions></Dialog>
-    <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="md" fullWidth><DialogTitle>Batch details</DialogTitle><DialogContent>{detailLoading ? <CircularProgress /> : detail && <Box><Box sx={{ display: "flex", gap: 2, mb: 1, p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}><Typography variant="body2"><strong>Cost per unit:</strong> {formatMoney(detail.total_cost / detail.produced_qty)}</Typography><Typography variant="body2"><strong>Qty:</strong> {detail.produced_qty}</Typography><Typography variant="body2"><strong>Method:</strong> {detail.costing_method}</Typography></Box><Typography><strong>#{detail.id} {detail.recipe_name}</strong> · {detail.produced_qty} output · {detail.costing_method}</Typography><Typography sx={{ mt: 1 }}>Cost: {formatMoney(detail.total_cost)} · Revenue: {detail.total_revenue == null ? "—" : formatMoney(detail.total_revenue)} · Profit: {detail.profit == null ? "—" : formatMoney(detail.profit)} · Margin: {detail.margin_pct == null ? "—" : `${detail.margin_pct.toFixed(2)}%`}</Typography>
+    </DialogContent><FormActions onCancel={close} submitLabel="Record batch" onSubmit={submit} pending={produce.isPending} disabled={!!preview?.lines.some((line: any) => line.is_short)} error={error} /></Dialog>
+    <Dialog open={!!detailId} onClose={() => setDetailId(null)} fullScreen={isMobile} maxWidth="md" fullWidth><DialogTitle>Batch details</DialogTitle><DialogContent>{detailLoading ? <CircularProgress /> : detail && <Box><Box sx={{ display: "flex", gap: 2, mb: 1, p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}><Typography variant="body2"><strong>Cost per unit:</strong> {formatMoney(detail.total_cost / detail.produced_qty)}</Typography><Typography variant="body2"><strong>Qty:</strong> {detail.produced_qty}</Typography><Typography variant="body2"><strong>Method:</strong> {detail.costing_method}</Typography></Box><Typography><strong>#{detail.id} {detail.recipe_name}</strong> · {detail.produced_qty} output · {detail.costing_method}</Typography><Typography sx={{ mt: 1 }}>Cost: {formatMoney(detail.total_cost)} · Revenue: {detail.total_revenue == null ? "—" : formatMoney(detail.total_revenue)} · Profit: {detail.profit == null ? "—" : formatMoney(detail.profit)} · Margin: {detail.margin_pct == null ? "—" : `${detail.margin_pct.toFixed(2)}%`}</Typography>
       {/* Batch Costing Breakdown Pie Chart */}
       <Box sx={{ mt: 2, mb: 1 }}><Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Cost Breakdown</Typography>
         <ResponsiveContainer width="100%" height={220}>
@@ -140,8 +188,8 @@ export const Production = () => {
           </BarChart>
         </ResponsiveContainer>
       </Box>
-      <TableContainer component={Paper} sx={{ mt: 1 }}><Table size="small"><TableHead><TableRow><TableCell>Ingredient</TableCell><TableCell>Quantity</TableCell><TableCell>Unit cost</TableCell><TableCell>Line cost</TableCell></TableRow></TableHead><TableBody>{detail.consumptions.map((item: any, index: number) => <TableRow key={`${item.ingredient_name}-${index}`}><TableCell>{item.ingredient_name}</TableCell><TableCell>{item.qty_used}</TableCell><TableCell>{formatMoney(item.unit_cost)}</TableCell><TableCell>{formatMoney(item.line_cost)}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
-      {detail.overheads && detail.overheads.length > 0 && <><Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 1 }}>Overheads</Typography><TableContainer component={Paper}><Table size="small"><TableHead><TableRow><TableCell>Type</TableCell><TableCell>Name</TableCell><TableCell>Cost</TableCell></TableRow></TableHead><TableBody>{detail.overheads.map((oh: any, i: number) => <TableRow key={i}><TableCell>{oh.overhead_type}</TableCell><TableCell>{oh.name}</TableCell><TableCell>{formatMoney(oh.cost)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></>}</Box>}</DialogContent><DialogActions><Button onClick={openEdit} disabled={!detail || detailLoading}>Edit batch</Button><Button onClick={() => setDetailId(null)}>Close</Button></DialogActions></Dialog>
+      <TableContainer component={Paper} sx={{ mt: 1, overflowX: "auto" }}><Table size="small" sx={{ minWidth: 440 }}><TableHead><TableRow><TableCell>Ingredient</TableCell><TableCell>Quantity</TableCell><TableCell>Unit cost</TableCell><TableCell>Line cost</TableCell></TableRow></TableHead><TableBody>{detail.consumptions.map((item: any, index: number) => <TableRow key={`${item.ingredient_name}-${index}`}><TableCell>{item.ingredient_name}</TableCell><TableCell>{item.qty_used}</TableCell><TableCell>{formatMoney(item.unit_cost)}</TableCell><TableCell>{formatMoney(item.line_cost)}</TableCell></TableRow>)}</TableBody></Table></TableContainer>
+      {detail.overheads && detail.overheads.length > 0 && <><Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 1 }}>Overheads</Typography><TableContainer component={Paper} sx={{ overflowX: "auto" }}><Table size="small" sx={{ minWidth: 320 }}><TableHead><TableRow><TableCell>Type</TableCell><TableCell>Name</TableCell><TableCell>Cost</TableCell></TableRow></TableHead><TableBody>{detail.overheads.map((oh: any, i: number) => <TableRow key={i}><TableCell>{oh.overhead_type}</TableCell><TableCell>{oh.name}</TableCell><TableCell>{formatMoney(oh.cost)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></>}</Box>}</DialogContent><DialogActions><Button onClick={openEdit} disabled={!detail || detailLoading}>Edit batch</Button><Button onClick={() => setDetailId(null)}>Close</Button></DialogActions></Dialog>
     <Dialog open={editOpen} onClose={() => { setEditOpen(false); setError(""); }} maxWidth="sm" fullWidth><DialogTitle>Update batch record</DialogTitle><DialogContent>{error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}<Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Produced quantity is fixed after recording because it is tied to ingredient consumption and stock.</Typography><TextField fullWidth margin="dense" label="Produced quantity" type="number" value={editQty} disabled /><TextField fullWidth margin="dense" label="Production date" type="date" value={editDate} onChange={(event) => setEditDate(event.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField fullWidth margin="dense" label="Total selling revenue (optional)" type="number" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} /></DialogContent><DialogActions><Button onClick={() => setEditOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveEdit} disabled={updateBatch.isPending}>Save changes</Button></DialogActions></Dialog>
     <Snackbar open={!!success} autoHideDuration={3500} onClose={() => setSuccess("")}><Alert severity="success" variant="filled">{success}</Alert></Snackbar>
   </Box>;

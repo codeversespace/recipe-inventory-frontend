@@ -92,37 +92,67 @@ export const Suppliers = () => {
     return supplierOptions.find((s) => s.id === selectedId) || null;
   }, [selectedId, supplierOptions]);
 
-  const filteredPurchases = useMemo(() => {
-    if (!profile?.purchases) return [];
-    let result = profile.purchases;
-    if (txnSearch.trim()) {
-      const q = txnSearch.toLowerCase();
-      result = result.filter((p: any) => p.item_name?.toLowerCase().includes(q) || p.reference?.toLowerCase().includes(q) || String(p.quantity).includes(q));
-    }
-    if (dateRange) {
-      result = result.filter((p: any) => {
-        const d = new Date(p.purchased_at);
-        return d >= dateRange.start && d <= dateRange.end;
-      });
-    }
-    return result;
-  }, [profile, txnSearch, dateRange]);
+  const unifiedTransactions = useMemo(() => {
+    if (!profile) return [];
+    const purchases = (profile.purchases || []).map((p: any) => ({
+      _type: "purchase" as const,
+      id: `p-${p.id}`,
+      dateRaw: p.purchased_at,
+      date: new Date(p.purchased_at),
+      amount: p.total_amount || 0,
+      title: p.item_name || "Purchase",
+      subtitle: `${p.quantity} ${p.unit || ""}`.trim(),
+      reference: p.reference || "",
+      method: "",
+      raw: p,
+    }));
+    const payments = (profile.payments || []).map((p: any) => ({
+      _type: "payment" as const,
+      id: `pay-${p.id}`,
+      dateRaw: p.paid_at,
+      date: new Date(p.paid_at),
+      amount: p.amount || 0,
+      title: `Payment · ${p.method || "—"}`,
+      subtitle: p.reference || p.method || "",
+      reference: p.reference || "",
+      method: p.method || "",
+      raw: p,
+    }));
+    return [...purchases, ...payments].sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [profile]);
 
-  const filteredPayments = useMemo(() => {
-    if (!profile?.payments) return [];
-    let result = profile.payments;
+  const filteredUnified = useMemo(() => {
+    let result = unifiedTransactions;
     if (txnSearch.trim()) {
       const q = txnSearch.toLowerCase();
-      result = result.filter((p: any) => p.method?.toLowerCase().includes(q) || p.reference?.toLowerCase().includes(q));
+      result = result.filter(
+        (t: any) =>
+          t.title.toLowerCase().includes(q) ||
+          t.subtitle.toLowerCase().includes(q) ||
+          t.reference.toLowerCase().includes(q) ||
+          t.method.toLowerCase().includes(q) ||
+          String(t.amount).includes(q)
+      );
     }
     if (dateRange) {
-      result = result.filter((p: any) => {
-        const d = new Date(p.paid_at);
-        return d >= dateRange.start && d <= dateRange.end;
-      });
+      result = result.filter((t: any) => t.date >= dateRange.start && t.date <= dateRange.end);
     }
     return result;
-  }, [profile, txnSearch, dateRange]);
+  }, [unifiedTransactions, txnSearch, dateRange]);
+
+  // (legacy filteredPurchases/filteredPayments removed — unified ledger is now single source of truth)
+
+  const balanceMap = useMemo(() => {
+    const sortedAsc = [...filteredUnified].sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
+    let running = 0;
+    const map: Record<string, number> = {};
+    for (const t of sortedAsc) {
+      if (t._type === "purchase") running += t.amount;
+      else running -= t.amount;
+      map[t.id] = running;
+    }
+    return map;
+  }, [filteredUnified]);
 
   const profileContent = profile ? (
     <>
@@ -192,12 +222,131 @@ export const Suppliers = () => {
           />
         </Box>
       )}
-      {filteredPurchases.length > 0 && filteredPurchases.map((purchase: any) => <Box key={`p-${purchase.id}`} sx={{ py: 0.75, borderBottom: 1, borderColor: "divider" }}><Typography variant="body2" sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}>{purchase.item_name}</Typography><Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary" }}>{purchase.quantity} {purchase.unit} · {formatMoney(purchase.total_amount)} · {formatDate(purchase.purchased_at)}</Typography></Box>)}
-      {filteredPayments.length > 0 && <>
-        <Typography variant="subtitle2" sx={{ mt: 1.5, mb: 1, fontWeight: 700 }}>Payments</Typography>
-        {filteredPayments.map((pay: any) => <Box key={`pay-${pay.id}`} sx={{ py: 0.75, borderBottom: 1, borderColor: "divider" }}><Typography variant="body2" sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" }, color: "success.main" }}>Payment {formatMoney(pay.amount)}</Typography><Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary" }}>{pay.method} · {formatDate(pay.paid_at)}</Typography></Box>)}
-      </>}
-      {filteredPurchases.length === 0 && filteredPayments.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem", py: 2, textAlign: "center" }}>No transactions found.</Typography>}
+      {filteredUnified.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8rem", py: 3, textAlign: "center" }}>
+          {unifiedTransactions.length === 0 ? "No transactions yet — purchases and payments will appear here." : "No transactions match your search or period."}
+        </Typography>
+      ) : (
+        <>
+          {/* Desktop ledger table */}
+          <Box sx={{ display: { xs: "none", sm: "block" } }}>
+            <Box sx={{ maxHeight: 380, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+              <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+                <Box component="thead" sx={{ position: "sticky", top: 0, bgcolor: "background.paper", zIndex: 1, "& th": { fontWeight: 700, fontSize: "0.7rem", color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, py: 1, px: 1.2, borderBottom: 1, borderColor: "divider", textAlign: "left", whiteSpace: "nowrap" } }}>
+                  <Box component="tr">
+                    <Box component="th">Date</Box>
+                    <Box component="th">Type</Box>
+                    <Box component="th">Details</Box>
+                    <Box component="th" sx={{ textAlign: "right !important" }}>Amount</Box>
+                    <Box component="th">Ref</Box>
+                  </Box>
+                </Box>
+                <Box component="tbody" sx={{ "& td": { py: 1, px: 1.2, borderBottom: 1, borderColor: "divider", verticalAlign: "top" } }}>
+                  {filteredUnified.map((txn: any) => (
+                    <Box component="tr" key={txn.id} sx={{ "&:hover": { bgcolor: "action.hover" } }}>
+                      <Box component="td" sx={{ whiteSpace: "nowrap", fontSize: "0.78rem" }}>
+                        <Box>{formatDate(txn.dateRaw)} {String(txn.dateRaw).slice(11, 16)}</Box>
+                        <Box
+                          sx={{
+                            fontSize: "0.62rem",
+                            fontWeight: 600,
+                            color: balanceMap[txn.id] > 0.5 ? "error.main" : balanceMap[txn.id] < -0.5 ? "warning.main" : "success.main",
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          Bal: {formatMoney(balanceMap[txn.id] ?? 0)}
+                        </Box>
+                      </Box>
+                      <Box component="td">
+                        <Box
+                          sx={{
+                            display: "inline-block",
+                            fontSize: "0.65rem",
+                            fontWeight: 700,
+                            letterSpacing: 0.4,
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: 1,
+                            color: txn._type === "payment" ? "success.main" : "text.primary",
+                            bgcolor: txn._type === "payment" ? "success.50" : "grey.100",
+                            border: 1,
+                            borderColor: txn._type === "payment" ? "success.200" : "divider",
+                          }}
+                        >
+                          {txn._type === "payment" ? "PAYMENT" : "PURCHASE"}
+                        </Box>
+                      </Box>
+                      <Box component="td">
+                        <Typography variant="body2" sx={{ fontSize: "0.82rem", fontWeight: 600, lineHeight: 1.3 }}>{txn.title}</Typography>
+                        {txn.subtitle && <Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary" }}>{txn.subtitle}</Typography>}
+                      </Box>
+                      <Box component="td" sx={{ textAlign: "right", fontWeight: 700, whiteSpace: "nowrap", color: txn._type === "payment" ? "success.main" : "text.primary", fontSize: "0.82rem" }}>
+                        {txn._type === "payment" ? "+" : ""}
+                        {formatMoney(txn.amount)}
+                      </Box>
+                      <Box component="td" sx={{ fontSize: "0.75rem", color: "text.secondary", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{txn.reference || "—"}</Box>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+          {/* Mobile ledger cards */}
+          <Box sx={{ display: { xs: "block", sm: "none" } }}>
+            {filteredUnified.map((txn: any) => (
+              <Card key={txn.id} variant="outlined" sx={{ mb: 1, borderRadius: 2 }}>
+                <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
+                    <Box
+                      sx={{
+                        fontSize: "0.6rem",
+                        fontWeight: 800,
+                        letterSpacing: 0.5,
+                        px: 1,
+                        py: 0.3,
+                        borderRadius: 1,
+                        color: txn._type === "payment" ? "success.main" : "text.secondary",
+                        bgcolor: txn._type === "payment" ? "success.50" : "grey.100",
+                        border: 1,
+                        borderColor: "divider",
+                      }}
+                    >
+                      {txn._type === "payment" ? "PAYMENT" : "PURCHASE"}
+                    </Box>
+                    <Box sx={{ textAlign: "right" }}>
+                      <Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary", whiteSpace: "nowrap", display: "block" }}>{formatDate(txn.dateRaw)} {String(txn.dateRaw).slice(11, 16)}</Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: "0.62rem",
+                          fontWeight: 700,
+                          color: balanceMap[txn.id] > 0.5 ? "error.main" : balanceMap[txn.id] < -0.5 ? "warning.main" : "success.main",
+                          display: "block",
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        Bal: {formatMoney(balanceMap[txn.id] ?? 0)}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.88rem", lineHeight: 1.3 }}>{txn.title}</Typography>
+                  {txn.subtitle && <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "text.secondary" }}>{txn.subtitle}</Typography>}
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.8 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 800, fontSize: "0.9rem", color: txn._type === "payment" ? "success.main" : "text.primary" }}>
+                      {txn._type === "payment" ? "+" : ""}
+                      {formatMoney(txn.amount)}
+                    </Typography>
+                    {txn.reference && <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "text.secondary", bgcolor: "grey.50", px: 0.8, py: 0.25, borderRadius: 1 }}>{txn.reference}</Typography>}
+                  </Box>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+          <Typography variant="caption" sx={{ display: "block", mt: 1, textAlign: "center", color: "text.secondary", fontSize: "0.68rem" }}>
+            {filteredUnified.length} of {unifiedTransactions.length} transactions · sorted newest first
+          </Typography>
+        </>
+      )}
     </>
   ) : selectedId > 0 && profileLoading ? (
     <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress /></Box>

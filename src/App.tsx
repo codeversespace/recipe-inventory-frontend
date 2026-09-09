@@ -14,6 +14,8 @@ import { Packing } from "./pages/Packing";
 import { Payments } from "./pages/Payments";
 import { Settings } from "./pages/Settings";
 import { PackTypes } from "./pages/PackTypes";
+import { PriceComparison } from "./pages/PriceComparison";
+import { BatchTracking } from "./pages/BatchTracking";
 import { Suppliers } from "./pages/Suppliers";
 import { Orders } from "./pages/Orders";
 import { Processing } from "./pages/Processing";
@@ -54,6 +56,8 @@ function App() {
             <Route path="/recipes" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><Recipes /></RoleRoute>} />
             <Route path="/production" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><Production /></RoleRoute>} />
             <Route path="/inventory" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><Inventory /></RoleRoute>} />
+            <Route path="/price-comparison" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><PriceComparison /></RoleRoute>} />
+            <Route path="/batch-tracking" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory"]}><BatchTracking /></RoleRoute>} />
             <Route path="/customers" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
             <Route path="/sales" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomersSales /></RoleRoute>} />
             <Route path="/customers/:id" element={<RoleRoute roles={["super_admin", "admin", "manager", "sales"]}><CustomerProfile /></RoleRoute>} />

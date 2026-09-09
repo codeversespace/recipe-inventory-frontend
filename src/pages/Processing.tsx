@@ -1,12 +1,11 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
-import HourglassEmptyRoundedIcon from "@mui/icons-material/HourglassEmptyRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { useState, useMemo } from "react";
 import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
+import { DeleteButton, EmptyState, ErrorState, FormSection, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 
 export const Processing = () => {
   const [processorFilter, setProcessorFilter] = useState<number | null>(null);
@@ -20,9 +19,12 @@ export const Processing = () => {
     return params;
   }, [processorFilter, dateFrom, dateTo]);
 
-  const { data: orders = [], isLoading } = useProcessingOrders(filterParams);
+  const { data: orders = [], isLoading, error: ordersError, refetch: refetchOrders } = useProcessingOrders(filterParams);
   const { data: ingredients = [], isLoading: ingredientsLoading } = useIngredients();
   const { data: processors = [], isLoading: processorsLoading } = useProcessors();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const createOrder = useCreateProcessingOrder();
   const receiveProcessing = useReceiveProcessing();
   const addPayment = useProcessingPayment();
@@ -105,10 +107,11 @@ export const Processing = () => {
     } catch (e: any) { setError(e.response?.data?.detail || "Could not record payment."); }
   };
 
-  const handleDelete = async (orderId: number) => {
-    if (!window.confirm("Delete this processing order?")) return;
-    try { await deleteOrder.mutateAsync(orderId); setSuccess("Order deleted. Stock restored."); } catch (e: any) { setError(e.response?.data?.detail || "Could not delete."); }
-  };
+  const handleDelete = (orderId: number) =>
+    deleteOrder.mutateAsync(orderId).then(
+      () => setSuccess("Order deleted. Stock restored."),
+      (e: any) => setError(e.response?.data?.detail || "Could not delete."),
+    );
 
   const saveProcessor = async () => {
     if (!newProcName.trim()) { setError("Processor name required."); return; }
@@ -118,8 +121,7 @@ export const Processing = () => {
     } catch (e: any) { setError(e.response?.data?.detail || "Could not create processor."); }
   };
 
-  const handleDeleteProcessor = async (id: number, name: string) => {
-    if (!window.confirm(`Delete processor "${name}"?`)) return;
+  const handleDeleteProcessor = async (id: number) => {
     try { await deleteProcessor.mutateAsync(id); setSuccess("Processor deleted."); } catch (e: any) { setError(e.response?.data?.detail || "Could not delete processor."); }
   };
 
@@ -134,17 +136,24 @@ export const Processing = () => {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "2rem" } }}>Processing</Typography>
-          <Typography color="text.secondary" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Track raw material processing (seed removal, peeling, etc.)</Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button variant="outlined" size="small" onClick={() => setProcessorOpen(true)} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>+ Processor</Button>
-          <Button variant="outlined" size="small" color="success" onClick={() => { setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectivePayOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>Pay Processor</Button>
-          <Button startIcon={<AddRoundedIcon />} variant="contained" size="small" onClick={() => { resetCreate(); setCreateOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>New Order</Button>
-        </Box>
-      </Box>
+      <PageHeader
+        title="Processing"
+        subtitle="Track raw material processing (seed removal, peeling, etc.)"
+        actions={
+          <Box sx={{ display: "flex", gap: 1, width: { xs: "100%", sm: "auto" } }}>
+            <Button startIcon={<AddRoundedIcon />} variant="contained" onClick={() => { resetCreate(); setCreateOpen(true); }} sx={{ flex: { xs: 1, sm: "0 0 auto" } }}>
+              New Order
+            </Button>
+            <IconButton aria-label="More processing actions" aria-haspopup="menu" onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ minWidth: 44, border: 1, borderColor: "divider", borderRadius: 2 }}>
+              <MoreVertRoundedIcon />
+            </IconButton>
+          </Box>
+        }
+      />
+      <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
+        <MenuItem onClick={() => { setMenuAnchor(null); setProcessorOpen(true); }}>Manage processors</MenuItem>
+        <MenuItem onClick={() => { setMenuAnchor(null); setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectivePayOpen(true); }}>Pay processor</MenuItem>
+      </Menu>
 
       {/* Filters */}
       <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
@@ -162,17 +171,18 @@ export const Processing = () => {
 
       {/* Summary */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(6, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
-        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : orders.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{isLoading ? <CircularProgress size={16} /> : pending.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : totalSent.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{isLoading ? <CircularProgress size={16} /> : totalReceived.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalPaid)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.6rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalDue)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : orders.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{isLoading ? <CircularProgress size={16} /> : pending.length}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : totalSent.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{isLoading ? <CircularProgress size={16} /> : totalReceived.toFixed(0)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalPaid)}</Typography></CardContent></Card>
+        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalDue)}</Typography></CardContent></Card>
       </Box>
 
-      {/* Orders Table */}
+      {/* Orders Table (desktop) / Cards (mobile) */}
+      <Box sx={{ display: { xs: "none", sm: "block" } }}>
       <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 760 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={headerSx}>#</TableCell>
@@ -183,40 +193,100 @@ export const Processing = () => {
               <TableCell sx={{ ...headerSx, display: { xs: "none", md: "table-cell" } }}>Yield</TableCell>
               <TableCell sx={headerSx}>Status</TableCell>
               <TableCell sx={headerSx}>Balance</TableCell>
-              <TableCell sx={headerSx}></TableCell>
+              <TableCell sx={headerSx}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={9} align="center"><CircularProgress size={24} /></TableCell></TableRow>
+              <TableSkeleton rows={5} colSpan={9} />
+            ) : ordersError ? (
+              <TableRow><TableCell colSpan={9} align="center"><ErrorState message={(ordersError as any).message} onRetry={() => refetchOrders()} /></TableCell></TableRow>
             ) : orders.length ? orders.map((order: any) => (
-              <TableRow key={order.id} hover sx={{ cursor: "pointer" }}>
-                <TableCell sx={{ ...cellSx, fontWeight: 600 }} onClick={() => setDetailId(order.id)}>#{order.id}</TableCell>
-                <TableCell sx={cellSx} onClick={() => setDetailId(order.id)}>{order.processor_name}</TableCell>
-                <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.raw_ingredient_name}</TableCell>
-                <TableCell sx={{ ...cellSx, fontWeight: 700 }} onClick={() => setDetailId(order.id)}>{order.quantity_sent} kg</TableCell>
-                <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.quantity_received > 0 ? `${order.quantity_received} kg` : "—"}</TableCell>
-                <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.yield_pct > 0 ? `${order.yield_pct.toFixed(1)}%` : "—"}</TableCell>
-                <TableCell onClick={() => setDetailId(order.id)}>
-                  <Chip icon={order.status === "COMPLETED" ? <CheckCircleOutlineRoundedIcon sx={{ fontSize: "0.9rem !important" }} /> : <HourglassEmptyRoundedIcon sx={{ fontSize: "0.9rem !important" }} />} label={order.status} color={order.status === "COMPLETED" ? "success" : "warning"} size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
-                </TableCell>
-                <TableCell sx={{ ...cellSx, fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }} onClick={() => setDetailId(order.id)}>{formatMoney(order.balance_due)}</TableCell>
+              <TableRow key={order.id} hover>
+                <TableCell sx={{ ...cellSx, fontWeight: 600 }}>#{order.id}</TableCell>
+                <TableCell sx={cellSx}>{order.processor_name}</TableCell>
+                <TableCell sx={{ ...cellSx, display: { xs: "none", sm: "table-cell" } }}>{order.raw_ingredient_name}</TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">{order.quantity_sent} kg</TableCell>
+                <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }} className="tnum">{order.quantity_received > 0 ? `${order.quantity_received} kg` : "—"}</TableCell>
+                <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }} className="tnum">{order.yield_pct > 0 ? `${order.yield_pct.toFixed(1)}%` : "—"}</TableCell>
                 <TableCell>
-                  {order.status === "PENDING" && <Button size="small" color="error" onClick={() => handleDelete(order.id)} disabled={deleteOrder.isPending} sx={{ fontSize: "0.65rem", minWidth: "auto", px: 1 }}>Del</Button>}
+                  <StatusChip status={order.status === "COMPLETED" ? "success" : "warning"} label={order.status} />
+                </TableCell>
+                <TableCell sx={{ ...cellSx, fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }} className="tnum">{formatMoney(order.balance_due)}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    <Button size="small" onClick={() => setDetailId(order.id)} aria-label={`View processing order ${order.id}`}>View</Button>
+                    {order.status === "PENDING" && (
+                      <DeleteButton
+                        label="Delete"
+                        itemName={`processing order ${order.id}`}
+                        confirmMessage="Delete this processing order? Consumed stock will be restored. This cannot be undone."
+                        onDelete={() => handleDelete(order.id)}
+                      />
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             )) : (
-              <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4, fontSize: "0.85rem", color: "text.secondary" }}>No processing orders found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} align="center" sx={{ py: 3 }}><EmptyState title="No processing orders found." message="Create an order to send raw material for processing." actionLabel="New Order" onAction={() => { resetCreate(); setCreateOpen(true); }} /></TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
+      </Box>
+      <Box sx={{ display: { xs: "block", sm: "none" } }}>
+        {isLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box>
+        ) : ordersError ? (
+          <ErrorState message={(ordersError as any).message} onRetry={() => refetchOrders()} />
+        ) : orders.length ? (
+          <Stack spacing={1.5}>
+            {orders.map((order: any) => (
+              <Card key={order.id} variant="outlined">
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{order.processor_name}</Typography>
+                      <Typography variant="caption" color="text.secondary">#{order.id} · {order.raw_ingredient_name} · {formatDate(order.sent_at)}</Typography>
+                    </Box>
+                    <StatusChip status={order.status === "COMPLETED" ? "success" : "warning"} label={order.status} />
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 2, mt: 1 }} className="tnum">
+                    <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Sent</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{order.quantity_sent} kg</Typography></Box>
+                    <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Received</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{order.quantity_received > 0 ? `${order.quantity_received} kg` : "—"}</Typography></Box>
+                    <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Balance</Typography><Typography variant="body2" sx={{ fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }}>{formatMoney(order.balance_due)}</Typography></Box>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+                    <Button variant="outlined" onClick={() => setDetailId(order.id)} aria-label={`View processing order ${order.id}`} sx={{ flex: 1, minHeight: 44 }}>
+                      Details
+                    </Button>
+                    {order.status === "PENDING" && (
+                      <Box sx={{ flex: 1 }}>
+                        <DeleteButton
+                          fullWidth
+                          label="Delete"
+                          itemName={`processing order ${order.id}`}
+                          confirmMessage="Delete this processing order? Consumed stock will be restored. This cannot be undone."
+                          onDelete={() => handleDelete(order.id)}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        ) : (
+          <EmptyState title="No processing orders found." message="Create an order to send raw material for processing." actionLabel="New Order" onAction={() => { resetCreate(); setCreateOpen(true); }} />
+        )}
+      </Box>
 
       {/* Create Dialog */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>New Processing Order</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pb: 1 }}>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <FormSection title="Processor & Ingredient">
           <Autocomplete
             options={processors}
             getOptionLabel={(p: any) => p.name}
@@ -235,11 +305,14 @@ export const Processing = () => {
             disabled={ingredientsLoading}
             renderInput={(params) => <TextField {...params} margin="dense" label={ingredientsLoading ? "Loading ingredients..." : "Raw ingredient"} />}
           />
-          <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-            <TextField margin="dense" label="Quantity sent (kg)" type="number" fullWidth value={qtySent} onChange={(e) => setQtySent(e.target.value)} />
-            <TextField margin="dense" label="Cost per kg (₹)" type="number" fullWidth value={costPerKg} onChange={(e) => setCostPerKg(e.target.value)} />
+          </FormSection>
+          <FormSection title="Quantity & Cost">
+          <Box sx={{ display: "flex", gap: 1, mt: 1, flexDirection: { xs: "column", sm: "row" } }}>
+            <TextField margin="dense" label="Quantity sent (kg)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={qtySent} onChange={(e) => setQtySent(e.target.value)} />
+            <TextField margin="dense" label="Cost per kg (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={costPerKg} onChange={(e) => setCostPerKg(e.target.value)} />
           </Box>
           <TextField margin="dense" label="Notes" fullWidth multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </FormSection>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -250,14 +323,14 @@ export const Processing = () => {
       </Dialog>
 
       {/* Detail Dialog */}
-      <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!detailId} onClose={() => setDetailId(null)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>
           {detailOrder && `#${detailOrder.id} — ${detailOrder.processor_name}`}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pb: 1 }}>
           {detailOrder && (
             <>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, mb: 2 }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1, mb: 2 }}>
                 <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Raw ingredient</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.raw_ingredient_name}</Typography>
@@ -301,8 +374,8 @@ export const Processing = () => {
               {detailOrder.payments.length > 0 && (
                 <>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Payments</Typography>
-                  <TableContainer component={Paper} sx={{ mb: 1 }}>
-                    <Table size="small">
+                  <TableContainer component={Paper} sx={{ mb: 1, overflowX: "auto" }}>
+                    <Table size="small" sx={{ minWidth: 360 }}>
                       <TableHead><TableRow><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Date</TableCell><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Amount</TableCell><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Method</TableCell></TableRow></TableHead>
                       <TableBody>{detailOrder.payments.map((p: any) => (
                         <TableRow key={p.id}>
@@ -318,24 +391,24 @@ export const Processing = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions sx={{ justifyContent: "space-between" }}>
-          <Box>
-            {detailOrder?.status === "PENDING" && <Button size="small" variant="outlined" color="success" onClick={() => { setReceiveOpen(detailOrder.id); setDetailId(null); }}>Mark received</Button>}
-            {detailOrder && detailOrder.balance_due > 0 && <Button size="small" variant="outlined" onClick={() => { setPayOpen(detailOrder.id); setDetailId(null); }}>Pay</Button>}
+        <DialogActions sx={{ justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            {detailOrder?.status === "PENDING" && <Button size="small" variant="outlined" color="success" sx={{ minHeight: 44 }} onClick={() => { setReceiveOpen(detailOrder.id); setDetailId(null); }}>Mark received</Button>}
+            {detailOrder && detailOrder.balance_due > 0 && <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setPayOpen(detailOrder.id); setDetailId(null); }}>Pay</Button>}
           </Box>
           <Button onClick={() => setDetailId(null)}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* Receive Dialog */}
-      <Dialog open={!!receiveOpen} onClose={() => setReceiveOpen(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!receiveOpen} onClose={() => setReceiveOpen(null)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Receive processed ingredient</DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Processed ingredient will be auto-created as "{detailOrder?.raw_ingredient_name} (Processed)"
           </Typography>
-          <TextField margin="dense" label="Quantity received (kg)" type="number" fullWidth value={qtyReceived} onChange={(e) => setQtyReceived(e.target.value)} />
+          <TextField margin="dense" label="Quantity received (kg)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={qtyReceived} onChange={(e) => setQtyReceived(e.target.value)} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setReceiveOpen(null)}>Cancel</Button>
@@ -346,12 +419,12 @@ export const Processing = () => {
       </Dialog>
 
       {/* Payment Dialog */}
-      <Dialog open={!!payOpen} onClose={() => setPayOpen(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!payOpen} onClose={() => setPayOpen(null)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Record payment</DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
-          <TextField margin="dense" label="Amount (₹)" type="number" fullWidth value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-          <TextField margin="dense" label="Method" fullWidth value={payMethod} onChange={(e) => setPayMethod(e.target.value)} />
+          <TextField margin="dense" label="Amount (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+          <TextField margin="dense" label="Method" fullWidth value={payMethod} onChange={(e) => setPayMethod(e.target.value)} helperText="Free text, e.g. CASH, UPI, Bank transfer" />
           <TextField margin="dense" label="Reference" fullWidth value={payRef} onChange={(e) => setPayRef(e.target.value)} />
         </DialogContent>
         <DialogActions>
@@ -363,7 +436,7 @@ export const Processing = () => {
       </Dialog>
 
       {/* Create Processor Dialog */}
-      <Dialog open={processorOpen} onClose={() => setProcessorOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={processorOpen} onClose={() => setProcessorOpen(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Add Processor</DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
@@ -376,9 +449,15 @@ export const Processing = () => {
               <Typography variant="caption" color="text.secondary">Existing processors:</Typography>
               <Stack spacing={0.5} sx={{ mt: 0.5 }}>
                 {processors.map((p: any) => (
-                  <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
                     <Typography variant="body2">{p.name} {p.phone ? `— ${p.phone}` : ""}</Typography>
-                    <IconButton size="small" color="error" onClick={() => handleDeleteProcessor(p.id, p.name)}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                    <DeleteButton
+                      iconOnly
+                      label={`Delete processor ${p.name}`}
+                      itemName={p.name}
+                      confirmMessage={`Delete processor "${p.name}"? Orders linked to this processor will block deletion.`}
+                      onDelete={() => handleDeleteProcessor(p.id)}
+                    />
                   </Box>
                 ))}
               </Stack>
@@ -393,14 +472,17 @@ export const Processing = () => {
                 <Typography variant="caption" color="text.secondary">Processed ingredients (delete to re-process with correct cost):</Typography>
                 <Stack spacing={0.5} sx={{ mt: 0.5 }}>
                   {processed.map((i: any) => (
-                    <Box key={i.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Box key={i.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
                       <Typography variant="body2">{i.name} — {i.on_hand_qty} {i.base_unit}</Typography>
-                      <IconButton size="small" color="error" disabled={deleteIngredient.isPending} onClick={async () => {
-                        if (window.confirm(`Delete "${i.name}"? This cannot be undone.`)) {
-                          try { await deleteIngredient.mutateAsync({ id: i.id, force: true }); setSuccess("Deleted."); }
-                          catch (e: any) { setError(e.response?.data?.detail || "Could not delete."); }
-                        }
-                      }}><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
+                      <DeleteButton
+                        iconOnly
+                        label={`Delete ${i.name}`}
+                        itemName={i.name}
+                        confirmMessage={`Delete "${i.name}"? This cannot be undone.`}
+                        onDelete={() => deleteIngredient.mutateAsync({ id: i.id, force: true })}
+                        onSuccess={() => setSuccess("Deleted.")}
+                        onError={(e: any) => setError(e.response?.data?.detail || "Could not delete.")}
+                      />
                     </Box>
                   ))}
                 </Stack>
@@ -417,7 +499,7 @@ export const Processing = () => {
       </Dialog>
 
       {/* Collective Payment Dialog */}
-      <Dialog open={collectivePayOpen} onClose={() => setCollectivePayOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={collectivePayOpen} onClose={() => setCollectivePayOpen(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Pay Processor (collective)</DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
@@ -431,8 +513,8 @@ export const Processing = () => {
             onChange={(_, v) => setCollectiveProcId(v?.id || 0)}
             renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
           />
-          <TextField margin="dense" label="Amount" type="number" fullWidth value={collectiveAmount} onChange={(e) => setCollectiveAmount(e.target.value)} />
-          <TextField margin="dense" label="Method" fullWidth value={collectiveMethod} onChange={(e) => setCollectiveMethod(e.target.value)} />
+          <TextField margin="dense" label="Amount" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={collectiveAmount} onChange={(e) => setCollectiveAmount(e.target.value)} />
+          <TextField margin="dense" label="Method" fullWidth value={collectiveMethod} onChange={(e) => setCollectiveMethod(e.target.value)} helperText="Free text, e.g. CASH, UPI, Bank transfer" />
           <TextField margin="dense" label="Reference" fullWidth value={collectiveRef} onChange={(e) => setCollectiveRef(e.target.value)} />
         </DialogContent>
         <DialogActions>

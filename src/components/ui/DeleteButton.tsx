@@ -13,6 +13,11 @@ type DeleteButtonProps = {
   iconOnly?: boolean;
   size?: "small" | "medium";
   disabled?: boolean;
+  fullWidth?: boolean;
+  /** Called with the raw error if the delete fails (button re-enables regardless). */
+  onError?: (error: unknown) => void;
+  /** Called after a successful delete (e.g. to show a toast). */
+  onSuccess?: () => void;
   /** The destructive mutation. Button disables + confirms around it. */
   onDelete: () => void | Promise<void>;
 };
@@ -26,6 +31,9 @@ export const DeleteButton = ({
   iconOnly = false,
   size = "small",
   disabled = false,
+  fullWidth = false,
+  onError,
+  onSuccess,
   onDelete,
 }: DeleteButtonProps) => {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -38,6 +46,9 @@ export const DeleteButton = ({
     try {
       await onDelete();
       setConfirmOpen(false);
+      onSuccess?.();
+    } catch (error) {
+      onError?.(error);
     } finally {
       setPending(false);
     }
@@ -47,6 +58,7 @@ export const DeleteButton = ({
       size={size}
       color="error"
       variant="outlined"
+      fullWidth={fullWidth}
       disabled={disabled || pending}
       aria-label={label}
       onClick={() => setConfirmOpen(true)}

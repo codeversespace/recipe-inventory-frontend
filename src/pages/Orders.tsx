@@ -1,18 +1,20 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { useState } from "react";
 import { useCreateOrder, useCustomers, useDeleteOrder, useOrders, useSaleableStock, useUpdateOrderStatus } from "../hooks/useApi";
+import { DeleteButton, EmptyState, ErrorState, FormActions, FormSection, PageHeader, StatusChip, TableSkeleton, ConfirmDialog } from "../components/ui";
 import { formatDate } from "../utils/formatDate";
 
 export const Orders = () => {
-  const { data: orders = [], isLoading } = useOrders();
+  const { data: orders = [], isLoading, error: ordersError, refetch: refetchOrders } = useOrders();
   const { data: customers = [], isLoading: customersLoading } = useCustomers();
   const { data: stock = [], isLoading: stockLoading } = useSaleableStock();
   const createOrder = useCreateOrder();
   const deleteOrder = useDeleteOrder();
   const updateStatus = useUpdateOrderStatus();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [cancelAsk, setCancelAsk] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -60,23 +62,22 @@ export const Orders = () => {
     setCustomerId(0); setExpectedDelivery(""); setNotes(""); setLines([]); setError("");
   };
 
-  const handleDelete = async (orderId: number) => {
-    if (!window.confirm("Delete this order?")) return;
-    try { await deleteOrder.mutateAsync(orderId); setSuccess("Order deleted."); } catch { setError("Could not delete order."); }
-  };
-
   const hasShortage = (order: any) => order.lines?.some((l: any) => l.shortage > 0);
   const totalShortage = (order: any) => order.lines?.reduce((sum: number, l: any) => sum + l.shortage, 0) || 0;
+  const statusKind = (status: string): "success" | "error" | "warning" =>
+    status === "CONFIRMED" ? "success" : status === "CANCELLED" ? "error" : "warning";
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "2rem" } }}>Orders</Typography>
-          <Typography color="text.secondary" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Track customer orders and stock availability.</Typography>
-        </Box>
-        <Button startIcon={<AddRoundedIcon />} variant="contained" size="small" onClick={() => { resetForm(); setCreateOpen(true); }} sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>New Order</Button>
-      </Box>
+      <PageHeader
+        title="Orders"
+        subtitle="Track customer orders and stock availability."
+        actions={
+          <Button startIcon={<AddRoundedIcon />} variant="contained" onClick={() => { resetForm(); setCreateOpen(true); }}>
+            New Order
+          </Button>
+        }
+      />
 
       {/* Summary Cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 1, sm: 2 }, mb: 2 }}>
@@ -86,9 +87,10 @@ export const Orders = () => {
         <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: { xs: 1, sm: 1.5 }, "&:last-child": { pb: { xs: 1, sm: 1.5 } } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Confirmed</Typography><Typography variant="h6" sx={{ fontWeight: 700, color: "success.main" }}>{isLoading ? <CircularProgress size={18} /> : orders.filter((o: any) => o.status === "CONFIRMED").length}</Typography></CardContent></Card>
       </Box>
 
-      {/* Orders Table */}
+      {/* Orders Table (desktop) / Cards (mobile) */}
+      <Box sx={{ display: { xs: "none", sm: "block" } }}>
       <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-        <Table size="small">
+        <Table size="small" sx={{ minWidth: 720 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>#</TableCell>
@@ -98,45 +100,109 @@ export const Orders = () => {
               <TableCell sx={{ fontWeight: 700, fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>Amount</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", sm: "table-cell" } }}>Stock</TableCell>
               <TableCell sx={{ fontWeight: 700, fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>Status</TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: { xs: "0.7rem", sm: "0.8rem" } }}></TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} align="center"><CircularProgress size={24} /></TableCell></TableRow>
+              <TableSkeleton rows={5} colSpan={8} />
+            ) : ordersError ? (
+              <TableRow><TableCell colSpan={8} align="center"><ErrorState message={(ordersError as any).message} onRetry={() => refetchOrders()} /></TableCell></TableRow>
             ) : orders.length ? orders.map((order: any) => (
-              <TableRow key={order.id} hover sx={{ cursor: "pointer" }}>
-                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, fontWeight: 600 }} onClick={() => setDetailId(order.id)}>#{order.id}</TableCell>
-                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }} onClick={() => setDetailId(order.id)}>{order.customer_name}</TableCell>
-                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", sm: "table-cell" } }} onClick={() => setDetailId(order.id)}>{formatDate(order.ordered_at)}</TableCell>
-                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", md: "table-cell" } }} onClick={() => setDetailId(order.id)}>{order.lines?.length || 0}</TableCell>
-                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, fontWeight: 700 }} onClick={() => setDetailId(order.id)}>₹{order.total_amount.toFixed(0)}</TableCell>
-                <TableCell onClick={() => setDetailId(order.id)} sx={{ display: { xs: "none", sm: "table-cell" } }}>
+              <TableRow key={order.id} hover>
+                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, fontWeight: 600 }}>#{order.id}</TableCell>
+                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" } }}>{order.customer_name}</TableCell>
+                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", sm: "table-cell" } }}>{formatDate(order.ordered_at)}</TableCell>
+                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, display: { xs: "none", md: "table-cell" } }} className="tnum">{order.lines?.length || 0}</TableCell>
+                <TableCell sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, fontWeight: 700 }} className="tnum">₹{order.total_amount.toFixed(0)}</TableCell>
+                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                   {hasShortage(order) ? (
-                    <Chip icon={<WarningAmberRoundedIcon sx={{ fontSize: "0.9rem !important" }} />} label={`${totalShortage(order)} short`} color="error" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                    <StatusChip status="error" label={`${totalShortage(order)} short`} />
                   ) : (
-                    <Chip icon={<CheckCircleOutlineRoundedIcon sx={{ fontSize: "0.9rem !important" }} />} label="In stock" color="success" size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                    <StatusChip status="success" label="In stock" />
                   )}
                 </TableCell>
-                <TableCell onClick={() => setDetailId(order.id)}>
-                  <Chip label={order.status} color={order.status === "CONFIRMED" ? "success" : order.status === "CANCELLED" ? "error" : "warning"} size="small" sx={{ fontSize: "0.65rem", height: 20 }} />
+                <TableCell>
+                  <StatusChip status={statusKind(order.status)} label={order.status} />
                 </TableCell>
                 <TableCell>
-                  <Button size="small" color="error" onClick={() => handleDelete(order.id)} disabled={deleteOrder.isPending} sx={{ fontSize: "0.65rem", minWidth: "auto", px: 1 }}>Del</Button>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    <Button size="small" onClick={() => setDetailId(order.id)} aria-label={`View order ${order.id}`}>View</Button>
+                    <DeleteButton
+                      label="Delete"
+                      itemName={`order ${order.id}`}
+                      confirmMessage="Delete this order? This cannot be undone."
+                      onDelete={() => deleteOrder.mutateAsync(order.id)}
+                      onSuccess={() => setSuccess("Order deleted.")}
+                      onError={() => setError("Could not delete order.")}
+                    />
+                  </Box>
                 </TableCell>
               </TableRow>
             )) : (
-              <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4, fontSize: "0.85rem", color: "text.secondary" }}>No orders yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} align="center" sx={{ py: 3 }}><EmptyState title="No orders yet." message="Create your first customer order to get started." actionLabel="New Order" onAction={() => { resetForm(); setCreateOpen(true); }} /></TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
+      </Box>
+      <Box sx={{ display: { xs: "block", sm: "none" } }}>
+        {isLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress /></Box>
+        ) : ordersError ? (
+          <ErrorState message={(ordersError as any).message} onRetry={() => refetchOrders()} />
+        ) : orders.length ? (
+          <Stack spacing={1.5}>
+            {orders.map((order: any) => (
+              <Card key={order.id} variant="outlined">
+                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{order.customer_name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        #{order.id} · {formatDate(order.ordered_at)} · <span className="tnum">{order.lines?.length || 0} items</span>
+                      </Typography>
+                    </Box>
+                    <StatusChip status={statusKind(order.status)} label={order.status} />
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">₹{order.total_amount.toFixed(0)}</Typography>
+                    {hasShortage(order) ? (
+                      <StatusChip status="error" label={`${totalShortage(order)} short`} />
+                    ) : (
+                      <StatusChip status="success" label="In stock" />
+                    )}
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Button variant="outlined" onClick={() => setDetailId(order.id)} aria-label={`View order ${order.id}`} sx={{ flex: 1, minHeight: 44 }}>
+                      View
+                    </Button>
+                    <Box sx={{ flex: 1 }}>
+                      <DeleteButton
+                        fullWidth
+                        label="Delete"
+                        itemName={`order ${order.id}`}
+                        confirmMessage="Delete this order? This cannot be undone."
+                        onDelete={() => deleteOrder.mutateAsync(order.id)}
+                        onSuccess={() => setSuccess("Order deleted.")}
+                        onError={() => setError("Could not delete order.")}
+                      />
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        ) : (
+          <EmptyState title="No orders yet." message="Create your first customer order to get started." actionLabel="New Order" onAction={() => { resetForm(); setCreateOpen(true); }} />
+        )}
+      </Box>
 
       {/* Create Order Dialog */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>New Customer Order</DialogTitle>
-        <DialogContent>
-          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+        <DialogContent sx={{ pb: 1 }}>
+          <FormSection title="Customer">
           <Autocomplete
             options={customers}
             getOptionLabel={(c: any) => c.name}
@@ -148,11 +214,12 @@ export const Orders = () => {
           />
           <TextField margin="dense" label="Expected delivery date" type="date" fullWidth value={expectedDelivery} onChange={(e) => setExpectedDelivery(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           <TextField margin="dense" label="Notes" fullWidth multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </FormSection>
 
-          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 700 }}>Order Items</Typography>
+          <FormSection title="Order Items" description="Availability is checked against current stock when you add each line.">
           <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
             <Autocomplete
-              sx={{ flex: "1 1 200px" }}
+              sx={{ flex: "1 1 100%", minWidth: 0 }}
               options={stock.filter((s: any) => !lines.some((l) => l.stock_item_id === s.id))}
               getOptionLabel={(s: any) => `${s.name} (${s.qty} ${s.unit} in stock)`}
               value={stock.find((s: any) => s.id === selectedStock) || null}
@@ -161,9 +228,9 @@ export const Orders = () => {
               disabled={stockLoading}
               renderInput={(params) => <TextField {...params} size="small" label={stockLoading ? "Loading products..." : "Product"} />}
             />
-            <TextField size="small" label="Qty" type="number" value={lineQty} onChange={(e) => setLineQty(e.target.value)} sx={{ width: 80 }} />
-            <TextField size="small" label="Price (₹)" type="number" value={linePrice} onChange={(e) => setLinePrice(e.target.value)} sx={{ width: 100 }} />
-            <Button onClick={addLine} variant="outlined" size="small">Add</Button>
+            <TextField size="small" label="Qty" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} value={lineQty} onChange={(e) => setLineQty(e.target.value)} sx={{ flex: "1 1 88px", minWidth: 88 }} />
+            <TextField size="small" label="Price (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} value={linePrice} onChange={(e) => setLinePrice(e.target.value)} sx={{ flex: "1 1 112px", minWidth: 112 }} />
+            <Button onClick={addLine} variant="outlined" sx={{ minHeight: 44, flex: { xs: "1 1 100%", sm: "0 0 auto" } }}>Add</Button>
           </Box>
 
           {lines.map((line, i) => {
@@ -186,25 +253,27 @@ export const Orders = () => {
 
           {lines.length > 0 && (
             <Box sx={{ mt: 1, p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>Total: ₹{lines.reduce((sum, l) => sum + Number(l.quantity) * Number(l.unit_price), 0).toFixed(0)}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }} className="tnum">Total: ₹{lines.reduce((sum, l) => sum + Number(l.quantity) * Number(l.unit_price), 0).toFixed(0)}</Typography>
             </Box>
           )}
+          </FormSection>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={saveOrder} disabled={createOrder.isPending}>
-            {createOrder.isPending ? <CircularProgress size={20} /> : "Create Order"}
-          </Button>
-        </DialogActions>
+        <FormActions
+          onCancel={() => setCreateOpen(false)}
+          submitLabel="Create Order"
+          onSubmit={saveOrder}
+          pending={createOrder.isPending}
+          error={error}
+        />
       </Dialog>
 
       {/* Order Detail Dialog */}
-      <Dialog open={!!detailId} onClose={() => setDetailId(null)} maxWidth="md" fullWidth>
+      <Dialog open={!!detailId} onClose={() => setDetailId(null)} fullScreen={isMobile} maxWidth="md" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>
           {detailOrder && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
               Order #{detailOrder.id} — {detailOrder.customer_name}
-              <Chip label={detailOrder.status} color={detailOrder.status === "CONFIRMED" ? "success" : detailOrder.status === "CANCELLED" ? "error" : "warning"} size="small" />
+              <StatusChip status={statusKind(detailOrder.status)} label={detailOrder.status} />
             </Box>
           )}
         </DialogTitle>
@@ -225,8 +294,8 @@ export const Orders = () => {
 
               {/* Order Lines */}
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Order Items</Typography>
-              <TableContainer component={Paper} sx={{ mb: 2 }}>
-                <Table size="small">
+              <TableContainer component={Paper} sx={{ mb: 2, overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 480 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Product</TableCell>
@@ -265,15 +334,29 @@ export const Orders = () => {
             </>
           )}
         </DialogContent>
-        <DialogActions sx={{ justifyContent: "space-between" }}>
-          <Box>
+        <DialogActions sx={{ justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             {detailOrder?.status === "PENDING" && <Button size="small" color="success" variant="outlined" disabled={updateStatus.isPending} onClick={() => updateStatus.mutateAsync({ orderId: detailOrder.id, status: "CONFIRMED" })}>Confirm</Button>}
             {detailOrder?.status === "CONFIRMED" && <Button size="small" color="warning" variant="outlined" disabled={updateStatus.isPending} onClick={() => updateStatus.mutateAsync({ orderId: detailOrder.id, status: "PENDING" })}>Mark pending</Button>}
-            {detailOrder?.status !== "CANCELLED" && <Button size="small" color="error" variant="outlined" disabled={updateStatus.isPending} onClick={() => { if (window.confirm("Cancel this order?")) updateStatus.mutateAsync({ orderId: detailOrder!.id, status: "CANCELLED" }); }}>Cancel order</Button>}
+            {detailOrder?.status !== "CANCELLED" && <Button size="small" color="error" variant="outlined" disabled={updateStatus.isPending} onClick={() => setCancelAsk(true)}>Cancel order</Button>}
           </Box>
           <Button onClick={() => setDetailId(null)}>Close</Button>
         </DialogActions>
       </Dialog>
+      <ConfirmDialog
+        open={cancelAsk}
+        title={`Cancel order ${detailOrder ? `#${detailOrder.id}` : ""}?`}
+        message="The order will be marked cancelled. Stock levels are unchanged."
+        confirmLabel="Cancel order"
+        danger
+        pending={updateStatus.isPending}
+        onCancel={() => setCancelAsk(false)}
+        onConfirm={async () => {
+          if (!detailOrder) return;
+          await updateStatus.mutateAsync({ orderId: detailOrder.id, status: "CANCELLED" });
+          setCancelAsk(false);
+        }}
+      />
 
       {/* Snackbar */}
       {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
