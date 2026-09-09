@@ -265,6 +265,29 @@ export const Dashboard = () => {
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" }, color: data.pending_orders_count > 0 ? "warning.main" : "text.secondary", fontWeight: data.pending_orders_count > 0 ? 700 : 400 }}>
             Pending orders: {data.pending_orders_count} {data.order_shortage_count > 0 ? `| ${data.order_shortage_count} units short` : ""}
           </Typography>
+          {data.recipe_ops && data.recipe_ops.length > 1 && (
+            <Box sx={{ mt: 1.5, borderTop: 1, borderColor: "divider", pt: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.68rem", color: "text.secondary", display: "block", mb: 0.5 }}>Per-recipe breakdown</Typography>
+              <Box sx={{ overflowX: "auto" }}>
+                <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
+                  <Box component="thead" sx={{ "& th": { fontWeight: 700, fontSize: "0.65rem", color: "text.secondary", textAlign: "left", py: 0.5, px: 0.7, borderBottom: 1, borderColor: "divider", whiteSpace: "nowrap" } }}>
+                    <Box component="tr"><Box component="th">Recipe</Box><Box component="th" sx={{ textAlign: "right" }}>Batches</Box><Box component="th" sx={{ textAlign: "right" }}>Produced</Box><Box component="th" sx={{ textAlign: "right" }}>Ready</Box><Box component="th" sx={{ textAlign: "right" }}>Packed</Box></Box>
+                  </Box>
+                  <Box component="tbody" sx={{ "& td": { py: 0.6, px: 0.7, borderBottom: 1, borderColor: "divider", fontSize: "0.72rem" } }}>
+                    {data.recipe_ops.map((r: any) => (
+                      <Box component="tr" key={r.recipe_id}>
+                        <Box component="td" sx={{ fontWeight: 600 }}>{r.recipe_name}</Box>
+                        <Box component="td" sx={{ textAlign: "right" }}>{r.batch_count}</Box>
+                        <Box component="td" sx={{ textAlign: "right" }}>{r.produced_qty}</Box>
+                        <Box component="td" sx={{ textAlign: "right" }}>{r.ready_to_pack_qty}</Box>
+                        <Box component="td" sx={{ textAlign: "right" }}>{r.packed_packs}</Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              </Box>
+            </Box>
+          )}
         </CardContent></Card>
         <Card><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>

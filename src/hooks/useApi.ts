@@ -490,7 +490,7 @@ export const useCustomerProfile = (customerId: number, status?: string, startDat
 
 export const useSetCustomerPrice = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { customer_id: number; recipe_id: number; price_per_unit: number }>({
+  return useMutation<any, Error, { customer_id: number; stock_item_id?: number; recipe_id?: number; price_per_unit: number }>({
     mutationFn: ({ customer_id, ...payload }) => api.put(`/customers/${customer_id}/prices`, payload),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["customerPrices", vars.customer_id] }),
   });
