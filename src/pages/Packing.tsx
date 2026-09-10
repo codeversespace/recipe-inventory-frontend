@@ -1,17 +1,19 @@
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
-import { usePackBatch, usePackTypes, useReadyToPack } from "../hooks/useApi";
+import { useEmployees, usePackBatch, usePackTypes, useReadyToPack } from "../hooks/useApi";
 import { VoiceInput } from "../components/VoiceInput";
 import { EmptyState, PageHeader, StatusChip } from "../components/ui";
 
 export const Packing = () => {
   const { data: batches = [], isLoading } = useReadyToPack();
   const { data: packTypes = [], isLoading: packTypesLoading } = usePackTypes();
+  const { data: allEmployees = [] } = useEmployees();
+  const employees = allEmployees.filter((e: any) => e.is_active);
   const pack = usePackBatch();
   const [selected, setSelected] = useState<any>(null);
   const [packTypeId, setPackTypeId] = useState(0);
   const [count, setCount] = useState("");
-  const [employee, setEmployee] = useState("");
+  const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -24,8 +26,8 @@ export const Packing = () => {
     const packCount = Number(count);
     if (!selected || !packTypeId || !Number.isInteger(packCount) || packCount <= 0) { setError("Select a pack type and enter a whole-number box count."); return; }
     try {
-      await pack.mutateAsync({ batch_id: selected.id, pack_type_id: packTypeId, pack_count: packCount, employee_name: employee || undefined });
-      setSelected(null); setCount(""); setEmployee(""); setPackTypeId(0); setError("");
+      await pack.mutateAsync({ batch_id: selected.id, pack_type_id: packTypeId, pack_count: packCount, employee_id: employeeId || undefined });
+      setSelected(null); setCount(""); setEmployeeId(null); setPackTypeId(0); setError("");
     } catch (requestError: any) { setError(requestError.response?.data?.detail || "Could not record packing."); }
   };
   return <Box>
@@ -38,7 +40,6 @@ export const Packing = () => {
             const parsed = JSON.parse(json);
             const item = parsed.items?.[0] || parsed;
             if (item.count) setCount(String(item.count));
-            if (item.employee) setEmployee(item.employee);
             if (!selected && batches.length) setSelected(batches[0]);
             setError("");
           } catch { /* ignore */ }
@@ -83,6 +84,6 @@ export const Packing = () => {
       </Box>
       <TablePagination component="div" count={filteredBatches.length} page={page} onPageChange={(_, nextPage) => setPage(nextPage)} rowsPerPage={rowsPerPage} onRowsPerPageChange={(event) => { setRowsPerPage(Number(event.target.value)); setPage(0); }} rowsPerPageOptions={[10, 25, 50]} />
     </CardContent></Card>}
-    <Dialog open={!!selected} onClose={() => { setSelected(null); setError(""); }} maxWidth="sm" fullWidth><DialogTitle>Pack batch #{selected?.id}</DialogTitle><DialogContent>{error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}{selected && <><Typography sx={{ mb: 2 }}>{selected.recipe_name} · {selected.remaining_qty} kg remaining</Typography><FormControl fullWidth margin="dense" disabled={packTypesLoading}><InputLabel>{packTypesLoading ? "Loading pack types..." : "Pack type"}</InputLabel><Select value={packTypeId} label={packTypesLoading ? "Loading pack types..." : "Pack type"} onChange={(event) => setPackTypeId(Number(event.target.value))}>{packTypes.map((item: any) => <MenuItem key={item.id} value={item.id}>{item.name} · {item.size_grams} g</MenuItem>)}</Select></FormControl><TextField fullWidth margin="dense" label="Number of boxes" type="number" value={count} onChange={(event) => setCount(event.target.value)} /><TextField fullWidth margin="dense" label="Packing employee" value={employee} onChange={(event) => setEmployee(event.target.value)} /><Typography variant="body2" sx={{ mt: 2 }}>This will pack {(((selectedType?.size_grams || 0) * Number(count)) / 1000 || 0).toFixed(3)} kg and leave {Math.max(selected.remaining_qty - ((selectedType?.size_grams || 0) * Number(count)) / 1000, 0).toFixed(3)} kg.</Typography><TableContainer component={Paper} sx={{ mt: 2 }}><Table size="small"><TableHead><TableRow><TableCell>Pack type</TableCell><TableCell>Boxes</TableCell><TableCell>Employee</TableCell></TableRow></TableHead><TableBody>{selected.packages.map((item: any) => <TableRow key={item.id}><TableCell>{item.pack_size_grams} g</TableCell><TableCell>{item.pack_count}</TableCell><TableCell>{item.employee_name || "—"}</TableCell></TableRow>)}</TableBody></Table></TableContainer></>}</DialogContent><DialogActions><Button onClick={() => setSelected(null)}>Cancel</Button><Button variant="contained" onClick={submit} disabled={pack.isPending}>Confirm packing</Button></DialogActions></Dialog>
+    <Dialog open={!!selected} onClose={() => { setSelected(null); setError(""); }} maxWidth="sm" fullWidth><DialogTitle>Pack batch #{selected?.id}</DialogTitle><DialogContent>{error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}{selected && <><Typography sx={{ mb: 2 }}>{selected.recipe_name} · {selected.remaining_qty} kg remaining</Typography><FormControl fullWidth margin="dense" disabled={packTypesLoading}><InputLabel>{packTypesLoading ? "Loading pack types..." : "Pack type"}</InputLabel><Select value={packTypeId} label={packTypesLoading ? "Loading pack types..." : "Pack type"} onChange={(event) => setPackTypeId(Number(event.target.value))}>{packTypes.map((item: any) => <MenuItem key={item.id} value={item.id}>{item.name} · {item.size_grams} g</MenuItem>)}</Select></FormControl><TextField fullWidth margin="dense" label="Number of boxes" type="number" value={count} onChange={(event) => setCount(event.target.value)} /><Autocomplete options={employees} getOptionLabel={(o) => o.name} value={employees.find((e: any) => e.id === employeeId) || null}             onChange={(_, v) => setEmployeeId(v?.id || null)} renderInput={(params) => <TextField {...params} fullWidth margin="dense" label="Packing employee" placeholder="Select employee" />} /><Typography variant="body2" sx={{ mt: 2 }}>This will pack {(((selectedType?.size_grams || 0) * Number(count)) / 1000 || 0).toFixed(3)} kg and leave {Math.max(selected.remaining_qty - ((selectedType?.size_grams || 0) * Number(count)) / 1000, 0).toFixed(3)} kg.</Typography><TableContainer component={Paper} sx={{ mt: 2 }}><Table size="small"><TableHead><TableRow><TableCell>Pack type</TableCell><TableCell>Boxes</TableCell><TableCell>Employee</TableCell></TableRow></TableHead><TableBody>{selected.packages.map((item: any) => <TableRow key={item.id}><TableCell>{item.pack_size_grams} g</TableCell><TableCell>{item.pack_count}</TableCell><TableCell>{item.employee_name || "—"}</TableCell></TableRow>)}</TableBody></Table></TableContainer></>}</DialogContent><DialogActions><Button onClick={() => setSelected(null)}>Cancel</Button><Button variant="contained" onClick={submit} disabled={pack.isPending}>Confirm packing</Button></DialogActions></Dialog>
   </Box>;
 };

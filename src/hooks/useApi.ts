@@ -358,8 +358,8 @@ export const useRecipeOverheads = (recipeId: number) =>
 
 export const useAddRecipeOverhead = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { recipe_id: number; name: string; cost_per_batch: number; overhead_type: string }>({
-    mutationFn: (payload) => api.post(`/recipes/${payload.recipe_id}/overheads`, { name: payload.name, cost_per_batch: payload.cost_per_batch, overhead_type: payload.overhead_type }),
+  return useMutation<any, Error, { recipe_id: number; name: string; cost_per_batch: number; overhead_type: string; employee_id?: number }>({
+    mutationFn: (payload) => api.post(`/recipes/${payload.recipe_id}/overheads`, { name: payload.name, cost_per_batch: payload.cost_per_batch, overhead_type: payload.overhead_type, employee_id: payload.employee_id }),
     onSuccess: (_data, vars) => qc.invalidateQueries({ queryKey: ["recipeOverheads", vars.recipe_id] }),
   });
 };
@@ -676,7 +676,7 @@ export const useAddManualStock = () => {
 
 export const usePackBatch = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { batch_id: number; pack_type_id: number; pack_count: number; employee_name?: string }>({
+  return useMutation<any, Error, { batch_id: number; pack_type_id: number; pack_count: number; employee_id?: number }>({
     mutationFn: (payload) => api.post("/packing", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["readyToPack"] });
@@ -837,7 +837,7 @@ export const useDeleteProcessingOrder = () => {
 
 export const useUpdateProcessingOrder = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { orderId: number; quantity_sent: number; cost_per_expected_kg: number; notes?: string }>({
+  return useMutation<any, Error, { orderId: number; raw_ingredient_id: number; processor_id: number; quantity_sent: number; cost_per_expected_kg: number; notes?: string }>({
     mutationFn: ({ orderId, ...payload }) => api.put(`/processing/${orderId}`, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["processingOrders"] });
@@ -871,3 +871,63 @@ export const useProcessingPayments = () =>
       return expenses.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
     },
   });
+
+/* ------------------------------------------------------------------ */
+/* Employees                                                           */
+/* ------------------------------------------------------------------ */
+export const useEmployees = (type?: string) =>
+  useQuery<any[], Error>({
+    queryKey: ["employees", type],
+    queryFn: async () => (await api.get("/employees", { params: type ? { type } : {} })).data,
+    initialData: [],
+  });
+
+export const useCreateEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { name: string; phone?: string; address?: string; type: string }>({
+    mutationFn: (payload) => api.post("/employees", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
+};
+
+export const useUpdateEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { id: number; name: string; phone?: string; address?: string; type: string }>({
+    mutationFn: ({ id, ...payload }) => api.put(`/employees/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
+};
+
+export const useToggleEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, number>({
+    mutationFn: (id) => api.post(`/employees/${id}/toggle-active`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
+};
+
+export const useDeleteEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation<void, Error, number>({
+    mutationFn: (id) => api.delete(`/employees/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["employees"] }),
+  });
+};
+
+export const useEmployeeLedger = (id: number | null) =>
+  useQuery<any, Error>({
+    queryKey: ["employeeLedger", id],
+    queryFn: async () => (await api.get(`/employees/${id}/ledger`)).data,
+    enabled: !!id,
+  });
+
+export const usePayEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { employeeId: number; amount: number; method?: string; reference?: string; notes?: string }>({
+    mutationFn: ({ employeeId, ...payload }) => api.post(`/employees/${employeeId}/payments`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["employeeLedger"] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+};

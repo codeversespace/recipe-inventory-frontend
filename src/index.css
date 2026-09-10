@@ -65,7 +65,7 @@ html, body, #root { min-height: 100%; }
   .MuiBottomNavigationAction-label.Mui-selected { font-size: 0.6rem !important; }
 
   /* Snackbar - bottom offset for bottom nav */
-  .MuiSnackbar-root { bottom: 72px !important; }
+  .MuiSnackbar-root { bottom: 80px !important; }
 
   /* Tabs - compact */
   .MuiTabs-root { min-height: 36px !important; }

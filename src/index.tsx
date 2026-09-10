@@ -16,7 +16,10 @@ const theme = createTheme({
     MuiPaper: { styleOverrides: { root: { boxShadow: "0 2px 12px rgba(15, 23, 42, .06)" } } },
     MuiTableCell: { styleOverrides: { head: { fontWeight: 750, color: "#475569", background: "#f8fafc" } } },
     MuiButton: { styleOverrides: { root: { borderRadius: 8 } } },
-    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8 } } },
+    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8 }, input: { fontSize: "1rem" } } },
+    MuiInputBase: { styleOverrides: { input: { fontSize: "1rem" } } },
+    MuiSelect: { styleOverrides: { select: { fontSize: "1rem" } } },
+    MuiAutocomplete: { styleOverrides: { inputRoot: { fontSize: "1rem" } } },
     MuiChip: { styleOverrides: { root: { borderRadius: 6 } } },
   },
 });

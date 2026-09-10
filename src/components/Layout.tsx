@@ -61,6 +61,7 @@ const navItems: NavItem[] = [
   { text: "Production", icon: <ProductionIcon />, to: "/production", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
   { text: "Scheduler", icon: <SchedulerIcon />, to: "/production-scheduler", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
   { text: "Processing", icon: <ScienceIcon />, to: "/processing", roles: ["super_admin", "admin", "manager", "production"], section: "Production" },
+  { text: "Employees", icon: <PeopleIcon />, to: "/employees", roles: ["super_admin", "admin", "manager"], section: "Staff" },
   { text: "Packing", icon: <PackingIcon />, to: "/packing", roles: ["super_admin", "admin", "manager", "packing"], section: "Production" },
   { text: "Pack types", icon: <PackTypeIcon />, to: "/pack-types", roles: ["super_admin", "admin", "manager"], section: "Production" },
   { text: "Admin", icon: <SettingsIcon />, roles: ["super_admin"], section: "Admin", children: [
@@ -91,8 +92,8 @@ const roleBottomNav = (role: Role | undefined): BottomTab[] => {
     case "production":
       return [
         { label: "Produce", icon: <ProductionIcon />, to: "/production" },
-        { label: "Orders", icon: <OrderIcon />, to: "/orders" },
         { label: "Process", icon: <ScienceIcon />, to: "/processing" },
+        { label: "Staff", icon: <PeopleIcon />, to: "/employees" },
       ];
     case "packing":
       return [{ label: "Packing", icon: <PackingIcon />, to: "/packing" }];
@@ -252,7 +253,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minWidth: 0,
           overflowX: "hidden",
-          pb: { xs: "calc(72px + env(safe-area-inset-bottom))", sm: 3 },
+          pb: { xs: "calc(80px + env(safe-area-inset-bottom))", sm: 3 },
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 52, sm: 64 } }} />

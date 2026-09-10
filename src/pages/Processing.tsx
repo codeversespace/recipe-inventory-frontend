@@ -2,7 +2,7 @@ import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { useState, useMemo } from "react";
-import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
+import { useCreateProcessingOrder, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useEmployees, useIngredients, useProcessingOrders, useProcessingPayment, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { DeleteButton, EmptyState, ErrorState, FormSection, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
@@ -24,7 +24,8 @@ export const Processing = () => {
 
   const { data: orders = [], isLoading, error: ordersError, refetch: refetchOrders } = useProcessingOrders(filterParams);
   const { data: ingredients = [], isLoading: ingredientsLoading } = useIngredients();
-  const { data: processors = [], isLoading: processorsLoading } = useProcessors();
+  const { data: allEmployees = [], isLoading: employeesLoading } = useEmployees();
+  const processors = allEmployees.filter((e: any) => e.type === "processor" && e.is_active);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -33,8 +34,6 @@ export const Processing = () => {
   const addPayment = useProcessingPayment();
   const deleteOrder = useDeleteProcessingOrder();
   const updateOrder = useUpdateProcessingOrder();
-  const createProcessor = useCreateProcessor();
-  const deleteProcessor = useDeleteProcessor();
   const deleteIngredient = useDeleteIngredient();
   const collectivePayment = useCollectiveProcessingPayment();
 
@@ -49,6 +48,8 @@ export const Processing = () => {
   const [payOpen, setPayOpen] = useState<number | null>(null);
   const [processorOpen, setProcessorOpen] = useState(false);
   const [editOpen, setEditOpen] = useState<number | null>(null);
+  const [editRawId, setEditRawId] = useState(0);
+  const [editProcessorId, setEditProcessorId] = useState(0);
   const [editQtySent, setEditQtySent] = useState("");
   const [editCostPerKg, setEditCostPerKg] = useState("");
   const [editNotes, setEditNotes] = useState("");
@@ -64,10 +65,6 @@ export const Processing = () => {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("CASH");
   const [payRef, setPayRef] = useState("");
-
-  const [newProcName, setNewProcName] = useState("");
-  const [newProcPhone, setNewProcPhone] = useState("");
-  const [newProcAddr, setNewProcAddr] = useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -122,12 +119,18 @@ export const Processing = () => {
     );
 
   const handleEdit = async () => {
-    if (!editOpen || !Number(editQtySent) || Number(editQtySent) <= 0 || !Number(editCostPerKg) || Number(editCostPerKg) < 0) {
+    if (!editOpen || !editRawId || !editProcessorId || !Number(editQtySent) || Number(editQtySent) <= 0 || !Number(editCostPerKg) || Number(editCostPerKg) < 0) {
       setError("Fill all fields with valid values."); return;
+    }
+    const raw = ingredients.find((i: any) => i.id === editRawId);
+    if (raw && Number(editQtySent) > (raw.on_hand_qty || 0)) {
+      setError(`Insufficient stock. Available: ${raw.on_hand_qty} ${raw.base_unit}`); return;
     }
     try {
       await updateOrder.mutateAsync({
         orderId: editOpen,
+        raw_ingredient_id: editRawId,
+        processor_id: editProcessorId,
         quantity_sent: Number(editQtySent),
         cost_per_expected_kg: Number(editCostPerKg),
         notes: editNotes || undefined,
@@ -136,20 +139,7 @@ export const Processing = () => {
     } catch (e: any) { setError(e.response?.data?.detail || "Could not update order."); }
   };
 
-  const saveProcessor = async () => {
-    if (!newProcName.trim()) { setError("Processor name required."); return; }
-    try {
-      await createProcessor.mutateAsync({ name: newProcName.trim(), phone: newProcPhone || undefined, address: newProcAddr || undefined });
-      setNewProcName(""); setNewProcPhone(""); setNewProcAddr(""); setProcessorOpen(false); setSuccess("Processor created.");
-    } catch (e: any) { setError(e.response?.data?.detail || "Could not create processor."); }
-  };
-
-  const handleDeleteProcessor = async (id: number) => {
-    try { await deleteProcessor.mutateAsync(id); setSuccess("Processor deleted."); } catch (e: any) { setError(e.response?.data?.detail || "Could not delete processor."); }
-  };
-
   const pending = orders.filter((o: any) => o.status === "PENDING");
-  const completed = orders.filter((o: any) => o.status === "COMPLETED");
   const totalSent = orders.reduce((s: number, o: any) => s + o.quantity_sent, 0);
   const totalReceived = orders.reduce((s: number, o: any) => s + (o.quantity_received || 0), 0);
   const totalPaid = orders.reduce((s: number, o: any) => s + (o.total_paid || 0), 0);
@@ -174,8 +164,8 @@ export const Processing = () => {
         }
       />
       <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
-        <MenuItem onClick={() => { setMenuAnchor(null); setProcessorOpen(true); }}>Manage processors</MenuItem>
-        <MenuItem onClick={() => { setMenuAnchor(null); setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectivePayOpen(true); }}>Pay processor</MenuItem>
+        <MenuItem onClick={() => { setMenuAnchor(null); window.location.href = "/employees"; }}>Manage employees</MenuItem>
+        <MenuItem onClick={() => { setMenuAnchor(null); setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectivePayOpen(true); }}>Pay processor/vendor</MenuItem>
       </Menu>
 
       {/* Filters */}
@@ -249,7 +239,7 @@ export const Processing = () => {
                     )}
                     {order.status === "COMPLETED" && isSuperAdmin && (
                       <>
-                        <Button size="small" onClick={() => { setEditOpen(order.id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }}>Edit</Button>
+                        <Button size="small" onClick={() => { setEditOpen(order.id); setEditRawId(order.raw_ingredient_id); setEditProcessorId(order.processor_id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }}>Edit</Button>
                         <DeleteButton
                           label="Delete"
                           itemName={`completed processing order ${order.id}`}
@@ -307,7 +297,7 @@ export const Processing = () => {
                     )}
                     {order.status === "COMPLETED" && isSuperAdmin && (
                       <>
-                        <Button variant="outlined" onClick={() => { setEditOpen(order.id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }} sx={{ flex: 1, minHeight: 44 }}>
+                        <Button variant="outlined" onClick={() => { setEditOpen(order.id); setEditRawId(order.raw_ingredient_id); setEditProcessorId(order.processor_id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }} sx={{ flex: 1, minHeight: 44 }}>
                           Edit
                         </Button>
                         <Box sx={{ flex: 1 }}>
@@ -342,9 +332,9 @@ export const Processing = () => {
             getOptionLabel={(p: any) => p.name}
             value={processors.find((p: any) => p.id === selectedProcessorId) || null}
             onChange={(_, v) => setSelectedProcessorId(v?.id || 0)}
-            loading={processorsLoading}
-            disabled={processorsLoading}
-            renderInput={(params) => <TextField {...params} margin="dense" label={processorsLoading ? "Loading processors..." : "Processor"} />}
+            loading={employeesLoading}
+            disabled={employeesLoading}
+            renderInput={(params) => <TextField {...params} margin="dense" label={employeesLoading ? "Loading employees..." : "Processor/Vendor"} />}
           />
           <Autocomplete
             options={ingredients}
@@ -446,7 +436,7 @@ export const Processing = () => {
             {detailOrder?.status === "PENDING" && <Button size="small" variant="outlined" color="success" sx={{ minHeight: 44 }} onClick={() => { setReceiveOpen(detailOrder.id); setDetailId(null); }}>Mark received</Button>}
             {detailOrder && detailOrder.balance_due > 0 && <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setPayOpen(detailOrder.id); setDetailId(null); }}>Pay</Button>}
             {detailOrder?.status === "COMPLETED" && isSuperAdmin && (
-              <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setEditOpen(detailOrder.id); setEditQtySent(String(detailOrder.quantity_sent)); setEditCostPerKg(String(detailOrder.cost_per_expected_kg)); setEditNotes(detailOrder.notes || ""); setDetailId(null); }}>
+              <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setEditOpen(detailOrder.id); setEditRawId(detailOrder.raw_ingredient_id); setEditProcessorId(detailOrder.processor_id); setEditQtySent(String(detailOrder.quantity_sent)); setEditCostPerKg(String(detailOrder.cost_per_expected_kg)); setEditNotes(detailOrder.notes || ""); setDetailId(null); }}>
                 Edit
               </Button>
             )}
@@ -490,34 +480,11 @@ export const Processing = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Create Processor Dialog */}
+      {/* Processor Manager Dialog — redirects to Employees page */}
       <Dialog open={processorOpen} onClose={() => setProcessorOpen(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Add Processor</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Manage Processors/Vendors</DialogTitle>
         <DialogContent>
-          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
-          <TextField margin="dense" label="Name" fullWidth value={newProcName} onChange={(e) => setNewProcName(e.target.value)} />
-          <TextField margin="dense" label="Phone" fullWidth value={newProcPhone} onChange={(e) => setNewProcPhone(e.target.value)} />
-          <TextField margin="dense" label="Address" fullWidth value={newProcAddr} onChange={(e) => setNewProcAddr(e.target.value)} />
-          {processors.length > 0 && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="caption" color="text.secondary">Existing processors:</Typography>
-              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                {processors.map((p: any) => (
-                  <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
-                    <Typography variant="body2">{p.name} {p.phone ? `— ${p.phone}` : ""}</Typography>
-                    <DeleteButton
-                      iconOnly
-                      label={`Delete processor ${p.name}`}
-                      itemName={p.name}
-                      confirmMessage={`Delete processor "${p.name}"? Orders linked to this processor will block deletion.`}
-                      onDelete={() => handleDeleteProcessor(p.id)}
-                    />
-                  </Box>
-                ))}
-              </Stack>
-            </>
-          )}
+          <Alert severity="info" sx={{ mb: 1 }}>Processor/vendor management has moved to the Employees page.</Alert>
           {(() => {
             const processed = ingredients.filter((i: any) => i.name.endsWith(" (Processed)"));
             if (processed.length === 0) return null;
@@ -547,9 +514,7 @@ export const Processing = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setProcessorOpen(false)}>Close</Button>
-          <Button variant="contained" onClick={saveProcessor} disabled={createProcessor.isPending}>
-            {createProcessor.isPending ? <CircularProgress size={20} /> : "Add"}
-          </Button>
+          <Button variant="contained" onClick={() => { window.location.href = "/employees"; }}>Go to Employees</Button>
         </DialogActions>
       </Dialog>
 
@@ -561,8 +526,24 @@ export const Processing = () => {
         <DialogContent sx={{ pb: 1 }}>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
           <Alert severity="warning" sx={{ mt: 1 }}>
-            Editing a completed order will recalculate raw stock, processed ingredient cost, and downstream batch costs. Batches that have already been packed or sold cannot be recalculated.
+            Editing a completed order will recalculate raw stock, processed ingredient cost, and downstream batch costs. Batches that have already been packed or sold cannot be recalculated. Changing the raw ingredient on a completed order is not allowed.
           </Alert>
+          <FormSection title="Processor & Ingredient">
+          <Autocomplete
+            options={processors}
+            getOptionLabel={(p: any) => p.name}
+            value={processors.find((p: any) => p.id === editProcessorId) || null}
+            onChange={(_, v) => setEditProcessorId(v?.id || 0)}
+            renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
+          />
+          <Autocomplete
+            options={ingredients}
+            getOptionLabel={(i: any) => `${i.name} (${i.on_hand_qty || 0} ${i.base_unit})`}
+            value={ingredients.find((i: any) => i.id === editRawId) || null}
+            onChange={(_, v) => setEditRawId(v?.id || 0)}
+            renderInput={(params) => <TextField {...params} margin="dense" label="Raw ingredient" />}
+          />
+          </FormSection>
           <FormSection title="Quantity & Cost">
             <TextField margin="dense" label="Quantity sent (kg)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={editQtySent} onChange={(e) => setEditQtySent(e.target.value)} />
             <TextField margin="dense" label="Cost per kg (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={editCostPerKg} onChange={(e) => setEditCostPerKg(e.target.value)} />

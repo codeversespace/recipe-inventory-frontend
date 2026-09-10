@@ -1,14 +1,16 @@
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { useAddRecipe, useAddRecipeIngredient, useDeleteRecipe, useIngredients, useRecipes, useUpdateRecipe, useRecipeOverheads, useAddRecipeOverhead, useDeleteRecipeOverhead } from "../hooks/useApi";
+import { Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { useAddRecipe, useAddRecipeIngredient, useDeleteRecipe, useEmployees, useIngredients, useRecipes, useUpdateRecipe, useAddRecipeOverhead } from "../hooks/useApi";
 import { useState } from "react";
 import { api } from "../api/client";
 
 type Line = { id?: number; ingredientId: number; name: string; quantity: number; unit: string };
-type OverheadLine = { name: string; cost_per_batch: number; overhead_type: string };
+type OverheadLine = { name: string; cost_per_batch: number; overhead_type: string; employee_id?: number | null };
 
 export const Recipes = () => {
   const { data: recipes = [], isLoading, error } = useRecipes();
   const { data: ingredients = [], isLoading: ingredientsLoading } = useIngredients();
+  const { data: allEmployees = [] } = useEmployees();
+  const labourEmployees = allEmployees.filter((e: any) => e.is_active);
   const rawMaterials = ingredients.filter((i: any) => i.category === "raw_material");
   const addRecipe = useAddRecipe();
   const addRecipeIngredient = useAddRecipeIngredient();
@@ -33,11 +35,12 @@ export const Recipes = () => {
   const [overheadName, setOverheadName] = useState("");
   const [overheadCost, setOverheadCost] = useState("");
   const [overheadType, setOverheadType] = useState("other");
+  const [overheadEmployeeId, setOverheadEmployeeId] = useState<number | null>(null);
 
   const reset = () => {
     setName(""); setBatchQty(""); setBatchUnit("");
     setIngredientId(0); setLineQty(""); setLines([]); setFormError(""); setEditingId(null);
-    setOverheads([]); setOverheadName(""); setOverheadCost(""); setOverheadType("other");
+    setOverheads([]); setOverheadName(""); setOverheadCost(""); setOverheadType("other"); setOverheadEmployeeId(null);
   };
   const close = () => { reset(); setOpen(false); };
 
@@ -71,7 +74,7 @@ export const Recipes = () => {
       }
       await Promise.all(lines.map((line) => addRecipeIngredient.mutateAsync({ recipe_id: recipe.id, ingredient_id: line.ingredientId, qty_per_batch: line.quantity, unit: line.unit })));
       for (const oh of overheads) {
-        await addRecipeOverhead.mutateAsync({ recipe_id: recipe.id, name: oh.name, cost_per_batch: oh.cost_per_batch, overhead_type: oh.overhead_type });
+        await addRecipeOverhead.mutateAsync({ recipe_id: recipe.id, name: oh.name, cost_per_batch: oh.cost_per_batch, overhead_type: oh.overhead_type, employee_id: oh.employee_id || undefined });
       }
       close();
     } catch (requestError: any) {
@@ -84,7 +87,7 @@ export const Recipes = () => {
     const { data: overheadData } = await api.get(`/recipes/${recipe.id}/overheads`);
     setEditingId(recipe.id); setName(recipe.name); setBatchQty(String(recipe.batch_qty)); setBatchUnit(recipe.batch_unit);
     setLines(data.map((line: any) => ({ id: line.id, ingredientId: line.ingredient_id, name: line.ingredient.name, quantity: line.qty_per_batch, unit: line.unit })));
-    setOverheads(overheadData.map((oh: any) => ({ name: oh.name, cost_per_batch: oh.cost_per_batch, overhead_type: oh.overhead_type })));
+    setOverheads(overheadData.map((oh: any) => ({ name: oh.name, cost_per_batch: oh.cost_per_batch, overhead_type: oh.overhead_type, employee_id: oh.employee_id })));
     setOpen(true);
   };
   const removeRecipe = async (recipe: any) => {
@@ -137,14 +140,33 @@ export const Recipes = () => {
             <MenuItem value="other">Other</MenuItem>
           </Select>
         </FormControl>
+        {overheadType === "labour" && (
+          <Autocomplete
+            size="small"
+            options={labourEmployees}
+            getOptionLabel={(o) => o.name}
+            value={labourEmployees.find((e: any) => e.id === overheadEmployeeId) || null}
+            onChange={(_, v) => setOverheadEmployeeId(v?.id || null)}
+            renderInput={(params) => <TextField {...params} label="Employee" placeholder="Select" />}
+            sx={{ flex: "1 1 180px" }}
+          />
+        )}
         <Button onClick={() => {
           const cost = Number(overheadCost);
           if (!overheadName.trim() || !Number.isFinite(cost) || cost <= 0) { setFormError("Enter a valid overhead name and cost."); return; }
-          setOverheads([...overheads, { name: overheadName.trim(), cost_per_batch: cost, overhead_type: overheadType }]);
-          setOverheadName(""); setOverheadCost(""); setOverheadType("other"); setFormError("");
+          setOverheads([...overheads, { name: overheadName.trim(), cost_per_batch: cost, overhead_type: overheadType, employee_id: overheadType === "labour" ? overheadEmployeeId : undefined }]);
+          setOverheadName(""); setOverheadCost(""); setOverheadType("other"); setOverheadEmployeeId(null); setFormError("");
         }} variant="outlined" size="small">Add</Button>
       </Box>
-      {overheads.map((oh, i) => <Box key={i} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}><Typography>{oh.name}: ₹{oh.cost_per_batch} ({oh.overhead_type})</Typography><Button size="small" color="error" onClick={() => setOverheads(overheads.filter((_, idx) => idx !== i))}>Remove</Button></Box>)}
+      {overheads.map((oh, i) => {
+        const emp = oh.employee_id ? labourEmployees.find((e: any) => e.id === oh.employee_id) : null;
+        return (
+          <Box key={i} sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
+            <Typography>{oh.name}: ₹{oh.cost_per_batch} ({oh.overhead_type}{emp ? ` — ${emp.name}` : ""})</Typography>
+            <Button size="small" color="error" onClick={() => setOverheads(overheads.filter((_, idx) => idx !== i))}>Remove</Button>
+          </Box>
+        );
+      })}
     </DialogContent><DialogActions><Button onClick={close} disabled={addRecipe.isPending || updateRecipe.isPending || addRecipeIngredient.isPending || addRecipeOverhead.isPending}>Cancel</Button><Button onClick={save} variant="contained" disabled={addRecipe.isPending || updateRecipe.isPending || addRecipeIngredient.isPending || addRecipeOverhead.isPending}>{(addRecipe.isPending || updateRecipe.isPending || addRecipeIngredient.isPending || addRecipeOverhead.isPending) ? <CircularProgress size={20} color="inherit" /> : editingId ? "Update Recipe" : "Save Recipe"}</Button></DialogActions></Dialog>
     {/* Scale Calculator Dialog */}
     <Dialog open={scaleOpen} onClose={() => setScaleOpen(false)} maxWidth="xs" fullWidth>
