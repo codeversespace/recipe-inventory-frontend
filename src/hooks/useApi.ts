@@ -835,6 +835,18 @@ export const useDeleteProcessingOrder = () => {
   });
 };
 
+export const useUpdateProcessingOrder = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { orderId: number; quantity_sent: number; cost_per_expected_kg: number; notes?: string }>({
+    mutationFn: ({ orderId, ...payload }) => api.put(`/processing/${orderId}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["processingOrders"] });
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+    },
+  });
+};
+
 export const useProcessingPayments = () =>
   useQuery<any[], Error>({
     queryKey: ["processingPayments"],

@@ -2,12 +2,15 @@ import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { useState, useMemo } from "react";
-import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing } from "../hooks/useApi";
+import { useCreateProcessingOrder, useCreateProcessor, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useDeleteProcessor, useIngredients, useProcessingOrders, useProcessingPayment, useProcessors, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { DeleteButton, EmptyState, ErrorState, FormSection, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { useAuth } from "../auth/AuthContext";
 
 export const Processing = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   const [processorFilter, setProcessorFilter] = useState<number | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -29,6 +32,7 @@ export const Processing = () => {
   const receiveProcessing = useReceiveProcessing();
   const addPayment = useProcessingPayment();
   const deleteOrder = useDeleteProcessingOrder();
+  const updateOrder = useUpdateProcessingOrder();
   const createProcessor = useCreateProcessor();
   const deleteProcessor = useDeleteProcessor();
   const deleteIngredient = useDeleteIngredient();
@@ -44,6 +48,10 @@ export const Processing = () => {
   const [receiveOpen, setReceiveOpen] = useState<number | null>(null);
   const [payOpen, setPayOpen] = useState<number | null>(null);
   const [processorOpen, setProcessorOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState<number | null>(null);
+  const [editQtySent, setEditQtySent] = useState("");
+  const [editCostPerKg, setEditCostPerKg] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   const [rawId, setRawId] = useState(0);
   const [selectedProcessorId, setSelectedProcessorId] = useState(0);
@@ -112,6 +120,21 @@ export const Processing = () => {
       () => setSuccess("Order deleted. Stock restored."),
       (e: any) => setError(e.response?.data?.detail || "Could not delete."),
     );
+
+  const handleEdit = async () => {
+    if (!editOpen || !Number(editQtySent) || Number(editQtySent) <= 0 || !Number(editCostPerKg) || Number(editCostPerKg) < 0) {
+      setError("Fill all fields with valid values."); return;
+    }
+    try {
+      await updateOrder.mutateAsync({
+        orderId: editOpen,
+        quantity_sent: Number(editQtySent),
+        cost_per_expected_kg: Number(editCostPerKg),
+        notes: editNotes || undefined,
+      });
+      setEditOpen(null); setSuccess("Order updated. Stock recalculated.");
+    } catch (e: any) { setError(e.response?.data?.detail || "Could not update order."); }
+  };
 
   const saveProcessor = async () => {
     if (!newProcName.trim()) { setError("Processor name required."); return; }
@@ -224,6 +247,17 @@ export const Processing = () => {
                         onDelete={() => handleDelete(order.id)}
                       />
                     )}
+                    {order.status === "COMPLETED" && isSuperAdmin && (
+                      <>
+                        <Button size="small" onClick={() => { setEditOpen(order.id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }}>Edit</Button>
+                        <DeleteButton
+                          label="Delete"
+                          itemName={`completed processing order ${order.id}`}
+                          confirmMessage="Super admin: Delete this completed order? Processed stock will be reversed, downstream batches deleted. This cannot be undone."
+                          onDelete={() => handleDelete(order.id)}
+                        />
+                      </>
+                    )}
                   </Box>
                 </TableCell>
               </TableRow>
@@ -270,6 +304,22 @@ export const Processing = () => {
                           onDelete={() => handleDelete(order.id)}
                         />
                       </Box>
+                    )}
+                    {order.status === "COMPLETED" && isSuperAdmin && (
+                      <>
+                        <Button variant="outlined" onClick={() => { setEditOpen(order.id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }} sx={{ flex: 1, minHeight: 44 }}>
+                          Edit
+                        </Button>
+                        <Box sx={{ flex: 1 }}>
+                          <DeleteButton
+                            fullWidth
+                            label="Delete"
+                            itemName={`completed processing order ${order.id}`}
+                            confirmMessage="Super admin: Delete this completed order? Processed stock will be reversed, downstream batches deleted. This cannot be undone."
+                            onDelete={() => handleDelete(order.id)}
+                          />
+                        </Box>
+                      </>
                     )}
                   </Box>
                 </CardContent>
@@ -395,6 +445,11 @@ export const Processing = () => {
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             {detailOrder?.status === "PENDING" && <Button size="small" variant="outlined" color="success" sx={{ minHeight: 44 }} onClick={() => { setReceiveOpen(detailOrder.id); setDetailId(null); }}>Mark received</Button>}
             {detailOrder && detailOrder.balance_due > 0 && <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setPayOpen(detailOrder.id); setDetailId(null); }}>Pay</Button>}
+            {detailOrder?.status === "COMPLETED" && isSuperAdmin && (
+              <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setEditOpen(detailOrder.id); setEditQtySent(String(detailOrder.quantity_sent)); setEditCostPerKg(String(detailOrder.cost_per_expected_kg)); setEditNotes(detailOrder.notes || ""); setDetailId(null); }}>
+                Edit
+              </Button>
+            )}
           </Box>
           <Button onClick={() => setDetailId(null)}>Close</Button>
         </DialogActions>
@@ -498,6 +553,30 @@ export const Processing = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Edit Dialog (super_admin only) */}
+      <Dialog open={!!editOpen} onClose={() => setEditOpen(null)} fullScreen={isMobile} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Edit Processing Order #{editOpen}
+        </DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            Editing a completed order will recalculate raw stock, processed ingredient cost, and downstream batch costs. Batches that have already been packed or sold cannot be recalculated.
+          </Alert>
+          <FormSection title="Quantity & Cost">
+            <TextField margin="dense" label="Quantity sent (kg)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={editQtySent} onChange={(e) => setEditQtySent(e.target.value)} />
+            <TextField margin="dense" label="Cost per kg (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={editCostPerKg} onChange={(e) => setEditCostPerKg(e.target.value)} />
+            <TextField margin="dense" label="Notes" fullWidth multiline rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+          </FormSection>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleEdit} disabled={updateOrder.isPending}>
+            {updateOrder.isPending ? <CircularProgress size={20} /> : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Collective Payment Dialog */}
       <Dialog open={collectivePayOpen} onClose={() => setCollectivePayOpen(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Pay Processor (collective)</DialogTitle>
@@ -526,7 +605,7 @@ export const Processing = () => {
       </Dialog>
 
       {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
-      {error && !createOpen && !receiveOpen && !payOpen && !detailId && !processorOpen && !collectivePayOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}
+      {error && !createOpen && !receiveOpen && !payOpen && !detailId && !processorOpen && !collectivePayOpen && !editOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}
     </Box>
   );
 };
