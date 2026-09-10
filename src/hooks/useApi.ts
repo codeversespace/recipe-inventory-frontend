@@ -240,7 +240,12 @@ export const useAddPurchaseLot = () => {
   return useMutation<void, Error, { ingredient_id: number; supplier_id?: number; qty: number; unit_price: number; supplier?: string; reference?: string; lot_number?: string; expiry_date?: string }>({
     mutationFn: (payload) =>
       api.post(`/ingredients/${payload.ingredient_id}/lots`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ingredients"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["purchaseLots"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 };
 
@@ -248,7 +253,12 @@ export const useUpdatePurchaseLot = () => {
   const qc = useQueryClient();
   return useMutation<any, any, { ingredient_id: number; id: number; qty: number; unit_price: number; supplier?: string; reference?: string; lot_number?: string; expiry_date?: string }>({
     mutationFn: ({ ingredient_id, id, ...payload }) => api.put(`/ingredients/${ingredient_id}/lots/${id}`, { ingredient_id, ...payload }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["purchaseLots"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["purchaseLots"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 };
 
@@ -256,7 +266,12 @@ export const useDeletePurchaseLot = () => {
   const qc = useQueryClient();
   return useMutation<void, any, { ingredient_id: number; id: number }>({
     mutationFn: ({ ingredient_id, id }) => api.delete(`/ingredients/${ingredient_id}/lots/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["purchaseLots"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["purchaseLots"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 };
 
