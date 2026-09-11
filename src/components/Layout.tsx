@@ -120,27 +120,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const canAccess = (roles: Role[]) => Boolean(user?.role && roles.includes(user.role as Role));
   const visibleNavItems = navItems.filter((item) => canAccess(item.roles));
 
-  // iOS Safari: re-anchor bottom nav when virtual keyboard opens/closes.
-  // The visualViewport fires resize when the keyboard appears/disappears.
-  React.useLayoutEffect(() => {
-    if (!isMobile || typeof window === "undefined") return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const reanchor = () => {
-      const nav = document.querySelector('[data-bottom-nav]') as HTMLElement | null;
-      if (nav) {
-        nav.style.position = "fixed";
-        nav.style.bottom = "0px";
-      }
-    };
-    vv.addEventListener("resize", reanchor);
-    vv.addEventListener("scroll", reanchor);
-    return () => {
-      vv.removeEventListener("resize", reanchor);
-      vv.removeEventListener("scroll", reanchor);
-    };
-  }, [isMobile]);
-
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -274,7 +253,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minWidth: 0,
           overflowX: "hidden",
-          pb: { xs: "calc(80px + env(safe-area-inset-bottom))", sm: 3 },
+          pb: { xs: "calc(72px + env(safe-area-inset-bottom))", sm: 3 },
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 52, sm: 64 } }} />
@@ -294,15 +273,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             zIndex: (theme) => theme.zIndex.drawer + 2,
             borderTop: 1,
             borderColor: "divider",
-            WebkitTransform: "translate3d(0,0,0)",
-            transform: "translate3d(0,0,0)",
+            paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
           <BottomNavigation
             showLabels
             value={currentBottomNav ? currentBottomNav.to : false}
             onChange={handleBottomNavChange}
-            sx={{ height: 64, "& .MuiBottomNavigationAction-root": { minWidth: "auto", py: 1, fontSize: "0.65rem", "&.Mui-selected": { color: "primary.main" } } }}
+            sx={{ height: 72, "& .MuiBottomNavigationAction-root": { minWidth: "auto", py: 1, fontSize: "0.65rem", "&.Mui-selected": { color: "primary.main" } } }}
           >
             {bottomNavItems.map((item) => (
               <BottomNavigationAction key={item.label} label={item.label} icon={item.icon} value={item.to} />
