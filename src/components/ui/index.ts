@@ -9,3 +9,5 @@ export { FormActions } from "./FormActions";
 export { DeleteButton } from "./DeleteButton";
 export { Money } from "./Money";
 export { FormSection } from "./FormSection";
+export { OverflowMenu } from "./OverflowMenu";
+export type { OverflowAction } from "./OverflowMenu";

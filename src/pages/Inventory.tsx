@@ -4,7 +4,7 @@ import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useAllSupplierPurchases, useBatches, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem } from "../hooks/useApi";
-import { DeleteButton, EmptyState, ErrorState, Money, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, Money, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
 import { formatDate } from "../utils/formatDate";
 
@@ -30,6 +30,7 @@ export const Inventory = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [alertsOpen, setAlertsOpen] = useState({ shortage: false, reorder: false });
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string; type: "saleable" | "ingredient" | "packing" } | null>(null);
   const toggleExpand = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const deleteMsgs = {
@@ -78,9 +79,6 @@ export const Inventory = () => {
             No production batches recorded for this recipe yet.
           </Typography>
         )}
-        <Button variant="outlined" onClick={() => goTracking(item.id)} aria-label={`View batch tracking for ${item.name}`} sx={{ mt: 1, minHeight: 44 }} fullWidth>
-          View Batch Tracking
-        </Button>
       </Box>
     );
   };
@@ -113,9 +111,6 @@ export const Inventory = () => {
         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
           {group.suppliers.length} supplier{group.suppliers.length === 1 ? "" : "s"} · {group.rows.length} purchase{group.rows.length === 1 ? "" : "s"}
         </Typography>
-        <Button variant="outlined" onClick={() => goCompare(name, source)} aria-label={`View price comparison for ${name}`} sx={{ mt: 1, minHeight: 44 }} fullWidth>
-          View Price Comparison
-        </Button>
       </Box>
     );
   };
@@ -149,18 +144,6 @@ export const Inventory = () => {
     }
     return <>—</>;
   };
-
-  const expandButton = (key: string, name: string) => (
-    <IconButton
-      size="small"
-      aria-label={expanded[key] ? `Hide details for ${name}` : `Show details for ${name}`}
-      aria-expanded={!!expanded[key]}
-      onClick={() => toggleExpand(key)}
-      sx={{ minWidth: 44 }}
-    >
-      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-    </IconButton>
-  );
 
   const compactAlert = (
     key: "shortage" | "reorder",
@@ -243,11 +226,18 @@ export const Inventory = () => {
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name}</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">
-                        {item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography>
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">
+                          {item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography>
+                        </Typography>
+                        {saleableStatus(item)}
+                      </Box>
                     </Box>
-                    {saleableStatus(item)}
+                    <OverflowMenu
+                      actions={[
+                        { label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "saleable" as const }), danger: true },
+                      ]}
+                    />
                   </Box>
                   {isProduced(item)
                     ? productionSnapshot(item)
@@ -262,18 +252,25 @@ export const Inventory = () => {
                       )}
                     </Box>
                   </Collapse>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-                    {expandButton(key, item.name)}
-                    <Box sx={{ flex: 1 }}>
-                      <DeleteButton
-                        fullWidth
-                        label="Delete"
-                        itemName={item.name}
-                        confirmMessage={`Delete saleable item "${item.name}" and all its purchase history? This cannot be undone.`}
-                        onDelete={() => deleteMsgs.saleable(item.id)}
-                        onError={(e) => setErrorMsg(formatError(e))}
-                      />
-                    </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                    <IconButton
+                      size="small"
+                      aria-label={expanded[key] ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+                      aria-expanded={!!expanded[key]}
+                      onClick={() => toggleExpand(key)}
+                      sx={{ minWidth: 44 }}
+                    >
+                      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
+                    </IconButton>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => goTracking(item.id)}
+                      aria-label={`View batch tracking for ${item.name}`}
+                      sx={{ minHeight: 36, fontSize: "0.8125rem" }}
+                    >
+                      View Batch Tracking
+                    </Button>
                   </Box>
                 </CardContent>
               </Card>
@@ -375,11 +372,18 @@ export const Inventory = () => {
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name}</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">
-                        {item.on_hand_qty} <Typography component="span" variant="caption" color="text.secondary">{item.base_unit}</Typography>
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">
+                          {item.on_hand_qty} <Typography component="span" variant="caption" color="text.secondary">{item.base_unit}</Typography>
+                        </Typography>
+                        <StatusChip status={item.is_low_stock ? "error" : "success"} label={item.is_low_stock ? "Low stock" : "In stock"} />
+                      </Box>
                     </Box>
-                    <StatusChip status={item.is_low_stock ? "error" : "success"} label={item.is_low_stock ? "Low stock" : "In stock"} />
+                    <OverflowMenu
+                      actions={[
+                        { label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "ingredient" as const }), danger: true },
+                      ]}
+                    />
                   </Box>
                   {priceSnapshot(item.name, "ingredient", item.avg_unit_price, item.base_unit)}
                   <Collapse in={!!expanded[key]} timeout="auto" unmountOnExit>
@@ -388,18 +392,25 @@ export const Inventory = () => {
                       <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Reorder at</Typography><Typography variant="body2" className="tnum">{item.min_stock > 0 ? `${item.min_stock} ${item.base_unit}` : "—"}</Typography></Box>
                     </Box>
                   </Collapse>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-                    {expandButton(key, item.name)}
-                    <Box sx={{ flex: 1 }}>
-                      <DeleteButton
-                        fullWidth
-                        label="Delete"
-                        itemName={item.name}
-                        confirmMessage={`Delete "${item.name}" and all its purchase history? This cannot be undone.`}
-                        onDelete={() => deleteMsgs.ingredient(item.id)}
-                        onError={(e) => setErrorMsg(formatError(e))}
-                      />
-                    </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                    <IconButton
+                      size="small"
+                      aria-label={expanded[key] ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+                      aria-expanded={!!expanded[key]}
+                      onClick={() => toggleExpand(key)}
+                      sx={{ minWidth: 44 }}
+                    >
+                      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
+                    </IconButton>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => goCompare(item.name, "ingredient")}
+                      aria-label={`View price comparison for ${item.name}`}
+                      sx={{ minHeight: 36, fontSize: "0.8125rem" }}
+                    >
+                      View Price Comparison
+                    </Button>
                   </Box>
                 </CardContent>
               </Card>
@@ -446,6 +457,19 @@ export const Inventory = () => {
         );
       })}
 
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title={`Delete ${confirmDelete?.type === "saleable" ? "saleable item" : confirmDelete?.type === "ingredient" ? "raw material" : "packing material"}`}
+        message={`Delete "${confirmDelete?.name}" and all its purchase history? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (!confirmDelete) return;
+          const fn = deleteMsgs[confirmDelete.type];
+          fn(confirmDelete.id).catch((e) => setErrorMsg(formatError(e))).finally(() => setConfirmDelete(null));
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
       {/* Packing Materials */}
       <Typography variant="h5" sx={{ mt: 3, mb: 1, fontSize: { xs: "1rem", sm: "1.25rem" }, fontWeight: 700 }}>Packing Materials</Typography>
       {packingLoading ? (
@@ -472,11 +496,18 @@ export const Inventory = () => {
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name}</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum" color={item.qty <= 0 ? "error.main" : "text.primary"}>
-                        {item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography>
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum" color={item.qty <= 0 ? "error.main" : "text.primary"}>
+                          {item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography>
+                        </Typography>
+                        <StatusChip status={item.qty <= 0 ? "error" : "success"} label={item.qty <= 0 ? "Out of stock" : "In stock"} />
+                      </Box>
                     </Box>
-                    <StatusChip status={item.qty <= 0 ? "error" : "success"} label={item.qty <= 0 ? "Out of stock" : "In stock"} />
+                    <OverflowMenu
+                      actions={[
+                        { label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "packing" as const }), danger: true },
+                      ]}
+                    />
                   </Box>
                   {priceSnapshot(item.name, "manual", item.unit_price, item.unit)}
                   <Collapse in={!!expanded[key]} timeout="auto" unmountOnExit>
@@ -484,18 +515,25 @@ export const Inventory = () => {
                       <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Unit cost</Typography><Typography variant="body2" className="tnum"><Money value={item.unit_price} /></Typography></Box>
                     </Box>
                   </Collapse>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-                    {expandButton(key, item.name)}
-                    <Box sx={{ flex: 1 }}>
-                      <DeleteButton
-                        fullWidth
-                        label="Delete"
-                        itemName={item.name}
-                        confirmMessage={`Delete packing material "${item.name}" and all its purchase history? This cannot be undone.`}
-                        onDelete={() => deleteMsgs.packing(item.id)}
-                        onError={(e) => setErrorMsg(formatError(e))}
-                      />
-                    </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                    <IconButton
+                      size="small"
+                      aria-label={expanded[key] ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
+                      aria-expanded={!!expanded[key]}
+                      onClick={() => toggleExpand(key)}
+                      sx={{ minWidth: 44 }}
+                    >
+                      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
+                    </IconButton>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => goCompare(item.name, "manual")}
+                      aria-label={`View price comparison for ${item.name}`}
+                      sx={{ minHeight: 36, fontSize: "0.8125rem" }}
+                    >
+                      View Price Comparison
+                    </Button>
                   </Box>
                 </CardContent>
               </Card>

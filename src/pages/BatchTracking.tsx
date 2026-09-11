@@ -1,6 +1,6 @@
-import { Box, Button, Card, CardContent, CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, CircularProgress, Collapse, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBatchDetail, usePackTypes, useProductionBatches, useRecipes, useSaleableStock, useStockBatches } from "../hooks/useApi";
 import { EmptyState, ErrorState, PageHeader } from "../components/ui";
@@ -80,6 +80,42 @@ export const BatchTracking = () => {
 
   const selected = detail || null;
 
+  const BatchDetailContent = ({ selected, item, recipe }: { selected: any; item: any; recipe: any }) => (
+    <>
+      <Typography variant="body2"><strong>Product:</strong> {item.name}</Typography>
+      <Typography variant="body2"><strong>Recipe:</strong> {recipe?.name || "—"}</Typography>
+      <Typography variant="body2"><strong>Prepared:</strong> {formatDate(selected.produced_at)} · <strong>Produced:</strong> <span className="tnum">{selected.produced_qty} kg</span></Typography>
+      <Typography variant="body2"><strong>Batch cost:</strong> <span className="tnum">{formatMoney(selected.total_cost)}</span>{selected.total_revenue != null && <> · <strong>Revenue:</strong> <span className="tnum">{formatMoney(selected.total_revenue)}</span></>}</Typography>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>Ingredients consumed</Typography>
+      <TableContainer sx={{ overflowX: "auto" }}>
+        <Table size="small" sx={{ minWidth: 420 }}>
+          <TableHead><TableRow>
+            <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell>
+            <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty used</TableCell>
+            <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Line cost</TableCell>
+          </TableRow></TableHead>
+          <TableBody>
+            {(selected.consumptions || []).map((c: any, i: number) => (
+              <TableRow key={i}>
+                <TableCell sx={cellSx}>{c.ingredient_name}</TableCell>
+                <TableCell sx={cellSx} className="tnum">{c.qty_used}</TableCell>
+                <TableCell sx={cellSx} className="tnum">{formatMoney(c.line_cost)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {(selected.overheads || []).length > 0 && (
+        <>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>Overheads</Typography>
+          {(selected.overheads || []).map((o: any, i: number) => (
+            <Typography key={i} variant="body2" className="tnum">{o.name} ({o.overhead_type}): {formatMoney(o.cost)}</Typography>
+          ))}
+        </>
+      )}
+    </>
+  );
+
   return (
     <Box>
       <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/inventory")} sx={{ mb: 1, minHeight: 44 }} aria-label="Back to Inventory">
@@ -149,17 +185,35 @@ export const BatchTracking = () => {
                     <TableBody>
                       {pageItems.map((b: any) => {
                         const t = trackByBatch.get(b.id);
+                        const isOpen = selectedId === b.id;
                         return (
-                        <TableRow key={b.id} hover selected={selectedId === b.id}>
-                          <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">#{b.id}</TableCell>
-                          <TableCell sx={cellSx}>{b.produced_at ? formatDate(b.produced_at) : "—"}</TableCell>
-                          <TableCell sx={cellSx} className="tnum">{t ? t.packed : "—"}</TableCell>
-                          <TableCell sx={cellSx} className="tnum">{t ? t.allocated : "—"}</TableCell>
-                          <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">{t ? t.available : "—"}</TableCell>
-                          <TableCell sx={cellSx}>
-                            <Button size="small" onClick={() => setSelectedId(selectedId === b.id ? null : b.id)} aria-label={`View batch ${b.id}`} aria-expanded={selectedId === b.id}>View</Button>
-                          </TableCell>
-                        </TableRow>
+                        <Fragment key={b.id}>
+                          <TableRow hover selected={isOpen}>
+                            <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">#{b.id}</TableCell>
+                            <TableCell sx={cellSx}>{b.produced_at ? formatDate(b.produced_at) : "—"}</TableCell>
+                            <TableCell sx={cellSx} className="tnum">{t ? t.packed : "—"}</TableCell>
+                            <TableCell sx={cellSx} className="tnum">{t ? t.allocated : "—"}</TableCell>
+                            <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">{t ? t.available : "—"}</TableCell>
+                            <TableCell sx={cellSx}>
+                              <Button size="small" onClick={() => setSelectedId(isOpen ? null : b.id)} aria-label={`View batch ${b.id}`} aria-expanded={isOpen}>{isOpen ? "Hide" : "View"}</Button>
+                            </TableCell>
+                          </TableRow>
+                          {isOpen && (
+                            <TableRow>
+                              <TableCell colSpan={6} sx={{ py: 0, borderBottom: "none" }}>
+                                <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                                  <Box sx={{ py: 2, px: 1 }}>
+                                    {detailLoading || !selected ? (
+                                      <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress /></Box>
+                                    ) : (
+                                      <BatchDetailContent selected={selected} item={item} recipe={recipe} />
+                                    )}
+                                  </Box>
+                                </Collapse>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
                         );
                       })}
                     </TableBody>
@@ -170,8 +224,9 @@ export const BatchTracking = () => {
                 <Stack spacing={1.5} sx={{ mb: 2 }}>
                   {pageItems.map((b: any) => {
                     const t = trackByBatch.get(b.id);
+                    const isOpen = selectedId === b.id;
                     return (
-                    <Card key={b.id} variant={selectedId === b.id ? "elevation" : "outlined"}>
+                    <Card key={b.id} variant={isOpen ? "elevation" : "outlined"}>
                       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
                           <Box sx={{ minWidth: 0 }}>
@@ -184,8 +239,17 @@ export const BatchTracking = () => {
                           <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Packed</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{t ? t.packed : "—"}</Typography></Box>
                           <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Sold</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{t ? t.allocated : "—"}</Typography></Box>
                         </Box>
-                        <Button fullWidth variant={selectedId === b.id ? "contained" : "outlined"} onClick={() => setSelectedId(selectedId === b.id ? null : b.id)} aria-label={`View batch ${b.id}`} aria-expanded={selectedId === b.id} sx={{ mt: 1.5, minHeight: 44 }}>
-                          {selectedId === b.id ? "Hide details" : "View batch"}
+                        <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+                            {detailLoading || !selected ? (
+                              <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress /></Box>
+                            ) : (
+                              <BatchDetailContent selected={selected} item={item} recipe={recipe} />
+                            )}
+                          </Box>
+                        </Collapse>
+                        <Button fullWidth variant={isOpen ? "contained" : "outlined"} onClick={() => setSelectedId(isOpen ? null : b.id)} aria-label={`View batch ${b.id}`} aria-expanded={isOpen} sx={{ mt: 1.5, minHeight: 44 }}>
+                          {isOpen ? "Hide details" : "View batch"}
                         </Button>
                       </CardContent>
                     </Card>
@@ -217,54 +281,6 @@ export const BatchTracking = () => {
                 </Button>
               </Box>
             </>
-          )}
-
-          {/* Batch detail */}
-          {selectedId !== null && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, fontSize: { xs: "1rem", sm: "1.25rem" }, mb: 1 }}>
-                Batch #{selectedId}{detailLoading ? " — loading…" : ""}
-              </Typography>
-              {detailLoading || !selected ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress /></Box>
-              ) : (
-                <Card variant="outlined">
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                    <Typography variant="body2"><strong>Product:</strong> {item.name}</Typography>
-                    <Typography variant="body2"><strong>Recipe:</strong> {recipe?.name || "—"}</Typography>
-                    <Typography variant="body2"><strong>Prepared:</strong> {formatDate(selected.produced_at)} · <strong>Produced:</strong> <span className="tnum">{selected.produced_qty} kg</span></Typography>
-                    <Typography variant="body2"><strong>Batch cost:</strong> <span className="tnum">{formatMoney(selected.total_cost)}</span>{selected.total_revenue != null && <> · <strong>Revenue:</strong> <span className="tnum">{formatMoney(selected.total_revenue)}</span></>}</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>Ingredients consumed</Typography>
-                    <TableContainer sx={{ overflowX: "auto" }}>
-                      <Table size="small" sx={{ minWidth: 420 }}>
-                        <TableHead><TableRow>
-                          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell>
-                          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Qty used</TableCell>
-                          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Line cost</TableCell>
-                        </TableRow></TableHead>
-                        <TableBody>
-                          {(selected.consumptions || []).map((c: any, i: number) => (
-                            <TableRow key={i}>
-                              <TableCell sx={cellSx}>{c.ingredient_name}</TableCell>
-                              <TableCell sx={cellSx} className="tnum">{c.qty_used}</TableCell>
-                              <TableCell sx={cellSx} className="tnum">{formatMoney(c.line_cost)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                    {(selected.overheads || []).length > 0 && (
-                      <>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>Overheads</Typography>
-                        {(selected.overheads || []).map((o: any, i: number) => (
-                          <Typography key={i} variant="body2" className="tnum">{o.name} ({o.overhead_type}): {formatMoney(o.cost)}</Typography>
-                        ))}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </Box>
           )}
 
           {/* Timeline grouped per batch: short connectors only */}

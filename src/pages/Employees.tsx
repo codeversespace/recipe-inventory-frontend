@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useCreateEmployee, useDeleteEmployee, useEmployeeLedger, useEmployees, usePayEmployee, useToggleEmployee, useUpdateEmployee } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
-import { DeleteButton, EmptyState, ErrorState, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 
 export const Employees = () => {
   const { data: employees = [], isLoading, error: employeesError, refetch } = useEmployees();
@@ -18,6 +18,7 @@ export const Employees = () => {
   const payEmp = usePayEmployee();
 
   const [formOpen, setFormOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [editId, setEditId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -143,10 +144,15 @@ export const Employees = () => {
                     </Box>
                     <StatusChip status={emp.is_active ? "success" : "error"} label={emp.is_active ? "Active" : "Inactive"} />
                   </Box>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
-                    <Button size="small" variant="outlined" onClick={() => setDetailId(emp.id)} sx={{ flex: 1, minHeight: 44 }}>Ledger</Button>
-                    <Button size="small" variant="outlined" onClick={() => { setEditId(emp.id); setName(emp.name); setPhone(emp.phone || ""); setAddress(emp.address || ""); setType(emp.type); setFormOpen(true); }} sx={{ flex: 1, minHeight: 44 }}>Edit</Button>
-                    <DeleteButton fullWidth label="Delete" itemName={emp.name} confirmMessage={`Delete "${emp.name}"?`} onDelete={() => handleDelete(emp.id)} />
+                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+                    <OverflowMenu
+                      ariaLabel={`${emp.name} actions`}
+                      actions={[
+                        { label: "Ledger", onClick: () => setDetailId(emp.id) },
+                        { label: "Edit", onClick: () => { setEditId(emp.id); setName(emp.name); setPhone(emp.phone || ""); setAddress(emp.address || ""); setType(emp.type); setFormOpen(true); } },
+                        { label: "Delete", danger: true, onClick: () => setDeleteTarget(emp) },
+                      ]}
+                    />
                   </Box>
                 </CardContent>
               </Card>
@@ -272,6 +278,26 @@ export const Employees = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete "${deleteTarget?.name ?? ""}"?`}
+        message="This employee will be permanently removed. This action cannot be undone."
+        confirmLabel="Delete"
+        danger
+        pending={deleteEmp.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await deleteEmp.mutateAsync(deleteTarget.id);
+            setSuccess("Employee deleted.");
+            setDeleteTarget(null);
+          } catch (e: any) {
+            setError(e.response?.data?.detail || "Could not delete employee.");
+            setDeleteTarget(null);
+          }
+        }}
+      />
     </Box>
   );
 };

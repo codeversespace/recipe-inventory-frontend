@@ -59,10 +59,12 @@ html, body, #root { min-height: 100%; }
   /* Select value text covered by the 16px input rule above. */
 
   /* Bottom navigation */
-  .MuiBottomNavigation-root { height: 60px !important; }
+  .MuiBottomNavigation-root { height: 60px !important; will-change: transform; }
   .MuiBottomNavigationAction-root { min-width: 48px !important; padding: 6px 0 !important; }
   .MuiBottomNavigationAction-label { font-size: 0.6rem !important; margin-top: 2px; }
   .MuiBottomNavigationAction-label.Mui-selected { font-size: 0.6rem !important; }
+  /* Prevent iOS Safari from unfixing bottom nav on keyboard open/close */
+  [data-bottom-nav] { position: fixed !important; bottom: 0 !important; will-change: transform; -webkit-transform: translate3d(0,0,0); transform: translate3d(0,0,0); }
 
   /* Snackbar - bottom offset for bottom nav */
   .MuiSnackbar-root { bottom: 80px !important; }

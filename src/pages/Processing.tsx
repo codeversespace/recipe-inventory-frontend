@@ -5,7 +5,7 @@ import { useState, useMemo } from "react";
 import { useCreateProcessingOrder, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useEmployees, useIngredients, useProcessingOrders, useProcessingPayment, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
-import { DeleteButton, EmptyState, ErrorState, FormSection, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormSection, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 
 export const Processing = () => {
@@ -29,6 +29,7 @@ export const Processing = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const createOrder = useCreateProcessingOrder();
   const receiveProcessing = useReceiveProcessing();
   const addPayment = useProcessingPayment();
@@ -281,35 +282,27 @@ export const Processing = () => {
                     <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Balance</Typography><Typography variant="body2" sx={{ fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }}>{formatMoney(order.balance_due)}</Typography></Box>
                   </Box>
                   <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-                    <Button variant="outlined" onClick={() => setDetailId(order.id)} aria-label={`View processing order ${order.id}`} sx={{ flex: 1, minHeight: 44 }}>
-                      Details
-                    </Button>
                     {order.status === "PENDING" && (
-                      <Box sx={{ flex: 1 }}>
-                        <DeleteButton
-                          fullWidth
-                          label="Delete"
-                          itemName={`processing order ${order.id}`}
-                          confirmMessage="Delete this processing order? Consumed stock will be restored. This cannot be undone."
-                          onDelete={() => handleDelete(order.id)}
-                        />
-                      </Box>
+                      <OverflowMenu
+                        ariaLabel={`Order ${order.id} actions`}
+                        actions={[
+                          { label: "Details", onClick: () => setDetailId(order.id) },
+                          { label: "Delete", danger: true, onClick: () => setDeleteTarget({ order, message: "Delete this processing order? Consumed stock will be restored. This cannot be undone." }) },
+                        ]}
+                      />
                     )}
                     {order.status === "COMPLETED" && isSuperAdmin && (
-                      <>
-                        <Button variant="outlined" onClick={() => { setEditOpen(order.id); setEditRawId(order.raw_ingredient_id); setEditProcessorId(order.processor_id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); }} sx={{ flex: 1, minHeight: 44 }}>
-                          Edit
-                        </Button>
-                        <Box sx={{ flex: 1 }}>
-                          <DeleteButton
-                            fullWidth
-                            label="Delete"
-                            itemName={`completed processing order ${order.id}`}
-                            confirmMessage="Super admin: Delete this completed order? Processed stock will be reversed, downstream batches deleted. This cannot be undone."
-                            onDelete={() => handleDelete(order.id)}
-                          />
-                        </Box>
-                      </>
+                      <OverflowMenu
+                        ariaLabel={`Order ${order.id} actions`}
+                        actions={[
+                          { label: "Details", onClick: () => setDetailId(order.id) },
+                          { label: "Edit", onClick: () => { setEditOpen(order.id); setEditRawId(order.raw_ingredient_id); setEditProcessorId(order.processor_id); setEditQtySent(String(order.quantity_sent)); setEditCostPerKg(String(order.cost_per_expected_kg)); setEditNotes(order.notes || ""); } },
+                          { label: "Delete", danger: true, onClick: () => setDeleteTarget({ order, message: "Super admin: Delete this completed order? Processed stock will be reversed, downstream batches deleted. This cannot be undone." }) },
+                        ]}
+                      />
+                    )}
+                    {order.status !== "PENDING" && !(order.status === "COMPLETED" && isSuperAdmin) && (
+                      <Button variant="outlined" onClick={() => setDetailId(order.id)} sx={{ minHeight: 44 }}>Details</Button>
                     )}
                   </Box>
                 </CardContent>
@@ -584,6 +577,25 @@ export const Processing = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete order ${deleteTarget?.order?.id ?? ""}?`}
+        message={deleteTarget?.message || "This cannot be undone."}
+        confirmLabel="Delete"
+        danger
+        pending={deleteOrder.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await handleDelete(deleteTarget.order.id);
+            setDeleteTarget(null);
+          } catch {
+            setDeleteTarget(null);
+          }
+        }}
+      />
 
       {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
       {error && !createOpen && !receiveOpen && !payOpen && !detailId && !processorOpen && !collectivePayOpen && !editOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}

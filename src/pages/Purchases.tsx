@@ -51,7 +51,7 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
-import { DeleteButton, EmptyState, ErrorState, FormActions, FormSection, Money, PageHeader, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormActions, FormSection, Money, OverflowMenu, PageHeader, TableSkeleton } from "../components/ui";
 
 export const Purchases = () => {
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
@@ -67,6 +67,7 @@ export const Purchases = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [pageError, setPageError] = useState("");
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilter = searchParams.get("item") || "";
   const visiblePurchases = itemFilter
@@ -349,19 +350,13 @@ export const Purchases = () => {
                       >
                         {open ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
                       </IconButton>
-                      <Button variant="outlined" onClick={() => handleEdit(p)} sx={{ flex: 1, minHeight: 44 }} aria-label={`Edit purchase ${p.id}`}>
-                        Edit
-                      </Button>
-                      <Box sx={{ flex: 1 }}>
-                        <DeleteButton
-                          fullWidth
-                          label="Delete"
-                          itemName={`purchase ${p.id}`}
-                          confirmMessage="Delete this purchase record? Inventory will be adjusted. This cannot be undone."
-                          onDelete={() => deletePurchase.mutateAsync(p.id)}
-                          onError={(e: any) => setPageError(e.response?.data?.detail || "Could not delete purchase.")}
-                        />
-                      </Box>
+                      <OverflowMenu
+                        ariaLabel={`Purchase ${p.id} actions`}
+                        actions={[
+                          { label: "Edit", onClick: () => handleEdit(p) },
+                          { label: "Delete", danger: true, onClick: () => setDeleteTarget(p) },
+                        ]}
+                      />
                     </Box>
                   </CardContent>
                 </Card>
@@ -563,6 +558,25 @@ export const Purchases = () => {
           error={formError && !fieldError("Select a supplier") && !fieldError("Enter item name") && !fieldError("valid quantity") && !fieldError("valid unit price") && !fieldError("Payment cannot exceed") && !fieldError("Enter a new item name") ? formError : ""}
         />
       </Dialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete purchase ${deleteTarget?.id ?? ""}?`}
+        message="Delete this purchase record? Inventory will be adjusted. This cannot be undone."
+        confirmLabel="Delete"
+        danger
+        pending={deletePurchase.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await deletePurchase.mutateAsync(deleteTarget.id);
+            setDeleteTarget(null);
+          } catch (e: any) {
+            setPageError(e.response?.data?.detail || "Could not delete purchase.");
+            setDeleteTarget(null);
+          }
+        }}
+      />
     </Box>
   );
 };

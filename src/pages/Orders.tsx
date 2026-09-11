@@ -2,7 +2,7 @@ import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { useState } from "react";
 import { useCreateOrder, useCustomers, useDeleteOrder, useOrders, useSaleableStock, useUpdateOrderStatus } from "../hooks/useApi";
-import { DeleteButton, EmptyState, ErrorState, FormActions, FormSection, PageHeader, StatusChip, TableSkeleton, ConfirmDialog } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormActions, FormSection, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 import { formatDate } from "../utils/formatDate";
 
 export const Orders = () => {
@@ -27,6 +27,7 @@ export const Orders = () => {
   const [linePrice, setLinePrice] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
   const detailOrder = orders.find((o: any) => o.id === detailId);
 
@@ -174,20 +175,13 @@ export const Orders = () => {
                     )}
                   </Box>
                   <Box sx={{ display: "flex", gap: 1 }}>
-                    <Button variant="outlined" onClick={() => setDetailId(order.id)} aria-label={`View order ${order.id}`} sx={{ flex: 1, minHeight: 44 }}>
-                      View
-                    </Button>
-                    <Box sx={{ flex: 1 }}>
-                      <DeleteButton
-                        fullWidth
-                        label="Delete"
-                        itemName={`order ${order.id}`}
-                        confirmMessage="Delete this order? This cannot be undone."
-                        onDelete={() => deleteOrder.mutateAsync(order.id)}
-                        onSuccess={() => setSuccess("Order deleted.")}
-                        onError={() => setError("Could not delete order.")}
-                      />
-                    </Box>
+                    <OverflowMenu
+                      ariaLabel={`Order ${order.id} actions`}
+                      actions={[
+                        { label: "View details", onClick: () => setDetailId(order.id) },
+                        { label: "Delete", danger: true, onClick: () => setDeleteTarget(order) },
+                      ]}
+                    />
                   </Box>
                 </CardContent>
               </Card>
@@ -358,6 +352,27 @@ export const Orders = () => {
         }}
       />
 
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete order ${deleteTarget?.id ?? ""}?`}
+        message="Delete this order? This cannot be undone."
+        confirmLabel="Delete"
+        danger
+        pending={deleteOrder.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await deleteOrder.mutateAsync(deleteTarget.id);
+            setSuccess("Order deleted.");
+            setDeleteTarget(null);
+          } catch {
+            setError("Could not delete order.");
+            setDeleteTarget(null);
+          }
+        }}
+      />
       {/* Snackbar */}
       {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
       {error && !createOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}

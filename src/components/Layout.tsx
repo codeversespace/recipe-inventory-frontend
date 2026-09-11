@@ -120,6 +120,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const canAccess = (roles: Role[]) => Boolean(user?.role && roles.includes(user.role as Role));
   const visibleNavItems = navItems.filter((item) => canAccess(item.roles));
 
+  // iOS Safari: re-anchor bottom nav when virtual keyboard opens/closes.
+  // The visualViewport fires resize when the keyboard appears/disappears.
+  React.useLayoutEffect(() => {
+    if (!isMobile || typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const reanchor = () => {
+      const nav = document.querySelector('[data-bottom-nav]') as HTMLElement | null;
+      if (nav) {
+        nav.style.position = "fixed";
+        nav.style.bottom = "0px";
+      }
+    };
+    vv.addEventListener("resize", reanchor);
+    vv.addEventListener("scroll", reanchor);
+    return () => {
+      vv.removeEventListener("resize", reanchor);
+      vv.removeEventListener("scroll", reanchor);
+    };
+  }, [isMobile]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -262,7 +283,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Bottom navigation for mobile */}
       {isMobile && (
-        <Paper sx={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: (theme) => theme.zIndex.drawer + 2, borderTop: 1, borderColor: "divider" }} elevation={3}>
+        <Paper
+          elevation={3}
+          data-bottom-nav
+          sx={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: (theme) => theme.zIndex.drawer + 2,
+            borderTop: 1,
+            borderColor: "divider",
+            WebkitTransform: "translate3d(0,0,0)",
+            transform: "translate3d(0,0,0)",
+          }}
+        >
           <BottomNavigation
             showLabels
             value={currentBottomNav ? currentBottomNav.to : false}
