@@ -931,3 +931,25 @@ export const usePayEmployee = () => {
     },
   });
 };
+
+// ── App Settings ──────────────────────────────────────────────
+
+export interface AppSetting {
+  key: string;
+  value: string;
+  description?: string;
+}
+
+export const useAppSettings = () =>
+  useQuery<AppSetting[], Error>({
+    queryKey: ["appSettings"],
+    queryFn: async () => (await api.get("/settings/public")).data,
+  });
+
+export const useUpdateAppSetting = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { key: string; value: string; description?: string }>({
+    mutationFn: ({ key, ...payload }) => api.put(`/settings/${key}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appSettings"] }),
+  });
+};

@@ -3,7 +3,7 @@ import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useAllSupplierPurchases, useBatches, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem } from "../hooks/useApi";
+import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useAllSupplierPurchases, useBatches, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem, useAppSettings } from "../hooks/useApi";
 import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, Money, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
 import { formatDate } from "../utils/formatDate";
@@ -24,6 +24,8 @@ export const Inventory = () => {
   const deleteIngredient = useDeleteIngredient();
   const deleteManualStock = useDeleteManualStockItem();
   const deleteStockItem = useDeleteStockItem();
+  const { data: appSettings = [] } = useAppSettings();
+  const deleteEnabled = appSettings.some((s) => s.key === "inventory_delete_enabled" && s.value === "true");
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -235,7 +237,7 @@ export const Inventory = () => {
                     </Box>
                     <OverflowMenu
                       actions={[
-                        { label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "saleable" as const }), danger: true },
+                        ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "saleable" as const }), danger: true }] : []),
                       ]}
                     />
                   </Box>
@@ -312,13 +314,15 @@ export const Inventory = () => {
                     <TableCell sx={cellSx} className="tnum"><Money value={item.unit_price} /></TableCell>
                     <TableCell sx={cellSx}>{marginChip(item)}</TableCell>
                     <TableCell sx={cellSx}>
-                      <DeleteButton
-                        label="Delete"
-                        itemName={item.name}
-                        confirmMessage={`Delete saleable item "${item.name}" and all its purchase history? This cannot be undone.`}
-                        onDelete={() => deleteMsgs.saleable(item.id)}
-                        onError={(e) => setErrorMsg(formatError(e))}
-                      />
+                      {deleteEnabled && (
+                        <DeleteButton
+                          label="Delete"
+                          itemName={item.name}
+                          confirmMessage={`Delete saleable item "${item.name}" and all its purchase history? This cannot be undone.`}
+                          onDelete={() => deleteMsgs.saleable(item.id)}
+                          onError={(e) => setErrorMsg(formatError(e))}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -381,7 +385,7 @@ export const Inventory = () => {
                     </Box>
                     <OverflowMenu
                       actions={[
-                        { label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "ingredient" as const }), danger: true },
+                        ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "ingredient" as const }), danger: true }] : []),
                       ]}
                     />
                   </Box>
@@ -433,13 +437,15 @@ export const Inventory = () => {
                   <TableCell sx={cellSx} className="tnum"><Money value={item.avg_unit_price} /></TableCell>
                   <TableCell sx={cellSx}><StatusChip status={item.is_low_stock ? "error" : "success"} label={item.is_low_stock ? "Low stock" : "In stock"} /></TableCell>
                   <TableCell sx={cellSx}>
-                    <DeleteButton
-                      label="Delete"
-                      itemName={item.name}
-                      confirmMessage={`Delete "${item.name}" and all its purchase history? This cannot be undone.`}
-                      onDelete={() => deleteMsgs.ingredient(item.id)}
-                      onError={(e) => setErrorMsg(formatError(e))}
-                    />
+                    {deleteEnabled && (
+                      <DeleteButton
+                        label="Delete"
+                        itemName={item.name}
+                        confirmMessage={`Delete "${item.name}" and all its purchase history? This cannot be undone.`}
+                        onDelete={() => deleteMsgs.ingredient(item.id)}
+                        onError={(e) => setErrorMsg(formatError(e))}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               )) : <TableRow><TableCell colSpan={6} align="center" sx={{ ...cellSx, py: 3 }}><EmptyState title="No raw materials recorded." message="Record a raw-material purchase to stock items here." /></TableCell></TableRow>}
@@ -505,7 +511,7 @@ export const Inventory = () => {
                     </Box>
                     <OverflowMenu
                       actions={[
-                        { label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "packing" as const }), danger: true },
+                        ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "packing" as const }), danger: true }] : []),
                       ]}
                     />
                   </Box>
@@ -556,13 +562,15 @@ export const Inventory = () => {
                 <TableCell sx={cellSx}>{item.unit}</TableCell>
                 <TableCell sx={cellSx} className="tnum"><Money value={item.unit_price} /></TableCell>
                 <TableCell sx={cellSx}>
-                  <DeleteButton
-                    label="Delete"
-                    itemName={item.name}
-                    confirmMessage={`Delete packing material "${item.name}" and all its purchase history? This cannot be undone.`}
-                    onDelete={() => deleteMsgs.packing(item.id)}
-                    onError={(e) => setErrorMsg(formatError(e))}
-                  />
+                  {deleteEnabled && (
+                    <DeleteButton
+                      label="Delete"
+                      itemName={item.name}
+                      confirmMessage={`Delete packing material "${item.name}" and all its purchase history? This cannot be undone.`}
+                      onDelete={() => deleteMsgs.packing(item.id)}
+                      onError={(e) => setErrorMsg(formatError(e))}
+                    />
+                  )}
                 </TableCell>
               </TableRow>
             )) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}><EmptyState title="No packing materials recorded." message="Record a packing-material purchase to stock items here." /></TableCell></TableRow>}

@@ -1,8 +1,8 @@
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import { ChangeEvent, Fragment, useState } from "react";
-import { useAuthActivities, useAuthRoles, useAuthUsers, useCreateAuthUser, useResetAuthPassword, useUpdateAuthUser } from "../hooks/useApi";
+import { useAuthActivities, useAppSettings, useUpdateAppSetting, useAuthRoles, useAuthUsers, useCreateAuthUser, useResetAuthPassword, useUpdateAuthUser } from "../hooks/useApi";
 import { ConfirmDialog, EmptyState, PageHeader, TableSkeleton } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
@@ -124,6 +124,32 @@ export const Settings = () => {
   const [confirmAction, setConfirmAction] = useState<null | "clear" | "reset">(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
+  const AppSettingsSection = () => {
+    const { data: settings = [], isLoading: settingsLoading } = useAppSettings();
+    const updateSetting = useUpdateAppSetting();
+    const deleteEnabled = settings.find((s) => s.key === "inventory_delete_enabled")?.value === "true";
+
+    const handleToggle = () => {
+      updateSetting.mutateAsync({
+        key: "inventory_delete_enabled",
+        value: deleteEnabled ? "false" : "true",
+        description: "Show delete action in inventory overflow menu",
+      }).catch((e) => setError(e.response?.data?.detail || "Could not update setting."));
+    };
+
+    if (settingsLoading) return <CircularProgress size={20} />;
+
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 1 }}>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>Inventory delete action</Typography>
+          <Typography variant="caption" color="text.secondary">Show the Delete option in inventory item overflow menus (saleable, raw materials, packing materials).</Typography>
+        </Box>
+        <Switch checked={deleteEnabled} onChange={handleToggle} disabled={updateSetting.isPending} />
+      </Box>
+    );
+  };
+
   return (
     <Box>
       <PageHeader
@@ -162,6 +188,13 @@ export const Settings = () => {
             <Button color="warning" variant="outlined" onClick={() => setConfirmAction("reset")} disabled={busy !== null}>Reset all data</Button>
             <Button color="error" variant="outlined" onClick={() => setConfirmAction("clear")} disabled={busy !== null}>Delete everything</Button>
           </Box>
+        </CardContent>
+      </Card>
+      <Card sx={{ maxWidth: 1100, mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Feature toggles</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>Control which actions are available across the application.</Typography>
+          <AppSettingsSection />
         </CardContent>
       </Card>
       <ConfirmDialog
