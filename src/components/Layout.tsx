@@ -225,7 +225,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
+              width: drawerWidth,
+              // Scroll containment: drawer content scrolls natively, but hitting
+              // its top/bottom boundary must not chain scroll to the page behind
+              // (iOS rubber-band scroll leak). Scoped to the temporary drawer only.
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+              WebkitOverflowScrolling: "touch",
+            },
           }}
         >
           {drawer}
