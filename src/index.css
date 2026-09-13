@@ -9,9 +9,7 @@ body {
   overscroll-behavior-x: none;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { height: -webkit-fill-available; }
-html, body, #root { min-height: 100%; min-height: 100dvh; min-height: -webkit-fill-available; }
-body { overscroll-behavior-y: none; }
+html, body, #root { min-height: 100%; }
 
 /* Mobile optimizations */
 @media (max-width: 600px) {
