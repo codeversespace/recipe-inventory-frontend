@@ -191,85 +191,88 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const currentBottomNav = bottomNavItems.find((item) => item.to !== "__drawer__" && location.pathname === item.to);
 
   return (
-    <Box sx={{ display: "flex" }}>
-      <CssBaseline />
-      {/* Top app bar */}
-      <AppBar
-        position="fixed"
-        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
-      >
-        <Toolbar sx={{ minHeight: { xs: 52, sm: 64 }, px: { xs: 1, sm: 2 } }}>
-          <IconButton
-            color="inherit"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 1, display: { md: "none" }, p: { xs: 1, sm: 1.5 } }}
+    <>
+      <Box sx={{ display: "flex" }}>
+        <CssBaseline />
+        {/* Top app bar */}
+        <AppBar
+          position="fixed"
+          sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        >
+          <Toolbar sx={{ minHeight: { xs: 52, sm: 64 }, px: { xs: 1, sm: 2 } }}>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 1, display: { md: "none" }, p: { xs: 1, sm: 1.5 } }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" noWrap component="div" sx={{ fontSize: { xs: "0.95rem", sm: "1.25rem" }, fontWeight: 700, flexGrow: 1 }}>
+              Recipe Inventory
+            </Typography>
+            <Typography variant="body2" sx={{ mr: 1, display: { xs: "none", sm: "block" }, fontSize: "0.8rem" }}>{user?.username}</Typography>
+            <Button color="inherit" size="small" onClick={logout} sx={{ display: { xs: "none", sm: "inline-flex" }, fontSize: "0.8rem" }}>Logout</Button>
+          </Toolbar>
+        </AppBar>
+
+        {/* Drawer (mobile / desktop) */}
+        <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+          {/* Mobile drawer */}
+          <Drawer
+            variant="temporary"
+            open={mobileOpen}
+            onClose={handleDrawerToggle}
+            ModalProps={{ keepMounted: true }}
+            sx={{
+              display: { xs: "block", md: "none" },
+              "& .MuiDrawer-paper": {
+                boxSizing: "border-box",
+                width: drawerWidth,
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                overscrollBehaviorY: "contain",
+                WebkitOverflowScrolling: "touch",
+                touchAction: "pan-y",
+              },
+            }}
           >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ fontSize: { xs: "0.95rem", sm: "1.25rem" }, fontWeight: 700, flexGrow: 1 }}>
-            Recipe Inventory
-          </Typography>
-          <Typography variant="body2" sx={{ mr: 1, display: { xs: "none", sm: "block" }, fontSize: "0.8rem" }}>{user?.username}</Typography>
-          <Button color="inherit" size="small" onClick={logout} sx={{ display: { xs: "none", sm: "inline-flex" }, fontSize: "0.8rem" }}>Logout</Button>
-        </Toolbar>
-      </AppBar>
+            {drawer}
+          </Drawer>
 
-      {/* Drawer (mobile / desktop) */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
-        {/* Mobile drawer */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{ keepMounted: true }}
+          {/* Desktop drawer */}
+          <Drawer
+            variant="permanent"
+            sx={{
+              display: { xs: "none", md: "block" },
+              "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
+            }}
+            open
+          >
+            {drawer}
+          </Drawer>
+        </Box>
+
+        {/* Main content area */}
+        <Box
+          component="main"
           sx={{
-            display: { xs: "block", md: "none" },
-            "& .MuiDrawer-paper": {
-              boxSizing: "border-box",
-              width: drawerWidth,
-              // Scroll containment: drawer content scrolls natively, but hitting
-              // its top/bottom boundary must not chain scroll to the page behind
-              // (iOS rubber-band scroll leak). Scoped to the temporary drawer only.
-              overflowY: "auto",
-              overscrollBehavior: "contain",
-              WebkitOverflowScrolling: "touch",
-            },
+            flexGrow: 1,
+            p: { xs: 1, sm: 2, md: 3 },
+            width: { md: `calc(100% - ${drawerWidth}px)` },
+            minWidth: 0,
+            overflowX: "hidden",
+            pb: { xs: "calc(72px + env(safe-area-inset-bottom))", sm: 3 },
           }}
         >
-          {drawer}
-        </Drawer>
-
-        {/* Desktop drawer */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: "none", md: "block" },
-            "& .MuiDrawer-paper": { boxSizing: "border-box", width: drawerWidth },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
+          <Toolbar sx={{ minHeight: { xs: 52, sm: 64 } }} />
+          {children}
+        </Box>
       </Box>
 
-      {/* Main content area */}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: { xs: 1, sm: 2, md: 3 },
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          minWidth: 0,
-          overflowX: "hidden",
-          pb: { xs: "calc(72px + env(safe-area-inset-bottom))", sm: 3 },
-        }}
-      >
-        <Toolbar sx={{ minHeight: { xs: 52, sm: 64 } }} />
-        {children}
-      </Box>
-
-      {/* Bottom navigation for mobile */}
+      {/* Bottom navigation — rendered outside the flex AppShell so no flex
+          ancestor can create a containing block for position:fixed on iOS.
+          Pure CSS fixed; no visualViewport/keyboard JS. */}
       {isMobile && (
         <Paper
           elevation={3}
@@ -297,6 +300,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </BottomNavigation>
         </Paper>
       )}
-    </Box>
+    </>
   );
 }
