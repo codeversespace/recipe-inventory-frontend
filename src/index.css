@@ -114,6 +114,10 @@ code {
   outline-offset: 2px;
   border-radius: 4px;
 }
+.recharts-wrapper:focus, .recharts-surface:focus,
+.recharts-wrapper:focus-visible, .recharts-surface:focus-visible,
+svg:focus, svg:focus-visible { outline: none; }
+svg rect:focus, svg rect:focus-visible { outline: none; }
 
 /* iPhone safe-area helper */
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
