@@ -138,23 +138,23 @@ export const Dashboard = () => {
     {
       label: "Total sales",
       value: formatMoney(data.revenue),
-      color: "#e5e5e5",
+      color: "text.primary",
       sparkData: revenueSparkline,
-      sparkColor: "#22c55e",
+      sparkColor: "success.main",
     },
     {
       label: "Profit",
       value: formatMoney(data.profit),
-      color: data.profit >= 0 ? "#22c55e" : "#ef4444",
+      color: data.profit >= 0 ? "success.main" : "error.main",
       sparkData: profitSparkline,
-      sparkColor: data.profit >= 0 ? "#22c55e" : "#ef4444",
+      sparkColor: data.profit >= 0 ? "success.main" : "error.main",
     },
     {
       label: "Net cash",
       value: formatMoney(netCash),
-      color: netCash >= 0 ? "#22c55e" : "#ef4444",
+      color: netCash >= 0 ? "success.main" : "error.main",
       sparkData: cashSparkline,
-      sparkColor: netCash >= 0 ? "#22c55e" : "#ef4444",
+      sparkColor: netCash >= 0 ? "success.main" : "error.main",
     },
   ];
 
@@ -167,14 +167,14 @@ export const Dashboard = () => {
 
       {/* Attention banner */}
       {attentionItems.length > 0 && (
-        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 2, p: 1.5, borderRadius: 1, bgcolor: "#2d1215", border: "1px solid #5c1a1a" }}>
+        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 2, p: 1.5, borderRadius: 1, bgcolor: "error.light", border: 1, borderColor: "error.main" }}>
           {attentionItems.map((item) => (
             <Box key={item.title} sx={{ minWidth: 220 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: "#fca5a5" }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: "error.main" }}>
                 <WarnIcon sx={{ fontSize: "0.9rem", mr: 0.5, verticalAlign: "text-bottom" }} />
                 {item.title}
               </Typography>
-              <Typography variant="caption" sx={{ color: "#f87171" }}>{item.detail}</Typography>
+              <Typography variant="caption" color="text.secondary">{item.detail}</Typography>
             </Box>
           ))}
         </Box>
@@ -194,9 +194,9 @@ export const Dashboard = () => {
               setEndDate(range.end);
             }} sx={{
               minWidth: "auto", px: 2, py: 0.5, fontSize: "0.75rem", borderRadius: 20,
-              color: preset === value ? "#fff" : "text.secondary",
-              bgcolor: preset === value ? "#333" : "transparent",
-              "&:hover": { bgcolor: preset === value ? "#333" : "#1a1a1a" },
+              color: preset === value ? "primary.contrastText" : "text.secondary",
+              bgcolor: preset === value ? "primary.main" : "transparent",
+              "&:hover": { bgcolor: preset === value ? "primary.main" : "action.hover" },
             }}>{label}</Button>
           ))}
         </Stack>
@@ -208,7 +208,7 @@ export const Dashboard = () => {
       {/* Hero KPI row */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 3 }}>
         {heroCards.map((card) => (
-          <Card key={card.label} sx={{ bgcolor: "#141414", borderColor: "#262626" }}>
+          <Card key={card.label} sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
             <CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
               <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>{card.label}</Typography>
               <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "2rem" }, color: card.color, mb: 1 }}>{card.value}</Typography>
@@ -221,43 +221,43 @@ export const Dashboard = () => {
       {/* Sales and suppliers */}
       <SectionLabel>Sales and suppliers</SectionLabel>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 2, sm: 3 }, mb: 1 }}>
-        <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="#22c55e" />
-        <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="#ef4444" />
-        <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="#e5e5e5" />
-        <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="#ef4444" />
+        <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" />
+        <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" />
+        <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" />
+        <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" />
       </Box>
 
       {/* Employees and cost */}
       <SectionLabel>Employees and cost</SectionLabel>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 2, sm: 3 }, mb: 1 }}>
-        <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="#e5e5e5" />
-        <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="#ef4444" />
-        <StatItem icon={<CartIcon />} label="Cost of goods sold" value={formatMoney(data.cost)} color="#e5e5e5" />
-        <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="#e5e5e5" />
+        <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" />
+        <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" />
+        <StatItem icon={<CartIcon />} label="Cost of goods sold" value={formatMoney(data.cost)} color="text.primary" />
+        <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" />
       </Box>
 
       {/* Cash flow this period */}
       <SectionLabel>Cash flow this period</SectionLabel>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 2, sm: 3 }, mb: 1 }}>
-        <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="#22c55e" />
-        <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="#ef4444" />
+        <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" />
+        <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" />
       </Box>
 
       {/* Charts Row */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card sx={{ bgcolor: "#141414", borderColor: "#262626" }}>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales & Profit Trend</Typography>
             {trendData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#737373" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#737373" }} />
-                  <RechartsTooltip contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8, color: "#e5e5e5" }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "#a0a0a0" }} />
-                  <Line type="monotone" dataKey="Revenue" stroke="#0f766e" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Profit" stroke="#22c55e" strokeWidth={2} dot={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="divider" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="Revenue" stroke="primary.main" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Profit" stroke="success.main" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -268,7 +268,7 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card sx={{ bgcolor: "#141414", borderColor: "#262626" }}>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales by Product</Typography>
             {productData.length > 0 ? (
@@ -289,8 +289,8 @@ export const Dashboard = () => {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8, color: "#e5e5e5" }} />
-                  <Legend wrapperStyle={{ fontSize: 10, color: "#a0a0a0" }} />
+                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -304,19 +304,19 @@ export const Dashboard = () => {
 
       {/* Cost vs Revenue & Margin % Trend */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card sx={{ bgcolor: "#141414", borderColor: "#262626" }}>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cost vs Sales</Typography>
             {costRevenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={costRevenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#737373" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#737373" }} />
-                  <RechartsTooltip contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8, color: "#e5e5e5" }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "#a0a0a0" }} />
-                  <Bar dataKey="Cost" fill="#f97316" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Revenue" fill="#0f766e" radius={[3, 3, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="divider" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Cost" fill="secondary.main" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Revenue" fill="primary.main" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -327,18 +327,18 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card sx={{ bgcolor: "#141414", borderColor: "#262626" }}>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Margin % Trend</Typography>
             {marginData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={marginData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#737373" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#737373" }} unit="%" />
-                  <RechartsTooltip contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: 8, color: "#e5e5e5" }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: "#a0a0a0" }} />
-                  <Line type="monotone" dataKey="Margin %" stroke="#a855f7" strokeWidth={2} dot={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="divider" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="Margin %" stroke="info.main" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -352,7 +352,7 @@ export const Dashboard = () => {
 
       {/* Operations & Alerts */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card sx={{ bgcolor: "#141414", borderColor: "#262626" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Sales: {data.invoice_count} invoices | Paid: {formatMoney(data.paid)}</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {formatMoney(data.avg_batch_cost)}</Typography>
@@ -385,7 +385,7 @@ export const Dashboard = () => {
             </Box>
           )}
         </CardContent></Card>
-        <Card sx={{ bgcolor: "#141414", borderColor: "#262626" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Low stock: {data.low_stock_count} | Out of stock: {data.out_of_stock_count}</Typography>
           <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Missing selling price: {data.missing_price_count}</Typography>
@@ -398,7 +398,7 @@ export const Dashboard = () => {
       </Box>
 
       {/* Top Products Table */}
-      <Card sx={{ mt: 2, bgcolor: "#141414", borderColor: "#262626" }}>
+      <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
         <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Products</Typography>
           <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
@@ -416,7 +416,7 @@ export const Dashboard = () => {
       </Card>
 
       {/* Top Customers Table */}
-      <Card sx={{ mt: 2, bgcolor: "#141414", borderColor: "#262626" }}>
+      <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
         <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Customers</Typography>
           <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
@@ -429,13 +429,13 @@ export const Dashboard = () => {
               <TableRow
                 key={customer.customer_id}
                 hover
-                sx={{ cursor: "pointer", "&:hover": { bgcolor: "#1a1a1a" } }}
+                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
                 onClick={() => navigate(`/customers/${customer.customer_id}`)}
               >
                 <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{customer.name}</TableCell>
                 <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.revenue)}</TableCell>
                 <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.cost)}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "#22c55e" : "#ef4444" }}>{formatMoney(customer.profit)}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "success.main" : "error.main" }}>{formatMoney(customer.profit)}</TableCell>
               </TableRow>
             ))}
             {(!data.top_customers || data.top_customers.length === 0) && (

@@ -10,14 +10,14 @@ export type StatusKind =
   | "inactive"
   | "default";
 
-const KIND_TO_COLOR: Record<StatusKind, "success" | "warning" | "error" | "info" | "default"> = {
-  success: "success",
-  warning: "warning",
-  error: "error",
-  info: "info",
-  pending: "warning",
-  inactive: "default",
-  default: "default",
+const STATUS_CONFIG: Record<StatusKind, { color: "success" | "warning" | "error" | "info" | "default"; bgKey: string }> = {
+  success: { color: "success", bgKey: "success.light" },
+  warning: { color: "warning", bgKey: "warning.light" },
+  error: { color: "error", bgKey: "error.light" },
+  info: { color: "info", bgKey: "info.light" },
+  pending: { color: "warning", bgKey: "warning.light" },
+  inactive: { color: "default", bgKey: "grey.200" },
+  default: { color: "default", bgKey: "grey.200" },
 };
 
 type StatusChipProps = {
@@ -26,14 +26,23 @@ type StatusChipProps = {
   icon?: React.ReactElement;
 };
 
-/** Single consistent status indicator. Never color-only text. */
-export const StatusChip = ({ status, label, icon }: StatusChipProps) => (
-  <Chip
-    label={label}
-    icon={icon}
-    color={KIND_TO_COLOR[status]}
-    variant="outlined"
-    size="small"
-    sx={{ height: 24, fontSize: "0.75rem", fontWeight: 600 }}
-  />
-);
+/** Single consistent status indicator with filled 15%-opacity background. */
+export const StatusChip = ({ status, label, icon }: StatusChipProps) => {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <Chip
+      label={label}
+      icon={icon}
+      color={cfg.color}
+      size="small"
+      sx={{
+        height: 22,
+        fontSize: "0.7rem",
+        fontWeight: 600,
+        bgcolor: cfg.bgKey,
+        border: "none",
+        "& .MuiChip-label": { px: 0.75 },
+      }}
+    />
+  );
+};

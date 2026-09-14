@@ -237,7 +237,7 @@ export const Orders = () => {
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{line.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {line.quantity} × ₹{line.unit_price} = ₹{(Number(line.quantity) * Number(line.unit_price)).toFixed(0)}
-                    {shortage > 0 && <span style={{ color: "#d32f2f", fontWeight: 600 }}> · {shortage} short</span>}
+                    {shortage > 0 && <span style={{ color: "inherit", fontWeight: 600, opacity: 0.7 }}> · {shortage} short</span>}
                   </Typography>
                 </Box>
                 <Button size="small" color="error" onClick={() => setLines(lines.filter((_, idx) => idx !== i))}>Remove</Button>
