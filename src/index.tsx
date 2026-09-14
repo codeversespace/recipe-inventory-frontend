@@ -1,14 +1,25 @@
-// src/index.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { ThemeModeProvider, useThemeMode } from "./contexts/ThemeModeContext";
+import CssBaseline from "@mui/material/CssBaseline";
 import "./index.css";
 import { AuthProvider } from "./auth/AuthContext";
 
 const queryClient = new QueryClient();
-const theme = createTheme({
+
+const sharedComponents = {
+  MuiButton: { styleOverrides: { root: { borderRadius: 8 } } },
+  MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8 }, input: { fontSize: "1rem" } } },
+  MuiInputBase: { styleOverrides: { input: { fontSize: "1rem" } } },
+  MuiSelect: { styleOverrides: { select: { fontSize: "1rem" } } },
+  MuiAutocomplete: { styleOverrides: { inputRoot: { fontSize: "1rem" } } },
+  MuiChip: { styleOverrides: { root: { borderRadius: 6 } } },
+};
+
+const darkTheme = createTheme({
   palette: {
     mode: "dark",
     primary: { main: "#0f766e" },
@@ -25,17 +36,12 @@ const theme = createTheme({
   shape: { borderRadius: 12 },
   typography: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", h4: { letterSpacing: "-0.04em" }, button: { fontWeight: 700, textTransform: "none" } },
   components: {
+    ...sharedComponents,
     MuiCssBaseline: { styleOverrides: { body: { backgroundColor: "#0a0a0a" } } },
     MuiPaper: { styleOverrides: { root: { boxShadow: "none", backgroundImage: "none", backgroundColor: "#141414", borderColor: "#262626", borderWidth: 1, borderStyle: "solid" } } },
     MuiCard: { styleOverrides: { root: { boxShadow: "none", backgroundImage: "none", backgroundColor: "#141414", borderColor: "#262626", borderWidth: 1, borderStyle: "solid" } } },
     MuiTableCell: { styleOverrides: { head: { fontWeight: 750, color: "#a0a0a0", background: "#1a1a1a", borderColor: "#262626" }, body: { borderColor: "#262626" } } },
     MuiTableRow: { styleOverrides: { root: { borderColor: "#262626" } } },
-    MuiButton: { styleOverrides: { root: { borderRadius: 8 } } },
-    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 8, borderColor: "#333" }, input: { fontSize: "1rem" } } },
-    MuiInputBase: { styleOverrides: { input: { fontSize: "1rem" } } },
-    MuiSelect: { styleOverrides: { select: { fontSize: "1rem" } } },
-    MuiAutocomplete: { styleOverrides: { inputRoot: { fontSize: "1rem" } } },
-    MuiChip: { styleOverrides: { root: { borderRadius: 6 } } },
     MuiAppBar: { styleOverrides: { root: { boxShadow: "none", backgroundImage: "none", backgroundColor: "#141414", borderBottom: "1px solid #262626" } } },
     MuiDrawer: { styleOverrides: { paper: { backgroundColor: "#141414", borderRight: "1px solid #262626", backgroundImage: "none" } } },
     MuiDialog: { styleOverrides: { paper: { backgroundColor: "#1a1a1a", backgroundImage: "none" } } },
@@ -45,10 +51,56 @@ const theme = createTheme({
   },
 });
 
+const lightTheme = createTheme({
+  palette: {
+    mode: "light",
+    primary: { main: "#0f766e" },
+    secondary: { main: "#c2540a" },
+    background: { default: "#f7f7f5", paper: "#ffffff" },
+    text: { primary: "#171717", secondary: "#5c5c5c" },
+    error: { main: "#dc2626", light: "#fee2e2" },
+    success: { main: "#16a34a", light: "#dcfce7" },
+    warning: { main: "#d97706", light: "#fef3c7" },
+    info: { main: "#2563eb", light: "#dbeafe" },
+    grey: { 50: "#fafafa", 100: "#f2f2f0", 200: "#e8e8e5", 300: "#d9d9d5", 400: "#b3b3ad", 500: "#8a8a83", 600: "#666660", 700: "#4d4d47", 800: "#33332f", 900: "#1a1a17" },
+    divider: "#e5e5e2",
+  },
+  shape: { borderRadius: 12 },
+  typography: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", h4: { letterSpacing: "-0.04em" }, button: { fontWeight: 700, textTransform: "none" } },
+  components: {
+    ...sharedComponents,
+    MuiCssBaseline: { styleOverrides: { body: { backgroundColor: "#f7f7f5" } } },
+    MuiPaper: { styleOverrides: { root: { boxShadow: "none", backgroundImage: "none", backgroundColor: "#ffffff", borderColor: "#e5e5e2", borderWidth: 1, borderStyle: "solid" } } },
+    MuiCard: { styleOverrides: { root: { boxShadow: "none", backgroundImage: "none", backgroundColor: "#ffffff", borderColor: "#e5e5e2", borderWidth: 1, borderStyle: "solid" } } },
+    MuiTableCell: { styleOverrides: { head: { fontWeight: 750, color: "#5c5c5c", background: "#f2f2f0", borderColor: "#e5e5e2" }, body: { borderColor: "#e5e5e2" } } },
+    MuiTableRow: { styleOverrides: { root: { borderColor: "#e5e5e2" } } },
+    MuiAppBar: { styleOverrides: { root: { boxShadow: "none", backgroundImage: "none", backgroundColor: "#ffffff", borderBottom: "1px solid #e5e5e2", color: "#171717" } } },
+    MuiDrawer: { styleOverrides: { paper: { backgroundColor: "#ffffff", borderRight: "1px solid #e5e5e2", backgroundImage: "none" } } },
+    MuiDialog: { styleOverrides: { paper: { backgroundColor: "#ffffff", backgroundImage: "none" } } },
+    MuiTab: { styleOverrides: { root: { color: "#5c5c5c" } } },
+    MuiBottomNavigation: { styleOverrides: { root: { backgroundColor: "#ffffff", borderTop: "1px solid #e5e5e2" } } },
+    MuiBottomNavigationAction: { styleOverrides: { root: { color: "#8a8a83" }, selected: { color: "#171717" } } },
+  },
+});
+
+const ThemeAwareApp = () => {
+  const { mode } = useThemeMode();
+  return (
+    <ThemeProvider theme={mode === "dark" ? darkTheme : lightTheme}>
+      <CssBaseline />
+      <App />
+    </ThemeProvider>
+  );
+};
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}><QueryClientProvider client={queryClient}>
-      <AuthProvider><App /></AuthProvider>
-    </QueryClientProvider></ThemeProvider>
+    <ThemeModeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <ThemeAwareApp />
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeModeProvider>
   </React.StrictMode>
 );

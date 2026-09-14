@@ -7,92 +7,75 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-x: none;
+  transition: background-color 0.2s, color 0.2s;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { min-height: 100%; }
 
-/* Mobile optimizations */
+/* Mobile optimizations + G8b font reductions */
 @media (max-width: 600px) {
-  /* Prevent sideways page scroll WITHOUT breaking position:fixed on iOS.
-     overflow-x:hidden turns body/html into a scroll container in WebKit, so
-     fixed descendants (bottom navbar) attach to the document and scroll with
-     the page after keyboard open/dismiss. overflow-x:clip clips identically
-     but creates no scroll container, keeping the viewport as the containing
-     block for fixed elements. The hidden declaration is a fallback for
-     browsers without clip support. */
   html, body { overflow-x: hidden; overflow-x: clip; }
   body { -webkit-text-size-adjust: 100%; }
 
-  /* Tables - horizontal scroll */
   .MuiTableContainer-root { max-width: 100vw; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .MuiTable-root { white-space: nowrap; }
 
-  /* Typography - smaller on mobile */
-  .MuiTypography-h4 { font-size: 1.4rem !important; line-height: 1.2; font-weight: 700; }
-  .MuiTypography-h5 { font-size: 1.15rem !important; line-height: 1.25; }
-  .MuiTypography-h6 { font-size: 0.95rem !important; line-height: 1.3; }
-  .MuiTypography-subtitle2 { font-size: 0.8rem !important; }
+  /* G8b: reduced mobile typography */
+  .MuiTypography-h4 { font-size: 1.05rem !important; line-height: 1.2; font-weight: 700; }
+  .MuiTypography-h5 { font-size: 1rem !important; line-height: 1.25; }
+  .MuiTypography-h6 { font-size: 0.9rem !important; line-height: 1.3; }
+  .MuiTypography-subtitle2 { font-size: 0.75rem !important; }
+  .MuiTypography-body2 { font-size: 0.8rem !important; }
+  .MuiTypography-caption { font-size: 0.65rem !important; }
 
-  /* Buttons - touch-friendly (44px minimum) */
   .MuiButton-root { min-height: 40px; font-size: 0.8rem !important; }
   .MuiButton-contained { min-height: 42px; }
   .MuiButton-sizeSmall { min-height: 34px; padding: 4px 10px !important; }
 
-  /* Cards */
-  .MuiCardContent-root { padding: 12px !important; }
-  .MuiCardContent-root:last-child { padding-bottom: 12px !important; }
+  /* G8b: reduced card padding */
+  .MuiCardContent-root { padding: 10px !important; }
+  .MuiCardContent-root:last-child { padding-bottom: 10px !important; }
   .MuiCard-root { border-radius: 10px !important; }
 
-  /* Dialogs - full width on mobile */
   .MuiDialog-paper { margin: 8px !important; width: calc(100% - 16px) !important; border-radius: 12px !important; max-height: calc(100vh - 16px) !important; }
-  .MuiDialogTitle-root { padding: 12px 16px !important; font-size: 1rem !important; }
+  .MuiDialogTitle-root { padding: 12px 16px !important; font-size: 0.95rem !important; }
   .MuiDialogContent-root { padding: 8px 16px !important; }
   .MuiDialogActions-root { padding: 8px 16px 12px !important; }
 
-  /* Text fields - compact */
   .MuiTextField-root { margin-bottom: 4px; }
-  /* Prevent iOS Safari auto-zoom on focus: editable text must be >= 16px.
-     Labels/helper text keep their compact sizes below. */
   .MuiInputBase-input,
   .MuiSelect-select,
   input,
   textarea,
   select { font-size: 16px !important; }
-  .MuiInputLabel-root { font-size: 0.8rem !important; }
+  .MuiInputLabel-root { font-size: 0.75rem !important; }
 
-  /* Tables - compact rows */
   .MuiTableCell-root { padding: 6px 8px !important; font-size: 0.75rem !important; }
   .MuiTableHead-root .MuiTableCell-root { font-weight: 700 !important; }
 
-  /* Select value text covered by the 16px input rule above. */
-
-  /* Bottom navigation */
   .MuiBottomNavigation-root { height: 72px !important; }
   .MuiBottomNavigationAction-root { min-width: 48px !important; padding: 6px 0 !important; }
   .MuiBottomNavigationAction-label { font-size: 0.6rem !important; margin-top: 2px; }
   .MuiBottomNavigationAction-label.Mui-selected { font-size: 0.6rem !important; }
 
-  /* Snackbar - bottom offset for bottom nav */
   .MuiSnackbar-root { bottom: 80px !important; }
 
-  /* Tabs - compact */
   .MuiTabs-root { min-height: 36px !important; }
   .MuiTab-root { min-height: 36px !important; padding: 0 12px !important; font-size: 0.75rem !important; }
 
-  /* Scrollbar styling */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 }
 
-/* Tablet - medium screens */
+/* Tablet */
 @media (min-width: 601px) and (max-width: 900px) {
   .MuiTypography-h4 { font-size: 1.6rem !important; }
   .MuiButton-root { min-height: 38px; }
   .MuiTableCell-root { font-size: 0.8rem !important; }
 }
 
-/* Print styles */
+/* Print */
 @media print {
   body { background: white; color: black; }
   .screen-content > *:not(.print-invoice) { display: none !important; }
@@ -105,25 +88,31 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
-/* Design-system baseline: tabular numerals for financial/quantity data */
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 
-/* Visible keyboard focus (mouse users unaffected via :focus-visible) */
 :focus-visible {
   outline: 2px solid #0f766e;
   outline-offset: 2px;
   border-radius: 4px;
 }
+.recharts-wrapper:focus, .recharts-surface:focus,
+.recharts-wrapper:focus-visible, .recharts-surface:focus-visible,
+svg:focus, svg:focus-visible { outline: none; }
+svg rect:focus, svg rect:focus-visible { outline: none; }
 
-/* iPhone safe-area helper */
 .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
 @media (max-width: 600px) {
-  /* Touch targets: 44px effective boxes, icons stay ~20px */
   .MuiIconButton-root { padding: 10px !important; }
   .MuiIconButton-sizeSmall { padding: 10px !important; }
   .MuiButton-root { min-height: 44px; }
   .MuiButton-contained { min-height: 44px; }
   .MuiButton-sizeSmall { min-height: 40px; padding: 6px 12px !important; }
   .MuiCheckbox-root, .MuiRadio-root, .MuiSwitch-root { padding: 10px !important; }
+}
+
+/* G8b: PageHeader mobile reductions */
+@media (max-width: 600px) {
+  .page-header-title { font-size: 1.05rem !important; }
+  .page-header-subtitle { font-size: 0.75rem !important; }
 }

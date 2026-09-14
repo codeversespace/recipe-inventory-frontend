@@ -148,11 +148,11 @@ export const Payments = () => {
                     <stop offset="100%" stopColor="#d32f2f" stopOpacity={0.3} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="divider" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <RechartsTooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="Balance" stroke="#1976d2" strokeWidth={2} fill="url(#balanceGradient)" dot={{ r: 3, fill: "#1976d2" }} />
+                <Area type="monotone" dataKey="Balance" stroke="primary.main" strokeWidth={2} fill="url(#balanceGradient)" dot={{ r: 3, fill: "primary.main" }} />
               </AreaChart>
             </ResponsiveContainer>
             <Box sx={{ display: "flex", gap: 2, mt: 0.5, justifyContent: "center" }}>

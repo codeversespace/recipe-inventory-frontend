@@ -1,4 +1,3 @@
-// src/components/Layout.tsx
 import * as React from "react";
 import {
   AppBar,
@@ -25,7 +24,6 @@ import {
   Dashboard as DashboardIcon,
   ShoppingCart as ShoppingCartIcon,
   ReceiptLong as ReceiptIcon,
-  Assessment as AssessmentIcon,
   People as PeopleIcon,
   Inventory as InventoryIcon,
   Payments as PaymentsIcon,
@@ -40,9 +38,12 @@ import {
   Science as ScienceIcon,
   MenuBook as RecipesIcon,
   Archive as PackingIcon,
+  LightMode as LightModeIcon,
+  DarkMode as DarkModeIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { useThemeMode } from "../contexts/ThemeModeContext";
 
 const drawerWidth = 240;
 
@@ -72,7 +73,7 @@ const navItems: NavItem[] = [
 type BottomTab = { label: string; icon: React.ReactNode; to: string };
 const MORE_TAB: BottomTab = { label: "More", icon: <MenuIcon />, to: "__drawer__" };
 
-/** Max 4 primary destinations + More, derived from the role's real permissions. */
+/** G5: Role-aware bottom nav — 4 primary destinations + More. */
 const roleBottomNav = (role: Role | undefined): BottomTab[] => {
   switch (role) {
     case "inventory":
@@ -93,6 +94,7 @@ const roleBottomNav = (role: Role | undefined): BottomTab[] => {
       return [
         { label: "Produce", icon: <ProductionIcon />, to: "/production" },
         { label: "Process", icon: <ScienceIcon />, to: "/processing" },
+        { label: "Orders", icon: <OrderIcon />, to: "/orders" },
         { label: "Staff", icon: <PeopleIcon />, to: "/employees" },
       ];
     case "packing":
@@ -111,6 +113,7 @@ const roleBottomNav = (role: Role | undefined): BottomTab[] => {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { mode, toggleMode } = useThemeMode();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,7 +138,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const drawer = (
     <div>
       <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
-        <Typography variant="h6" noWrap sx={{ fontSize: { xs: "0.95rem", sm: "1.1rem" } }}>
+        <Typography variant="h6" noWrap sx={{ fontSize: { xs: "0.95rem", sm: "1.1rem" }, fontWeight: 700 }}>
           Recipe Inventory
         </Typography>
       </Toolbar>
@@ -148,7 +151,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             if (item.section && item.section !== lastSection) {
               lastSection = item.section;
               elements.push(
-                <Typography key={`section-${item.section}`} variant="caption" sx={{ display: "block", px: 2, pt: 2, pb: 0.5, fontSize: "0.65rem", fontWeight: 700, color: "text.secondary", letterSpacing: 1, textTransform: "uppercase" }}>
+                <Typography key={`section-${item.section}`} variant="caption" sx={{ display: "block", px: 2, pt: 2.5, pb: 0.75, fontSize: "0.6rem", fontWeight: 800, color: "text.secondary", letterSpacing: 1.5, textTransform: "uppercase" }}>
                   {item.section}
                 </Typography>
               );
@@ -193,7 +196,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <Box sx={{ display: "flex" }}>
       <CssBaseline />
-      {/* Top app bar */}
       <AppBar
         position="fixed"
         sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
@@ -210,14 +212,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <Typography variant="h6" noWrap component="div" sx={{ fontSize: { xs: "0.95rem", sm: "1.25rem" }, fontWeight: 700, flexGrow: 1 }}>
             Recipe Inventory
           </Typography>
-          <Typography variant="body2" sx={{ mr: 1, display: { xs: "none", sm: "block" }, fontSize: "0.8rem" }}>{user?.username}</Typography>
+          <IconButton onClick={toggleMode} color="inherit" sx={{ p: 1 }}>
+            {mode === "dark" ? <LightModeIcon sx={{ fontSize: "1.2rem" }} /> : <DarkModeIcon sx={{ fontSize: "1.2rem" }} />}
+          </IconButton>
+          <Typography variant="body2" sx={{ mx: 1, display: { xs: "none", sm: "block" }, fontSize: "0.8rem" }}>{user?.username}</Typography>
           <Button color="inherit" size="small" onClick={logout} sx={{ display: { xs: "none", sm: "inline-flex" }, fontSize: "0.8rem" }}>Logout</Button>
         </Toolbar>
       </AppBar>
 
-      {/* Drawer (mobile / desktop) */}
       <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
-        {/* Mobile drawer */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -228,9 +231,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
               width: drawerWidth,
-              // Scroll containment: drawer content scrolls natively, but hitting
-              // its top/bottom boundary must not chain scroll to the page behind
-              // (iOS rubber-band scroll leak). Scoped to the temporary drawer only.
               overflowY: "auto",
               overscrollBehavior: "contain",
               WebkitOverflowScrolling: "touch",
@@ -240,7 +240,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {drawer}
         </Drawer>
 
-        {/* Desktop drawer */}
         <Drawer
           variant="permanent"
           sx={{
@@ -253,7 +252,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </Drawer>
       </Box>
 
-      {/* Main content area */}
       <Box
         component="main"
         sx={{
@@ -269,7 +267,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </Box>
 
-      {/* Bottom navigation for mobile */}
       {isMobile && (
         <Paper
           elevation={3}
