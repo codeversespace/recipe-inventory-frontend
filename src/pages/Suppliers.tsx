@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, LinearProgress, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, LinearProgress, ListItemButton, MenuItem, Select, TextField, Typography } from "@mui/material";
 import { Autocomplete } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useState, useMemo } from "react";
@@ -367,12 +367,12 @@ export const Suppliers = () => {
       <CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
         <TextField size="small" placeholder="Search..." fullWidth value={search} onChange={(e) => setSearch(e.target.value)} sx={{ mb: 1, "& .MuiInputBase-root": { fontSize: "0.875rem" } }} />
         <Box sx={{ overflowY: "auto", maxHeight: { xs: 200, md: "calc(100vh - 240px)" } }}>
-          {filtered.map((supplier: any) => <Button key={supplier.id} fullWidth sx={{ justifyContent: "flex-start", py: 0.75, minHeight: 40, fontSize: "0.85rem", color: supplier.id === selectedId ? "primary.main" : "text.primary", bgcolor: supplier.id === selectedId ? "action.selected" : "transparent", textAlign: "left", textTransform: "none" }} onClick={() => setSelectedId(supplier.id)}>
+          {filtered.map((supplier: any) => <ListItemButton key={supplier.id} selected={supplier.id === selectedId} sx={{ py: 0.75, minHeight: 40 }} onClick={() => setSelectedId(supplier.id)}>
             <Box sx={{ width: "100%" }}>
               <Typography sx={{ fontSize: "0.85rem", fontWeight: supplier.id === selectedId ? 700 : 400 }}>{supplier.name}</Typography>
               <Typography sx={{ fontSize: "0.7rem", color: "text.secondary" }}>Due: {formatMoney(supplier.balance_due || 0)} · Paid: {formatMoney(supplier.total_paid || 0)}</Typography>
             </Box>
-          </Button>)}
+          </ListItemButton>)}
           {filtered.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ p: 1, fontSize: "0.8rem" }}>No suppliers found</Typography>}
         </Box>
       </CardContent>

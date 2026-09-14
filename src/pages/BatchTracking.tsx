@@ -3,7 +3,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBatchDetail, usePackTypes, useProductionBatches, useRecipes, useSaleableStock, useStockBatches } from "../hooks/useApi";
-import { EmptyState, ErrorState, PageHeader } from "../components/ui";
+import { EmptyState, ErrorState, ListItemCard, PageHeader } from "../components/ui";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 
@@ -226,33 +226,28 @@ export const BatchTracking = () => {
                     const t = trackByBatch.get(b.id);
                     const isOpen = selectedId === b.id;
                     return (
-                    <Card key={b.id} variant={isOpen ? "elevation" : "outlined"}>
-                      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }} className="tnum">Batch #{b.id}</Typography>
-                            <Typography variant="caption" color="text.secondary">{b.produced_at ? formatDate(b.produced_at) : "—"}</Typography>
-                          </Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: "nowrap" }} className="tnum">{t ? `${t.available} left` : "Not packed"}</Typography>
+                    <Box key={b.id}>
+                      <ListItemCard
+                        title={`Batch #${b.id}`}
+                        subtitle={b.produced_at ? formatDate(b.produced_at) : "—"}
+                        primaryValue={t ? `${t.available} left` : "Not packed"}
+                        status={t ? { kind: t.available > 0 ? "warning" : "success", label: t.available > 0 ? "Available" : "Fully sold" } : undefined}
+                        meta={[
+                          { label: "Packed", value: t ? t.packed : "—" },
+                          { label: "Sold", value: t ? t.allocated : "—" },
+                        ]}
+                        onClick={() => setSelectedId(isOpen ? null : b.id)}
+                      />
+                      <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                        <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+                          {detailLoading || !selected ? (
+                            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress /></Box>
+                          ) : (
+                            <BatchDetailContent selected={selected} item={item} recipe={recipe} />
+                          )}
                         </Box>
-                        <Box sx={{ display: "flex", gap: 2, mt: 1 }} className="tnum">
-                          <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Packed</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{t ? t.packed : "—"}</Typography></Box>
-                          <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Sold</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{t ? t.allocated : "—"}</Typography></Box>
-                        </Box>
-                        <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
-                            {detailLoading || !selected ? (
-                              <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress /></Box>
-                            ) : (
-                              <BatchDetailContent selected={selected} item={item} recipe={recipe} />
-                            )}
-                          </Box>
-                        </Collapse>
-                        <Button fullWidth variant={isOpen ? "contained" : "outlined"} onClick={() => setSelectedId(isOpen ? null : b.id)} aria-label={`View batch ${b.id}`} aria-expanded={isOpen} sx={{ mt: 1.5, minHeight: 44 }}>
-                          {isOpen ? "Hide details" : "View batch"}
-                        </Button>
-                      </CardContent>
-                    </Card>
+                      </Collapse>
+                    </Box>
                     );
                   })}
                 </Stack>

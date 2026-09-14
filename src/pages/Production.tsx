@@ -117,7 +117,7 @@ export const Production = () => {
       ) : batches.length ? (
         <Stack spacing={1.5}>
           {batches.map((batch: any) => (
-            <Card key={batch.id} variant="outlined">
+            <Card key={batch.id} variant="outlined" sx={{ cursor: "pointer", "&:hover": { borderColor: "primary.main" } }} onClick={() => setDetailId(batch.id)}>
               <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
                   <Box sx={{ minWidth: 0 }}>
@@ -133,7 +133,7 @@ export const Production = () => {
                   <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Cost</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{formatMoney(batch.total_cost)}</Typography></Box>
                   <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Cost / unit</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{formatMoney(batch.total_cost / batch.produced_qty)}</Typography></Box>
                 </Box>
-                <Button fullWidth variant="outlined" onClick={() => setDetailId(batch.id)} aria-label={`View batch ${batch.id}`} sx={{ mt: 1.5, minHeight: 44 }}>
+                <Button variant="outlined" size="small" onClick={(e) => { e.stopPropagation(); setDetailId(batch.id); }} aria-label={`View batch ${batch.id}`} sx={{ mt: 1.5, minHeight: 44 }}>
                   View details
                 </Button>
               </CardContent>

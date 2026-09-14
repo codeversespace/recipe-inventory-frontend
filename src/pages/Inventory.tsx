@@ -1,10 +1,8 @@
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Collapse, IconButton, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useMediaQuery, useTheme } from "@mui/material";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useMediaQuery, useTheme } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useAllSupplierPurchases, useBatches, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem, useAppSettings } from "../hooks/useApi";
-import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, Money, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, ListItemCard, Money, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
 import { formatDate } from "../utils/formatDate";
 
@@ -30,10 +28,8 @@ export const Inventory = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [errorMsg, setErrorMsg] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [alertsOpen, setAlertsOpen] = useState({ shortage: false, reorder: false });
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string; type: "saleable" | "ingredient" | "packing" } | null>(null);
-  const toggleExpand = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const deleteMsgs = {
     ingredient: (id: number) => deleteIngredient.mutateAsync({ id, force: true }),
@@ -218,64 +214,30 @@ export const Inventory = () => {
       ) : isMobile ? (
         <Stack spacing={1.5} sx={{ mb: 3 }}>
           {saleableStock.length ? saleableStock.map((item: any) => {
-            const key = `saleable:${item.id}`;
             const demand = orderDemand.find((d: any) => d.stock_item_id === item.id);
             const pendingQty = demand?.total_ordered || 0;
             const shortage = demand?.shortage || 0;
             return (
-              <Card key={item.id} variant="outlined">
-                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name}</Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.25 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">
-                          {item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography>
-                        </Typography>
-                        {saleableStatus(item)}
-                      </Box>
-                    </Box>
-                    <OverflowMenu
-                      actions={[
-                        ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "saleable" as const }), danger: true }] : []),
-                      ]}
-                    />
-                  </Box>
-                  {isProduced(item)
-                    ? productionSnapshot(item)
-                    : priceSnapshot(item.name, "manual", item.cost_per_unit, item.unit)}
-                  <Collapse in={!!expanded[key]} timeout="auto" unmountOnExit>
-                    <Box sx={{ display: "flex", gap: 2, mt: 1, flexWrap: "wrap" }}>
-                      <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Cost</Typography><Typography variant="body2" className="tnum"><Money value={item.cost_per_unit} /></Typography></Box>
-                      <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Price</Typography><Typography variant="body2" className="tnum"><Money value={item.unit_price} /></Typography></Box>
-                      <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Margin</Typography><Typography variant="body2">{marginChip(item)}</Typography></Box>
-                      {!orderDemandLoading && (pendingQty > 0 || shortage > 0) && (
-                        <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Orders</Typography><Typography variant="body2" className="tnum">{shortage > 0 ? `${shortage} short` : `${pendingQty} ordered`}</Typography></Box>
-                      )}
-                    </Box>
-                  </Collapse>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                    <IconButton
-                      size="small"
-                      aria-label={expanded[key] ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
-                      aria-expanded={!!expanded[key]}
-                      onClick={() => toggleExpand(key)}
-                      sx={{ minWidth: 44 }}
-                    >
-                      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                    </IconButton>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => goTracking(item.id)}
-                      aria-label={`View batch tracking for ${item.name}`}
-                      sx={{ minHeight: 36, fontSize: "0.8125rem" }}
-                    >
-                      View Batch Tracking
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
+              <ListItemCard
+                key={item.id}
+                title={item.name}
+                primaryValue={<>{item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography></>}
+                status={orderDemandLoading ? undefined : (shortage > 0 ? { kind: "error", label: `Short by ${shortage}` } : pendingQty > 0 ? { kind: "info", label: `${pendingQty} ordered` } : { kind: "success", label: "In stock" })}
+                meta={[
+                  { label: "Cost", value: <Money value={item.cost_per_unit} /> },
+                  { label: "Price", value: <Money value={item.unit_price} /> },
+                  { label: "Margin", value: marginChip(item) },
+                  ...(!orderDemandLoading && (pendingQty > 0 || shortage > 0) ? [{ label: "Orders", value: <>{shortage > 0 ? `${shortage} short` : `${pendingQty} ordered`}</> }] : []),
+                ]}
+                actions={
+                  <OverflowMenu
+                    actions={[
+                      ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "saleable" as const }), danger: true }] : []),
+                    ]}
+                  />
+                }
+                onClick={() => (isProduced(item) ? goTracking(item.id) : goCompare(item.name, "manual"))}
+              />
             );
           }) : <EmptyState title="No saleable goods in stock." message="Purchased goods and packed production will appear here." />}
         </Stack>
@@ -369,55 +331,25 @@ export const Inventory = () => {
       ) : isMobile ? (
         <Stack spacing={1.5} sx={{ mb: 2 }}>
           {rawMaterials.length ? rawMaterials.map((item: any) => {
-            const key = `raw:${item.id}`;
             return (
-              <Card key={item.id} variant="outlined">
-                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name}</Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.25 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">
-                          {item.on_hand_qty} <Typography component="span" variant="caption" color="text.secondary">{item.base_unit}</Typography>
-                        </Typography>
-                        <StatusChip status={item.is_low_stock ? "error" : "success"} label={item.is_low_stock ? "Low stock" : "In stock"} />
-                      </Box>
-                    </Box>
-                    <OverflowMenu
-                      actions={[
-                        ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "ingredient" as const }), danger: true }] : []),
-                      ]}
-                    />
-                  </Box>
-                  {priceSnapshot(item.name, "ingredient", item.avg_unit_price, item.base_unit)}
-                  <Collapse in={!!expanded[key]} timeout="auto" unmountOnExit>
-                    <Box sx={{ display: "flex", gap: 2, mt: 1, flexWrap: "wrap" }}>
-                      <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Avg cost</Typography><Typography variant="body2" className="tnum"><Money value={item.avg_unit_price} /></Typography></Box>
-                      <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Reorder at</Typography><Typography variant="body2" className="tnum">{item.min_stock > 0 ? `${item.min_stock} ${item.base_unit}` : "—"}</Typography></Box>
-                    </Box>
-                  </Collapse>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                    <IconButton
-                      size="small"
-                      aria-label={expanded[key] ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
-                      aria-expanded={!!expanded[key]}
-                      onClick={() => toggleExpand(key)}
-                      sx={{ minWidth: 44 }}
-                    >
-                      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                    </IconButton>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => goCompare(item.name, "ingredient")}
-                      aria-label={`View price comparison for ${item.name}`}
-                      sx={{ minHeight: 36, fontSize: "0.8125rem" }}
-                    >
-                      View Price Comparison
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
+              <ListItemCard
+                key={item.id}
+                title={item.name}
+                primaryValue={<>{item.on_hand_qty} <Typography component="span" variant="caption" color="text.secondary">{item.base_unit}</Typography></>}
+                status={{ kind: item.is_low_stock ? "error" : "success", label: item.is_low_stock ? "Low stock" : "In stock" }}
+                meta={[
+                  { label: "Avg cost", value: <Money value={item.avg_unit_price} /> },
+                  { label: "Reorder at", value: <>{item.min_stock > 0 ? `${item.min_stock} ${item.base_unit}` : "—"}</> },
+                ]}
+                actions={
+                  <OverflowMenu
+                    actions={[
+                      ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "ingredient" as const }), danger: true }] : []),
+                    ]}
+                  />
+                }
+                onClick={() => goCompare(item.name, "ingredient")}
+              />
             );
           }) : <EmptyState title="No raw materials recorded." message="Record a raw-material purchase to stock items here." />}
         </Stack>
@@ -495,54 +427,24 @@ export const Inventory = () => {
       ) : isMobile ? (
         <Stack spacing={1.5}>
           {packingMaterials.length ? packingMaterials.map((item: any) => {
-            const key = `packing:${item.id}`;
             return (
-              <Card key={item.id} variant="outlined">
-                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name}</Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.25 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum" color={item.qty <= 0 ? "error.main" : "text.primary"}>
-                          {item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography>
-                        </Typography>
-                        <StatusChip status={item.qty <= 0 ? "error" : "success"} label={item.qty <= 0 ? "Out of stock" : "In stock"} />
-                      </Box>
-                    </Box>
-                    <OverflowMenu
-                      actions={[
-                        ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "packing" as const }), danger: true }] : []),
-                      ]}
-                    />
-                  </Box>
-                  {priceSnapshot(item.name, "manual", item.unit_price, item.unit)}
-                  <Collapse in={!!expanded[key]} timeout="auto" unmountOnExit>
-                    <Box sx={{ display: "flex", gap: 2, mt: 1, flexWrap: "wrap" }}>
-                      <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Unit cost</Typography><Typography variant="body2" className="tnum"><Money value={item.unit_price} /></Typography></Box>
-                    </Box>
-                  </Collapse>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                    <IconButton
-                      size="small"
-                      aria-label={expanded[key] ? `Hide details for ${item.name}` : `Show details for ${item.name}`}
-                      aria-expanded={!!expanded[key]}
-                      onClick={() => toggleExpand(key)}
-                      sx={{ minWidth: 44 }}
-                    >
-                      {expanded[key] ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                    </IconButton>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => goCompare(item.name, "manual")}
-                      aria-label={`View price comparison for ${item.name}`}
-                      sx={{ minHeight: 36, fontSize: "0.8125rem" }}
-                    >
-                      View Price Comparison
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
+              <ListItemCard
+                key={item.id}
+                title={item.name}
+                primaryValue={<>{item.qty} <Typography component="span" variant="caption" color="text.secondary">{item.unit}</Typography></>}
+                status={{ kind: item.qty <= 0 ? "error" : "success", label: item.qty <= 0 ? "Out of stock" : "In stock" }}
+                meta={[
+                  { label: "Unit cost", value: <Money value={item.unit_price} /> },
+                ]}
+                actions={
+                  <OverflowMenu
+                    actions={[
+                      ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "packing" as const }), danger: true }] : []),
+                    ]}
+                  />
+                }
+                onClick={() => goCompare(item.name, "manual")}
+              />
             );
           }) : <EmptyState title="No packing materials recorded." message="Record a packing-material purchase to stock items here." />}
         </Stack>

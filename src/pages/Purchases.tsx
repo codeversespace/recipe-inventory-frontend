@@ -3,12 +3,11 @@ import {
   Autocomplete,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
+  Fab,
   TextField,
   Select,
   MenuItem,
@@ -24,15 +23,12 @@ import {
   Typography,
   Checkbox,
   Chip,
-  Collapse,
   FormControlLabel,
-  IconButton,
   Stack,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
+import AddIcon from "@mui/icons-material/Add";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
   useAllSupplierPurchases,
@@ -45,13 +41,14 @@ import {
   useAddIngredient,
   useAddManualStock,
 } from "../hooks/useApi";
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
 import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormActions, FormSection, Money, OverflowMenu, PageHeader, TableSkeleton } from "../components/ui";
+import { ListItemCard } from "../components/ui/ListItemCard";
 
 export const Purchases = () => {
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
@@ -66,7 +63,6 @@ export const Purchases = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [pageError, setPageError] = useState("");
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilter = searchParams.get("item") || "";
@@ -93,6 +89,7 @@ export const Purchases = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [paymentReference, setPaymentReference] = useState("");
+  const purchaseQtyRef = React.useRef<HTMLInputElement>(null);
 
   const resetForm = () => {
     setOpen(false);
@@ -313,55 +310,36 @@ export const Purchases = () => {
       ) : visiblePurchases.length ? (
         isMobile ? (
           <Stack spacing={1.5}>
-            {visiblePurchases.map((p: any) => {
-              const open = !!expanded[p.id];
-              return (
-                <Card key={p.id} variant="outlined">
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{p.supplier_name || "—"}</Typography>
-                        <Typography variant="caption" color="text.secondary">{formatDate(p.purchased_at)} · {p.item_name}</Typography>
-                      </Box>
-                      <Typography variant="h6" sx={{ fontWeight: 700, whiteSpace: "nowrap" }} className="tnum"><Money value={p.total_amount} /></Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }} className="tnum">
-                      {p.quantity} {p.unit} · {catLabel(p.category)}{p.reference ? ` · ${p.reference}` : ""}
-                    </Typography>
-                    <Collapse in={open} timeout="auto" unmountOnExit>
-                      <Box sx={{ display: "flex", gap: 2, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
-                        <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Unit price</Typography><Typography variant="body2" className="tnum"><Money value={p.unit_price} /></Typography></Box>
-                        <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Price trend</Typography>
-                          <ResponsiveContainer width={80} height={24}>
-                            <LineChart data={(priceHistory[p.item_name] || []).slice(-5)}>
-                              <Line type="monotone" dataKey="price" stroke="#1976d2" strokeWidth={1.5} dot={false} />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </Box>
-                      </Box>
-                    </Collapse>
-                    <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-                      <IconButton
-                        size="small"
-                        aria-label={open ? `Hide details for purchase ${p.id}` : `Show details for purchase ${p.id}`}
-                        aria-expanded={open}
-                        onClick={() => setExpanded((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
-                        sx={{ minWidth: 44 }}
-                      >
-                        {open ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                      </IconButton>
-                      <OverflowMenu
-                        ariaLabel={`Purchase ${p.id} actions`}
-                        actions={[
-                          { label: "Edit", onClick: () => handleEdit(p) },
-                          { label: "Delete", danger: true, onClick: () => setDeleteTarget(p) },
-                        ]}
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {visiblePurchases.map((p: any) => (
+              <ListItemCard
+                key={p.id}
+                title={p.supplier_name || "—"}
+                subtitle={`${formatDate(p.purchased_at)} · ${p.item_name}`}
+                primaryValue={<Money value={p.total_amount} />}
+                meta={[
+                  { label: "Unit price", value: <Money value={p.unit_price} /> },
+                  { label: "Quantity", value: `${p.quantity} ${p.unit}` },
+                  { label: "Category", value: catLabel(p.category) },
+                  ...(p.reference ? [{ label: "Reference", value: p.reference }] : []),
+                  { label: "Price trend", value: (
+                    <ResponsiveContainer width={80} height={24}>
+                      <LineChart data={(priceHistory[p.item_name] || []).slice(-5)}>
+                        <Line type="monotone" dataKey="price" stroke="#1976d2" strokeWidth={1.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) },
+                ]}
+                actions={
+                  <OverflowMenu
+                    ariaLabel={`Purchase ${p.id} actions`}
+                    actions={[
+                      { label: "Edit", onClick: () => handleEdit(p) },
+                      { label: "Delete", danger: true, onClick: () => setDeleteTarget(p) },
+                    ]}
+                  />
+                }
+              />
+            ))}
           </Stack>
         ) : (
         <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
@@ -491,6 +469,7 @@ export const Purchases = () => {
                     const found = manualStockItems.find((m: any) => m.name === newValue && m.category === category);
                     if (found) setUnit(found.unit);
                   }
+                  setTimeout(() => purchaseQtyRef.current?.focus(), 100);
                 }
                 setFormError("");
               }}
@@ -502,7 +481,7 @@ export const Purchases = () => {
             />
           )}
           <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" }, mt: 1 }}>
-            <TextField margin="dense" label="Quantity" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={qty} onChange={(e) => setQty(e.target.value)} error={!!fieldError("valid quantity")} helperText={fieldError("valid quantity")} sx={{ flex: { sm: 1 } }} />
+            <TextField margin="dense" label="Quantity" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} inputRef={purchaseQtyRef} fullWidth value={qty} onChange={(e) => setQty(e.target.value)} error={!!fieldError("valid quantity")} helperText={fieldError("valid quantity")} sx={{ flex: { sm: 1 } }} />
             <TextField margin="dense" label="Unit" fullWidth value={unit} onChange={(e) => setUnit(e.target.value)} sx={{ flex: { sm: "0 0 120px" } }} />
             <TextField margin="dense" label="Unit Price (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={price} onChange={(e) => setPrice(e.target.value)} error={!!fieldError("valid unit price")} helperText={fieldError("valid unit price")} sx={{ flex: { sm: 1 } }} />
           </Box>
@@ -577,6 +556,14 @@ export const Purchases = () => {
           }
         }}
       />
+      <Fab
+        color="primary"
+        aria-label="Add Purchase"
+        sx={{ position: "fixed", bottom: { xs: 80, sm: 24 }, right: 24, zIndex: 1000 }}
+        onClick={() => { resetForm(); setOpen(true); }}
+      >
+        <AddIcon />
+      </Fab>
     </Box>
   );
 };

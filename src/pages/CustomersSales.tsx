@@ -1,11 +1,12 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, Checkbox, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, IconButton, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
-import { useEffect, useState } from "react";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, Checkbox, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Fab, FormControl, FormControlLabel, IconButton, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAddCustomer, useAddSale, useCustomerPrices, useCustomerProfile, useCustomers, useSaleableStock, useStockBatches, useUpdateCustomer, useSales } from "../hooks/useApi";
 import { VoiceInput } from "../components/VoiceInput";
 import { EmptyState, ErrorState, FormActions, FormSection, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ListItemCard } from "../components/ui/ListItemCard";
 import { bestMatch } from "../utils/fuzzy";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
@@ -22,7 +23,7 @@ export const CustomersSales = () => {
   const { data: sales = [], isLoading: salesLoading, error: salesError, refetch: refetchSales } = useSales();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const [expandedSale, setExpandedSale] = useState<Record<number, boolean>>({});
+
   const addCustomer = useAddCustomer();
   const updateCustomer = useUpdateCustomer();
   const addSale = useAddSale();
@@ -52,6 +53,7 @@ export const CustomersSales = () => {
     return s + (Number.isFinite(n) && n > 0 ? n : 0);
   }, 0);
   const allocTarget = Number(saleQty) || 0;
+  const saleQtyRef = React.useRef<HTMLInputElement>(null);
   const [saleError, setSaleError] = useState("");
   const [customerError, setCustomerError] = useState("");
   const [profileId, setProfileId] = useState(0);
@@ -203,47 +205,31 @@ export const CustomersSales = () => {
       ) : sales.length ? (
         <Stack spacing={1.5}>
           {sales.map((sale: any) => {
-            const open = !!expandedSale[sale.id];
+            const hasDue = sale.amount_due > 0;
+            const metaItems = [
+              { label: "Paid", value: formatMoney(sale.amount_paid) },
+              ...(hasDue ? [{ label: "Due", value: formatMoney(sale.amount_due) }] : []),
+              ...sale.lines.map((line: any) => ({
+                label: line.item_name || line.recipe_name,
+                value: `× ${line.quantity} · ${formatMoney(line.line_total)}`
+              }))
+            ];
             return (
-              <Card key={sale.id} variant="outlined">
-                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{sale.customer_name || "Walk-in"}</Typography>
-                      <Typography variant="caption" color="text.secondary">#{sale.id}{sale.reference ? ` · ${sale.reference}` : ""} · {formatDate(sale.sold_at)}</Typography>
-                    </Box>
-                    <StatusChip status={saleStatus(sale.payment_status)} label={sale.payment_status} />
-                  </Box>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.5 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">{formatMoney(sale.total_amount)}</Typography>
-                    <Typography variant="caption" color="text.secondary" className="tnum">Paid {formatMoney(sale.amount_paid)} · Due {formatMoney(sale.amount_due)}</Typography>
-                  </Box>
-                  <Collapse in={open} timeout="auto" unmountOnExit>
-                    <Box sx={{ mt: 1 }}>
-                      {sale.lines.map((line: any) => (
-                        <Box key={line.recipe_id} sx={{ display: "flex", justifyContent: "space-between", py: 0.5, borderTop: 1, borderColor: "divider" }}>
-                          <Typography variant="body2">{line.item_name || line.recipe_name} × {line.quantity}</Typography>
-                          <Typography variant="body2" className="tnum">{formatMoney(line.line_total)}</Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Collapse>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
-                    <IconButton
-                      size="small"
-                      aria-label={open ? `Hide lines for invoice ${sale.id}` : `Show lines for invoice ${sale.id}`}
-                      aria-expanded={open}
-                      onClick={() => setExpandedSale((prev) => ({ ...prev, [sale.id]: !prev[sale.id] }))}
-                      sx={{ minWidth: 44 }}
-                    >
-                      {open ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                    </IconButton>
-                    <Button variant="outlined" onClick={() => setInvoiceSale(sale)} aria-label={`View invoice ${sale.id}`} sx={{ flex: 1, minHeight: 44 }}>
-                      View / Print
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
+              <ListItemCard
+                key={sale.id}
+                title={sale.customer_name || "Walk-in"}
+                subtitle={`#${sale.id}${sale.reference ? ` · ${sale.reference}` : ""} · ${formatDate(sale.sold_at)}${hasDue ? ` · Due ${formatMoney(sale.amount_due)}` : ""}`}
+                primaryValue={formatMoney(sale.total_amount)}
+                status={{ kind: saleStatus(sale.payment_status), label: sale.payment_status }}
+                meta={metaItems}
+                actions={
+                  <OverflowMenu
+                    ariaLabel={`Sale ${sale.id} actions`}
+                    actions={[{ label: "Print invoice", onClick: () => window.print() }]}
+                  />
+                }
+                onClick={() => setInvoiceSale(sale)}
+              />
             );
           })}
         </Stack>
@@ -301,7 +287,7 @@ export const CustomersSales = () => {
     <Dialog open={saleOpen} onClose={() => setSaleOpen(false)} fullScreen={isMobile} maxWidth="sm" fullWidth><DialogTitle sx={{ fontWeight: 700 }}>Record sale</DialogTitle><DialogContent sx={{ pb: 1 }}>
     <FormSection title="Customer"><Autocomplete options={customerOptions} getOptionLabel={(item: any) => item.name} value={customerOptions.find((item: any) => item.id === customerId) || walkIn} onChange={(_, item) => { setCustomerId(item?.id || 0); setSalePrice(""); }} loading={customersLoading} disabled={customersLoading} renderInput={(params) => <TextField {...params} margin="dense" label={customersLoading ? "Loading customers..." : "Customer"} />} />            {customerId > 0 && (() => { const cust = customers.find((c: any) => c.id === customerId); return cust && (cust.advance_balance || 0) > 0 ? <Alert severity="success" sx={{ mt: 1 }}>Advance balance: {formatMoney(cust.advance_balance)}{!useAdvance ? " — check 'Use advance' below to apply" : ""}</Alert> : null; })()}    {customerId > 0 && (() => { const cust = customers.find((c: any) => c.id === customerId); return cust && (cust.advance_balance || 0) > 0 ? <FormControlLabel sx={{ mt: 1 }} control={<Checkbox size="medium" checked={useAdvance} onChange={(e) => setUseAdvance(e.target.checked)} slotProps={{ input: { "aria-label": "Use advance balance" } }} />} label={<Typography variant="body2">Use advance balance ({formatMoney((customers.find((c: any) => c.id === customerId) as any)?.advance_balance || 0)})</Typography>} /> : null; })()}
     </FormSection>
-    <FormSection title="Sale Items" description="Select an item — selling price auto-fills from the stock item. Edit the price field if needed."><Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1, flexDirection: { xs: "column", sm: "row" } }}><FormControl sx={{ flex: "1 1 180px" }} size="small" disabled={stockLoading}>    <InputLabel>{stockLoading ? "Loading items..." : "Items"}</InputLabel><Select value={saleRecipe} label={stockLoading ? "Loading items..." : "Items"} onChange={(event) => { const itemId = Number(event.target.value); setSaleRecipe(itemId); resetAlloc(); const item = saleableStock.find((stock: any) => stock.id === itemId); setSalePrice(item?.unit_price > 0 ? String(item.unit_price) : ""); }}>{saleableStock.map((item: any) => <MenuItem key={item.id} value={item.id}>{item.name} ({item.qty} {item.unit})</MenuItem>)}</Select></FormControl><TextField sx={{ flex: { xs: "1 1 100%", sm: "1 1 90px" } }} size="small" label="Qty" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} value={saleQty} onChange={(e) => setSaleQty(e.target.value)} /><TextField sx={{ flex: { xs: "1 1 100%", sm: "1 1 120px" } }} size="small" label="Selling price" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /><Button onClick={addSaleLine} variant="outlined" sx={{ minHeight: 44, flex: { xs: "1 1 100%", sm: "0 0 auto" } }}>{editingLineIndex === null ? "Add" : "Update"}</Button></Box>
+    <FormSection title="Sale Items" description="Select an item — selling price auto-fills from the stock item. Edit the price field if needed."><Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1, flexDirection: { xs: "column", sm: "row" } }}><FormControl sx={{ flex: "1 1 180px" }} size="small" disabled={stockLoading}>    <InputLabel>{stockLoading ? "Loading items..." : "Items"}</InputLabel><Select value={saleRecipe} label={stockLoading ? "Loading items..." : "Items"} onChange={(event) => { const itemId = Number(event.target.value); setSaleRecipe(itemId); resetAlloc(); const item = saleableStock.find((stock: any) => stock.id === itemId); setSalePrice(item?.unit_price > 0 ? String(item.unit_price) : ""); setTimeout(() => saleQtyRef.current?.focus(), 100); }}>{saleableStock.map((item: any) => <MenuItem key={item.id} value={item.id}>{item.name} ({item.qty} {item.unit})</MenuItem>)}</Select></FormControl><TextField sx={{ flex: { xs: "1 1 100%", sm: "1 1 90px" } }} size="small" label="Qty" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} inputRef={saleQtyRef} value={saleQty} onChange={(e) => setSaleQty(e.target.value)} /><TextField sx={{ flex: { xs: "1 1 100%", sm: "1 1 120px" } }} size="small" label="Selling price" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} value={salePrice} onChange={(e) => setSalePrice(e.target.value)} /><Button onClick={addSaleLine} variant="outlined" sx={{ minHeight: 44, flex: { xs: "1 1 100%", sm: "0 0 auto" } }}>{editingLineIndex === null ? "Add" : "Update"}</Button></Box>
             {selectedStockItem && selectedStockItem.pack_type_id != null && (
               <Box sx={{ mt: 1.5, p: 1.5, border: 1, borderColor: "divider", borderRadius: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Batch Allocation</Typography>
@@ -347,5 +333,15 @@ export const CustomersSales = () => {
 </DialogContent><FormActions onCancel={() => setSaleOpen(false)} submitLabel="Record sale" onSubmit={saveSale} pending={addSale.isPending} error={saleError} /></Dialog>
     <Dialog open={!!profileId} onClose={() => setProfileId(0)} maxWidth="lg" fullWidth><DialogTitle>{profile?.name || "Customer profile"}</DialogTitle><DialogContent>{profile && <><Typography color="text.secondary">{profile.phone || "No phone"} · {profile.email || "No email"} · Credit limit: {formatMoney(profile.credit_limit || 0)}{profile.advance_balance > 0 ? ` · Advance: ${formatMoney(profile.advance_balance)}` : ""}</Typography><Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 2, my: 2 }}><Card><CardContent><Typography variant="caption">Sales</Typography><Typography variant="h6">{profile.total_sales}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Billed</Typography><Typography variant="h6">{formatMoney(profile.total_billed)}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Paid</Typography><Typography variant="h6">{formatMoney(profile.total_paid)}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Due</Typography><Typography variant="h6" color={profile.total_due ? "error" : "success.main"}>{formatMoney(profile.total_due)}</Typography></CardContent></Card></Box><Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}><FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Status</InputLabel><Select value={profileStatus} label="Status" onChange={(e) => setProfileStatus(e.target.value)}><MenuItem value="">All</MenuItem><MenuItem value="PAID">Paid</MenuItem><MenuItem value="PARTIAL">Partial</MenuItem><MenuItem value="PENDING">Pending</MenuItem></Select></FormControl><TextField size="small" label="From" type="date" value={profileStart} onChange={(e) => setProfileStart(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField size="small" label="To" type="date" value={profileEnd} onChange={(e) => setProfileEnd(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Box>{profileLoading ? <Typography>Loading...</Typography> : <Table size="small"><TableHead><TableRow><TableCell>Invoice</TableCell><TableCell>Date</TableCell><TableCell>Due date</TableCell><TableCell>Products</TableCell><TableCell>Status</TableCell><TableCell>Billed</TableCell><TableCell>Paid</TableCell><TableCell>Due</TableCell><TableCell>Action</TableCell></TableRow></TableHead><TableBody>{profile.sales.map((sale: any) => <TableRow key={sale.id}><TableCell>#{sale.id} {sale.reference || ""}</TableCell><TableCell>{formatDate(sale.sold_at)}</TableCell><TableCell>{sale.due_date || "—"}</TableCell><TableCell>{sale.lines.map((line: any) => `${line.recipe_name} × ${line.quantity}`).join(", ")}</TableCell><TableCell>{sale.payment_status}</TableCell><TableCell>₹{sale.total_amount.toFixed(2)}</TableCell><TableCell>₹{sale.amount_paid.toFixed(2)}</TableCell><TableCell>₹{sale.amount_due.toFixed(2)}</TableCell></TableRow>)}</TableBody></Table>}</>}</DialogContent><DialogActions><Button onClick={() => setProfileId(0)}>Close</Button></DialogActions></Dialog>
     {invoiceSale && <Box className="print-invoice"><Box sx={{ maxWidth: 760, mx: "auto", p: { xs: 2, sm: 5 }, color: "#172033" }}><Box sx={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #0f766e", pb: 2, mb: 3 }}><Box><Typography variant="h4" sx={{ fontWeight: 800, color: "#0f766e" }}>INVOICE</Typography><Typography variant="body2">Recipe Inventory</Typography></Box><Box sx={{ textAlign: "right" }}><Typography variant="h6">#{invoiceSale.id}</Typography><Typography variant="body2">{formatDate(invoiceSale.sold_at)}</Typography>{invoiceSale.reference && <Typography variant="body2">Ref: {invoiceSale.reference}</Typography>}</Box></Box><Box sx={{ mb: 3 }}><Typography variant="overline">Bill to</Typography><Typography variant="h6">{invoiceSale.customer_name || "Walk-in customer"}</Typography></Box><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#f0fdfa" }}><TableCell>Product</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Unit price</TableCell><TableCell align="right">Amount</TableCell></TableRow></TableHead><TableBody>{invoiceSale.lines.map((line: any) => <TableRow key={line.recipe_id}>    <TableCell>{line.item_name || line.recipe_name}</TableCell><TableCell align="right">{line.quantity}</TableCell><TableCell align="right">{formatMoney(line.unit_price)}</TableCell><TableCell align="right">{formatMoney(line.line_total)}</TableCell></TableRow>)}</TableBody></Table><Box sx={{ ml: "auto", maxWidth: 280, mt: 3 }}><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Total</Typography><Typography sx={{ fontWeight: 700 }}>{formatMoney(invoiceSale.total_amount)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Paid</Typography><Typography>{formatMoney(invoiceSale.amount_paid)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #ddd", mt: 1, pt: 1 }}><Typography sx={{ fontWeight: 700 }}>Due</Typography><Typography sx={{ fontWeight: 700, color: invoiceSale.amount_due ? "#dc2626" : "#15803d" }}>{formatMoney(invoiceSale.amount_due)}</Typography></Box></Box><Typography sx={{ mt: 5, textAlign: "center", color: "#64748b" }}>Thank you for your business.</Typography></Box><Box className="invoice-actions" sx={{ textAlign: "center", pb: 2 }}><Button variant="contained" onClick={() => window.print()}>Print / Save PDF</Button><Button sx={{ ml: 1 }} onClick={() => setInvoiceSale(null)}>Close</Button></Box></Box>}
+    {salesOnly && (
+      <Fab
+        color="primary"
+        aria-label="Record sale"
+        sx={{ position: "fixed", bottom: { xs: 80, sm: 24 }, right: 24, zIndex: 1000 }}
+        onClick={() => { setSaleLines([]); setCustomerId(0); setSaleError(""); setEditingLineIndex(null); resetAlloc(); setSaleOpen(true); }}
+      >
+        <AddIcon />
+      </Fab>
+    )}
   </Box>;
 };

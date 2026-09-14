@@ -1,4 +1,5 @@
 import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { ListItemCard } from "../components/ui/ListItemCard";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { useState } from "react";
 import { useCreateOrder, useCustomers, useDeleteOrder, useOrders, useSaleableStock, useUpdateOrderStatus } from "../hooks/useApi";
@@ -155,36 +156,29 @@ export const Orders = () => {
         ) : orders.length ? (
           <Stack spacing={1.5}>
             {orders.map((order: any) => (
-              <Card key={order.id} variant="outlined">
-                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{order.customer_name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        #{order.id} · {formatDate(order.ordered_at)} · <span className="tnum">{order.lines?.length || 0} items</span>
-                      </Typography>
-                    </Box>
-                    <StatusChip status={statusKind(order.status)} label={order.status} />
-                  </Box>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }} className="tnum">₹{order.total_amount.toFixed(0)}</Typography>
-                    {hasShortage(order) ? (
-                      <StatusChip status="error" label={`${totalShortage(order)} short`} />
-                    ) : (
-                      <StatusChip status="success" label="In stock" />
-                    )}
-                  </Box>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    <OverflowMenu
-                      ariaLabel={`Order ${order.id} actions`}
-                      actions={[
-                        { label: "View details", onClick: () => setDetailId(order.id) },
-                        { label: "Delete", danger: true, onClick: () => setDeleteTarget(order) },
-                      ]}
-                    />
-                  </Box>
-                </CardContent>
-              </Card>
+              <ListItemCard
+                key={order.id}
+                title={order.customer_name}
+                subtitle={`#${order.id} · ${formatDate(order.ordered_at)} · ${order.lines?.length || 0} items`}
+                primaryValue={<span className="tnum">₹{order.total_amount.toFixed(0)}</span>}
+                status={{ kind: statusKind(order.status), label: order.status }}
+                meta={[
+                  { label: "Items", value: `${order.lines?.length || 0}` },
+                  ...(hasShortage(order) ? [{ label: "Stock", value: `${totalShortage(order)} short` }] : [{ label: "Stock", value: "In stock" }]),
+                  ...(order.expected_delivery ? [{ label: "Expected", value: order.expected_delivery }] : []),
+                  ...(order.notes ? [{ label: "Notes", value: order.notes }] : []),
+                ]}
+                actions={
+                  <OverflowMenu
+                    ariaLabel={`Order ${order.id} actions`}
+                    actions={[
+                      { label: "View details", onClick: () => setDetailId(order.id) },
+                      { label: "Delete", danger: true, onClick: () => setDeleteTarget(order) },
+                    ]}
+                  />
+                }
+                onClick={() => setDetailId(order.id)}
+              />
             ))}
           </Stack>
         ) : (

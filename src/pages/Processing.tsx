@@ -1,11 +1,12 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Fab, IconButton, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AddIcon from "@mui/icons-material/Add";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { useState, useMemo } from "react";
 import { useCreateProcessingOrder, useDeleteIngredient, useDeleteProcessingOrder, useEmployees, useIngredients, useProcessingOrders, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
-import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormSection, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormSection, ListItemCard, OverflowMenu, PageHeader, StatusChip, StatStrip, TableSkeleton } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 
 export const Processing = () => {
@@ -152,11 +153,13 @@ export const Processing = () => {
       </Box>
 
       {/* Summary */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
-        <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : orders.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{isLoading ? <CircularProgress size={16} /> : pending.length}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : totalSent.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{isLoading ? <CircularProgress size={16} /> : totalReceived.toFixed(0)}</Typography></CardContent></Card>
+      <Box sx={{ mb: 2 }}>
+        <StatStrip stats={[
+          { label: "Orders", value: isLoading ? <CircularProgress size={16} /> : orders.length },
+          { label: "Pending", value: isLoading ? <CircularProgress size={16} /> : pending.length, color: "warning.main" },
+          { label: "Sent (kg)", value: isLoading ? <CircularProgress size={16} /> : totalSent.toFixed(0) },
+          { label: "Received (kg)", value: isLoading ? <CircularProgress size={16} /> : totalReceived.toFixed(0), color: "success.main" },
+        ]} />
       </Box>
 
       {/* Orders Table (desktop) / Cards (mobile) */}
@@ -231,20 +234,19 @@ export const Processing = () => {
         ) : orders.length ? (
           <Stack spacing={1.5}>
             {orders.map((order: any) => (
-              <Card key={order.id} variant="outlined">
-                <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: "0.9375rem" }}>{order.processor_name}</Typography>
-                      <Typography variant="caption" color="text.secondary">#{order.id} · {order.raw_ingredient_name} · {formatDate(order.sent_at)}</Typography>
-                    </Box>
-                    <StatusChip status={order.status === "COMPLETED" ? "success" : "warning"} label={order.status} />
-                  </Box>
-                  <Box sx={{ display: "flex", gap: 2, mt: 1 }} className="tnum">
-                    <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Sent</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{order.quantity_sent} kg</Typography></Box>
-                    <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Received</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{order.quantity_received > 0 ? `${order.quantity_received} kg` : "—"}</Typography></Box>
-                  </Box>
-                  <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+              <ListItemCard
+                key={order.id}
+                title={order.processor_name}
+                subtitle={`#${order.id} · ${order.raw_ingredient_name} · ${formatDate(order.sent_at)}`}
+                primaryValue={`${order.quantity_sent} kg`}
+                status={{ kind: order.status === "COMPLETED" ? "success" : "warning", label: order.status }}
+                meta={[
+                  { label: "Received", value: order.quantity_received > 0 ? `${order.quantity_received} kg` : "—" },
+                  { label: "Raw ingredient", value: order.raw_ingredient_name },
+                ]}
+                onClick={() => setDetailId(order.id)}
+                actions={
+                  <Box sx={{ display: "flex", gap: 1 }}>
                     {order.status === "PENDING" && (
                       <OverflowMenu
                         ariaLabel={`Order ${order.id} actions`}
@@ -264,12 +266,9 @@ export const Processing = () => {
                         ]}
                       />
                     )}
-                    {order.status !== "PENDING" && !(order.status === "COMPLETED" && isSuperAdmin) && (
-                      <Button variant="outlined" onClick={() => setDetailId(order.id)} sx={{ minHeight: 44 }}>Details</Button>
-                    )}
                   </Box>
-                </CardContent>
-              </Card>
+                }
+              />
             ))}
           </Stack>
         ) : (
@@ -495,6 +494,14 @@ export const Processing = () => {
 
       {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
       {error && !createOpen && !receiveOpen && !detailId && !processorOpen && !editOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}
+      <Fab
+        color="primary"
+        aria-label="New order"
+        sx={{ position: "fixed", bottom: { xs: 80, sm: 24 }, right: 24, zIndex: 1000 }}
+        onClick={() => { resetCreate(); setCreateOpen(true); }}
+      >
+        <AddIcon />
+      </Fab>
     </Box>
   );
 };

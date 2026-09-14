@@ -53,7 +53,7 @@ export const Packing = () => {
         {visibleBatches.length ? (
           <Stack spacing={1.5}>
             {visibleBatches.map((batch: any) => (
-              <Card key={batch.id} variant="outlined">
+              <Card key={batch.id} variant="outlined" sx={{ cursor: "pointer", "&:hover": { borderColor: "primary.main" } }} onClick={() => setSelected(batch)}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 1 }}>
                     <Box sx={{ minWidth: 0 }}>
@@ -67,7 +67,7 @@ export const Packing = () => {
                     <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Packed</Typography><Typography variant="body2" sx={{ fontWeight: 600, color: "success.main" }}>{batch.packed_qty} kg</Typography></Box>
                     <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Remaining</Typography><Typography variant="body2" sx={{ fontWeight: 700, color: "warning.main" }}>{batch.remaining_qty} kg</Typography></Box>
                   </Box>
-                  <Button fullWidth variant="contained" onClick={() => setSelected(batch)} sx={{ minHeight: 44 }}>
+                   <Button variant="outlined" size="small" onClick={(e) => { e.stopPropagation(); setSelected(batch); }} sx={{ mt: 1.5, minHeight: 44 }}>
                     Pack batch #{batch.id}
                   </Button>
                 </CardContent>
