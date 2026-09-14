@@ -1,6 +1,6 @@
 import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
-import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useProcessingPayments, useSuppliers, useSupplierPayments } from "../hooks/useApi";
+import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useSuppliers, useSupplierPayments } from "../hooks/useApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { VoiceInput } from "../components/VoiceInput";
 import { EmptyState, PageHeader, TableSkeleton } from "../components/ui";
@@ -30,7 +30,6 @@ export const Payments = () => {
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const customerPayment = useCustomerPayment();
   const addSupplierPayment = useAddSupplierPaymentFromPayments();
-  const { data: processingExpenses = [], isLoading: expensesLoading } = useProcessingPayments();
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -176,7 +175,6 @@ export const Payments = () => {
     <Tabs value={tab} onChange={(_, v) => { setTab(v); setSearch(""); }} sx={{ mb: 2, minHeight: 40, "& .MuiTab-root": { minHeight: 40, py: 0, fontSize: { xs: "0.75rem", sm: "0.875rem" } } }}>
       <Tab label="Customer" />
       <Tab label="Supplier" />
-      <Tab label="Expenses" />
     </Tabs>
 
     {tab === 0 && <>
@@ -230,36 +228,6 @@ export const Payments = () => {
         <TableCell sx={cellSx}>{payment.method}</TableCell>
       </TableRow>) : <TableRow><TableCell colSpan={4} align="center"><EmptyState title="No supplier payments recorded." message="Recorded supplier payments will appear here." /></TableCell></TableRow>}</TableBody></Table></TableContainer>
     </>}
-
-    {tab === 2 && (() => {
-      const filteredExpenses = search
-        ? processingExpenses.filter((e: any) => e.processor_name.toLowerCase().includes(search.toLowerCase()) || e.raw_ingredient.toLowerCase().includes(search.toLowerCase()))
-        : processingExpenses;
-      const totalExpenses = filteredExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
-      return <>
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)" }, gap: { xs: 1, sm: 2 }, mb: 2 }}>
-          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Total expenses</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{formatMoney(totalExpenses)}</Typography></CardContent></Card>
-          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Transactions</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{filteredExpenses.length}</Typography></CardContent></Card>
-          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary" }}>Processors</Typography><Typography variant="subtitle2" sx={{ fontSize: { xs: "0.85rem", sm: "1rem" }, fontWeight: 700 }}>{new Set(filteredExpenses.map((e: any) => e.processor_name)).size}</Typography></CardContent></Card>
-        </Box>
-        <Box sx={{ mb: 2 }}>
-          <TextField size="small" placeholder="Search by processor or ingredient..." value={search} onChange={(event) => setSearch(event.target.value)} sx={{ width: "100%", maxWidth: 400, "& .MuiInputBase-root": { fontSize: "0.85rem" } }} />
-        </Box>
-        <TableContainer sx={{ overflowX: "auto" }}><Table size="small" sx={{ minWidth: 480 }}><TableHead><TableRow>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Date</TableCell>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Processor</TableCell>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Ingredient</TableCell>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Amount</TableCell>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Method</TableCell>
-        </TableRow></TableHead><TableBody>{expensesLoading ? <TableSkeleton rows={4} colSpan={5} /> : filteredExpenses.length ? filteredExpenses.map((expense: any) => <TableRow key={expense.id}>
-          <TableCell sx={cellSx}>{formatDate(expense.date)}</TableCell>
-          <TableCell sx={cellSx}>{expense.processor_name}</TableCell>
-          <TableCell sx={cellSx}>{expense.raw_ingredient}</TableCell>
-          <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">{formatMoney(expense.amount)}</TableCell>
-          <TableCell sx={cellSx}>{expense.method}</TableCell>
-        </TableRow>) : <TableRow><TableCell colSpan={5} align="center"><EmptyState title="No processing expenses recorded." message="Processor payments will appear here." /></TableCell></TableRow>}</TableBody></Table></TableContainer>
-      </>;
-    })()}
 
     <Dialog open={customerOpen} onClose={() => { setCustomerOpen(false); setError(""); }} maxWidth="xs" fullWidth slotProps={{ paper: { sx: { mx: 1, width: "calc(100% - 16px)" } } }}>
       <DialogTitle sx={{ fontSize: "1rem", fontWeight: 700 }}>Receive payment</DialogTitle>

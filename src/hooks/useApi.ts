@@ -807,22 +807,6 @@ export const useReceiveProcessing = () => {
   });
 };
 
-export const useProcessingPayment = () => {
-  const qc = useQueryClient();
-  return useMutation<any, Error, { orderId: number; amount: number; method?: string; reference?: string }>({
-    mutationFn: ({ orderId, ...payload }) => api.post(`/processing/${orderId}/payments`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["processingOrders"] }),
-  });
-};
-
-export const useCollectiveProcessingPayment = () => {
-  const qc = useQueryClient();
-  return useMutation<any[], Error, { processor_id: number; amount: number; method?: string; reference?: string }>({
-    mutationFn: (payload) => api.post("/processing/pay", payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["processingOrders"] }),
-  });
-};
-
 export const useDeleteProcessingOrder = () => {
   const qc = useQueryClient();
   return useMutation<void, Error, number>({
@@ -846,31 +830,6 @@ export const useUpdateProcessingOrder = () => {
     },
   });
 };
-
-export const useProcessingPayments = () =>
-  useQuery<any[], Error>({
-    queryKey: ["processingPayments"],
-    queryFn: async () => (await api.get("/processing")).data,
-    initialData: [],
-    select: (orders: any[]) => {
-      const expenses: any[] = [];
-      for (const order of orders) {
-        for (const p of order.payments || []) {
-          expenses.push({
-            id: p.id,
-            date: p.paid_at,
-            amount: p.amount,
-            method: p.method,
-            reference: p.reference,
-            processor_name: order.processor_name,
-            raw_ingredient: order.raw_ingredient_name,
-            order_id: order.id,
-          });
-        }
-      }
-      return expenses.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    },
-  });
 
 /* ------------------------------------------------------------------ */
 /* Employees                                                           */

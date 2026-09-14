@@ -1,10 +1,10 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { useState } from "react";
 import { useCreateEmployee, useDeleteEmployee, useEmployeeLedger, useEmployees, usePayEmployee, useToggleEmployee, useUpdateEmployee } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
-import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { ConfirmDialog, EmptyState, ErrorState, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 
 export const Employees = () => {
   const { data: employees = [], isLoading, error: employeesError, refetch } = useEmployees();
@@ -55,10 +55,6 @@ export const Employees = () => {
     try { await toggleEmp.mutateAsync(emp.id); setSuccess(emp.is_active ? "Deactivated." : "Activated."); } catch (e: any) { setError(e.response?.data?.detail || "Could not toggle."); }
   };
 
-  const handleDelete = async (id: number) => {
-    try { await deleteEmp.mutateAsync(id); setSuccess("Employee deleted."); } catch (e: any) { setError(e.response?.data?.detail || "Could not delete."); }
-  };
-
   const savePayment = async () => {
     if (!payOpen || !Number(payAmount) || Number(payAmount) <= 0) { setError("Enter a valid amount."); return; }
     try {
@@ -67,6 +63,11 @@ export const Employees = () => {
     } catch (e: any) { setError(e.response?.data?.detail || "Could not record payment."); }
   };
 
+  const totalEarned = employees.reduce((s: number, e: any) => s + (e.total_earned || 0), 0);
+  const totalPaid = employees.reduce((s: number, e: any) => s + (e.total_paid || 0), 0);
+  const totalDue = employees.reduce((s: number, e: any) => s + (e.balance_due || 0), 0);
+  const totalPaidThisMonth = employees.reduce((s: number, e: any) => s + (e.paid_this_month || 0), 0);
+
   const headerSx = { fontWeight: 700, fontSize: { xs: "0.7rem" as const, sm: "0.8rem" as const } };
   const cellSx = { fontSize: { xs: "0.7rem" as const, sm: "0.8rem" as const } };
 
@@ -74,7 +75,7 @@ export const Employees = () => {
     <Box>
       <PageHeader
         title="Employees"
-        subtitle="Manage staff and processor/vendors, track earnings and payments"
+        subtitle="Manage staff and processors/vendors, track earnings and payments"
         actions={
           <Button startIcon={<AddRoundedIcon />} variant="contained" onClick={() => { resetForm(); setFormOpen(true); }}>
             Add Employee
@@ -85,41 +86,65 @@ export const Employees = () => {
       {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess("")}>{success}</Alert>}
       {error && !formOpen && !payOpen && !detailId && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
+      {/* Summary Cards */}
+      {!isLoading && employees.length > 0 && (
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
+          <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Total Earned</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{formatMoney(totalEarned)}</Typography></CardContent></Card>
+          <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Total Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{formatMoney(totalPaid)}</Typography></CardContent></Card>
+          <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Paid This Month</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "info.main" }}>{formatMoney(totalPaidThisMonth)}</Typography></CardContent></Card>
+          <Card sx={{ bgcolor: totalDue > 0 ? "error.50" : "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Total Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: totalDue > 0 ? "error.main" : "success.main" }}>{formatMoney(totalDue)}</Typography></CardContent></Card>
+        </Box>
+      )}
+
       {/* Desktop Table */}
       <Box sx={{ display: { xs: "none", sm: "block" } }}>
         <TableContainer component={Paper}>
-          <Table size="small" sx={{ minWidth: 600 }}>
+          <Table size="small" sx={{ minWidth: 900 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={headerSx}>Name</TableCell>
                 <TableCell sx={headerSx}>Type</TableCell>
                 <TableCell sx={headerSx}>Phone</TableCell>
-                <TableCell sx={{ ...headerSx, display: { xs: "none", md: "table-cell" } }}>Status</TableCell>
+                <TableCell sx={{ ...headerSx, display: { md: "table-cell" } }}>Earned</TableCell>
+                <TableCell sx={{ ...headerSx, display: { md: "table-cell" } }}>Paid</TableCell>
+                <TableCell sx={{ ...headerSx, display: { lg: "table-cell" } }}>This Month</TableCell>
+                <TableCell sx={headerSx}>Due</TableCell>
                 <TableCell sx={headerSx}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <TableSkeleton rows={5} colSpan={5} />
+                <TableSkeleton rows={5} colSpan={8} />
               ) : employeesError ? (
-                <TableRow><TableCell colSpan={5} align="center"><ErrorState message={(employeesError as any).message} onRetry={() => refetch()} /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} align="center"><ErrorState message={(employeesError as any).message} onRetry={() => refetch()} /></TableCell></TableRow>
               ) : employees.length ? employees.map((emp: any) => (
                 <TableRow key={emp.id} hover>
                   <TableCell sx={{ ...cellSx, fontWeight: 600 }}>{emp.name}</TableCell>
                   <TableCell sx={cellSx}><StatusChip status={emp.type === "processor" ? "info" : "success"} label={emp.type} /></TableCell>
                   <TableCell sx={cellSx}>{emp.phone || "—"}</TableCell>
-                  <TableCell sx={{ ...cellSx, display: { xs: "none", md: "table-cell" } }}><StatusChip status={emp.is_active ? "success" : "error"} label={emp.is_active ? "Active" : "Inactive"} /></TableCell>
+                  <TableCell sx={{ ...cellSx, display: { md: "table-cell" } }} className="tnum">{formatMoney(emp.total_earned || 0)}</TableCell>
+                  <TableCell sx={{ ...cellSx, display: { md: "table-cell" } }} className="tnum">{formatMoney(emp.total_paid || 0)}</TableCell>
+                  <TableCell sx={{ ...cellSx, display: { lg: "table-cell" } }} className="tnum">{formatMoney(emp.paid_this_month || 0)}</TableCell>
+                  <TableCell sx={{ ...cellSx, fontWeight: 700, color: (emp.balance_due || 0) > 0 ? "error.main" : "success.main" }} className="tnum">{formatMoney(emp.balance_due || 0)}</TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", gap: 0.5 }}>
-                      <Button size="small" onClick={() => setDetailId(emp.id)}>Ledger</Button>
-                      <Button size="small" onClick={() => { setEditId(emp.id); setName(emp.name); setPhone(emp.phone || ""); setAddress(emp.address || ""); setType(emp.type); setFormOpen(true); }}>Edit</Button>
-                      <Button size="small" color={emp.is_active ? "warning" : "success"} onClick={() => handleToggle(emp)}>{emp.is_active ? "Deactivate" : "Activate"}</Button>
-                      <DeleteButton label="Delete" itemName={emp.name} confirmMessage={`Delete "${emp.name}"?`} onDelete={() => handleDelete(emp.id)} />
+                      <Button size="small" variant="outlined" onClick={() => setDetailId(emp.id)}>Ledger</Button>
+                      {(emp.balance_due || 0) > 0 && (
+                        <Button size="small" variant="contained" color="success" onClick={() => { setPayOpen(emp.id); setPayAmount(""); setPayRef(""); setPayNotes(""); }}>Pay</Button>
+                      )}
+                      <OverflowMenu
+                        ariaLabel={`${emp.name} more actions`}
+                        actions={[
+                          { label: "Edit", onClick: () => { setEditId(emp.id); setName(emp.name); setPhone(emp.phone || ""); setAddress(emp.address || ""); setType(emp.type); setFormOpen(true); } },
+                          { label: emp.is_active ? "Deactivate" : "Activate", onClick: () => handleToggle(emp) },
+                          { label: "Delete", danger: true, onClick: () => setDeleteTarget(emp) },
+                        ]}
+                      />
                     </Box>
                   </TableCell>
                 </TableRow>
               )) : (
-                <TableRow><TableCell colSpan={5} align="center" sx={{ py: 3 }}><EmptyState title="No employees found." message="Add employees or processors/vendors." actionLabel="Add Employee" onAction={() => { resetForm(); setFormOpen(true); }} /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} align="center" sx={{ py: 3 }}><EmptyState title="No employees found." message="Add employees or processors/vendors." actionLabel="Add Employee" onAction={() => { resetForm(); setFormOpen(true); }} /></TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -138,17 +163,41 @@ export const Employees = () => {
               <Card key={emp.id} variant="outlined">
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <Box>
+                    <Box sx={{ minWidth: 0 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{emp.name}</Typography>
                       <Typography variant="caption" color="text.secondary">{emp.phone || "No phone"} · {emp.type}</Typography>
                     </Box>
                     <StatusChip status={emp.is_active ? "success" : "error"} label={emp.is_active ? "Active" : "Inactive"} />
                   </Box>
+
+                  {/* Financial Summary Row */}
+                  <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0.5, mt: 1.5, p: 1, bgcolor: "grey.50", borderRadius: 1 }}>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block" }}>Earned</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem" }}>{formatMoney(emp.total_earned || 0)}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block" }}>Paid</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem", color: "success.main" }}>{formatMoney(emp.total_paid || 0)}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block" }}>Month</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem", color: "info.main" }}>{formatMoney(emp.paid_this_month || 0)}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.6rem", display: "block" }}>Due</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.75rem", color: (emp.balance_due || 0) > 0 ? "error.main" : "success.main" }}>{formatMoney(emp.balance_due || 0)}</Typography>
+                    </Box>
+                  </Box>
+
                   <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+                    <Button size="small" variant="outlined" onClick={() => setDetailId(emp.id)} sx={{ flex: 1 }}>Ledger</Button>
+                    {(emp.balance_due || 0) > 0 && (
+                      <Button size="small" variant="contained" color="success" onClick={() => { setPayOpen(emp.id); setPayAmount(""); setPayRef(""); setPayNotes(""); }} sx={{ flex: 1 }}>Pay {formatMoney(emp.balance_due)}</Button>
+                    )}
                     <OverflowMenu
                       ariaLabel={`${emp.name} actions`}
                       actions={[
-                        { label: "Ledger", onClick: () => setDetailId(emp.id) },
                         { label: "Edit", onClick: () => { setEditId(emp.id); setName(emp.name); setPhone(emp.phone || ""); setAddress(emp.address || ""); setType(emp.type); setFormOpen(true); } },
                         { label: "Delete", danger: true, onClick: () => setDeleteTarget(emp) },
                       ]}
@@ -189,8 +238,13 @@ export const Employees = () => {
 
       {/* Ledger Detail Dialog */}
       <Dialog open={!!detailId} onClose={() => setDetailId(null)} fullScreen={isMobile} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          {ledger ? `${ledger.employee.name} — Ledger` : "Employee Ledger"}
+        <DialogTitle sx={{ fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{ledger ? `${ledger.employee.name} — Ledger` : "Employee Ledger"}</span>
+          {ledger && ledger.balance_due > 0 && (
+            <Button size="small" variant="contained" color="success" onClick={() => { setPayOpen(ledger.employee.id); setDetailId(null); }} sx={{ ml: 2 }}>
+              Pay {formatMoney(ledger.balance_due)}
+            </Button>
+          )}
         </DialogTitle>
         <DialogContent sx={{ pb: 1 }}>
           {ledgerLoading ? (
@@ -202,16 +256,21 @@ export const Employees = () => {
                 <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Total Earned</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{formatMoney(ledger.total_earned)}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>{ledger.earnings.length} earning(s)</Typography>
                 </CardContent></Card>
                 <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Total Paid</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "info.main" }}>{formatMoney(ledger.total_paid)}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>{ledger.payments.length} payment(s)</Typography>
                 </CardContent></Card>
                 <Card sx={{ bgcolor: ledger.balance_due > 0 ? "error.50" : "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
                   <Typography variant="caption" color="text.secondary">Balance Due</Typography>
                   <Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: ledger.balance_due > 0 ? "error.main" : "success.main" }}>{formatMoney(ledger.balance_due)}</Typography>
+                  {ledger.balance_due > 0 && <Typography variant="caption" color="error.main" sx={{ fontSize: "0.65rem" }}>Outstanding</Typography>}
                 </CardContent></Card>
               </Box>
+
+              <Divider sx={{ my: 1.5 }} />
 
               {/* Earnings Table */}
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Earnings</Typography>
@@ -231,13 +290,10 @@ export const Employees = () => {
                 </TableContainer>
               ) : <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>No earnings recorded yet.</Typography>}
 
+              <Divider sx={{ my: 1.5 }} />
+
               {/* Payments Table */}
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Payments</Typography>
-                {ledger.balance_due > 0 && (
-                  <Button size="small" variant="contained" onClick={() => { setPayOpen(ledger.employee.id); setDetailId(null); }}>Record Payment</Button>
-                )}
-              </Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Payments</Typography>
               {ledger.payments.length ? (
                 <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
                   <Table size="small" sx={{ minWidth: 360 }}>
@@ -263,9 +319,22 @@ export const Employees = () => {
 
       {/* Payment Dialog */}
       <Dialog open={!!payOpen} onClose={() => setPayOpen(null)} fullScreen={isMobile} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Record Payment</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Pay {employees.find((e: any) => e.id === payOpen)?.name || "Employee"}
+        </DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
+          {(() => {
+            const emp = employees.find((e: any) => e.id === payOpen);
+            if (emp && (emp.balance_due || 0) > 0) {
+              return (
+                <Alert severity="info" sx={{ mt: 1, fontSize: "0.8rem" }}>
+                  Balance due: {formatMoney(emp.balance_due)}. This payment will be recorded against their ledger.
+                </Alert>
+              );
+            }
+            return null;
+          })()}
           <TextField margin="dense" label="Amount (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
           <TextField margin="dense" label="Method" fullWidth value={payMethod} onChange={(e) => setPayMethod(e.target.value)} helperText="CASH, UPI, Bank transfer, etc." />
           <TextField margin="dense" label="Reference" fullWidth value={payRef} onChange={(e) => setPayRef(e.target.value)} />
@@ -273,8 +342,8 @@ export const Employees = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPayOpen(null)}>Cancel</Button>
-          <Button variant="contained" onClick={savePayment} disabled={payEmp.isPending}>
-            {payEmp.isPending ? <CircularProgress size={20} /> : "Pay"}
+          <Button variant="contained" color="success" onClick={savePayment} disabled={payEmp.isPending}>
+            {payEmp.isPending ? <CircularProgress size={20} /> : "Record Payment"}
           </Button>
         </DialogActions>
       </Dialog>

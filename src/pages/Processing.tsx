@@ -2,7 +2,7 @@ import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { useState, useMemo } from "react";
-import { useCreateProcessingOrder, useCollectiveProcessingPayment, useDeleteIngredient, useDeleteProcessingOrder, useEmployees, useIngredients, useProcessingOrders, useProcessingPayment, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
+import { useCreateProcessingOrder, useDeleteIngredient, useDeleteProcessingOrder, useEmployees, useIngredients, useProcessingOrders, useReceiveProcessing, useUpdateProcessingOrder } from "../hooks/useApi";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormSection, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
@@ -32,21 +32,13 @@ export const Processing = () => {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const createOrder = useCreateProcessingOrder();
   const receiveProcessing = useReceiveProcessing();
-  const addPayment = useProcessingPayment();
   const deleteOrder = useDeleteProcessingOrder();
   const updateOrder = useUpdateProcessingOrder();
   const deleteIngredient = useDeleteIngredient();
-  const collectivePayment = useCollectiveProcessingPayment();
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [collectivePayOpen, setCollectivePayOpen] = useState(false);
-  const [collectiveProcId, setCollectiveProcId] = useState(0);
-  const [collectiveAmount, setCollectiveAmount] = useState("");
-  const [collectiveMethod, setCollectiveMethod] = useState("CASH");
-  const [collectiveRef, setCollectiveRef] = useState("");
   const [detailId, setDetailId] = useState<number | null>(null);
   const [receiveOpen, setReceiveOpen] = useState<number | null>(null);
-  const [payOpen, setPayOpen] = useState<number | null>(null);
   const [processorOpen, setProcessorOpen] = useState(false);
   const [editOpen, setEditOpen] = useState<number | null>(null);
   const [editRawId, setEditRawId] = useState(0);
@@ -62,10 +54,6 @@ export const Processing = () => {
   const [notes, setNotes] = useState("");
 
   const [qtyReceived, setQtyReceived] = useState("");
-
-  const [payAmount, setPayAmount] = useState("");
-  const [payMethod, setPayMethod] = useState("CASH");
-  const [payRef, setPayRef] = useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -94,23 +82,6 @@ export const Processing = () => {
       await receiveProcessing.mutateAsync({ orderId: receiveOpen, quantity_received: Number(qtyReceived) });
       setReceiveOpen(null); setQtyReceived(""); setSuccess("Received! Processed ingredient added to stock."); setDetailId(null);
     } catch (e: any) { setError(e.response?.data?.detail || "Could not receive."); }
-  };
-
-  const savePayment = async () => {
-    if (!payOpen || !Number(payAmount) || Number(payAmount) <= 0) { setError("Enter a valid amount."); return; }
-    try {
-      await addPayment.mutateAsync({ orderId: payOpen, amount: Number(payAmount), method: payMethod, reference: payRef || undefined });
-      setPayOpen(null); setPayAmount(""); setPayRef(""); setPayMethod("CASH"); setSuccess("Payment recorded.");
-    } catch (e: any) { setError(e.response?.data?.detail || "Could not record payment."); }
-  };
-
-  const saveCollectivePayment = async () => {
-    if (!collectiveProcId || !Number(collectiveAmount) || Number(collectiveAmount) <= 0) { setError("Select processor and enter a valid amount."); return; }
-    try {
-      const result = await collectivePayment.mutateAsync({ processor_id: collectiveProcId, amount: Number(collectiveAmount), method: collectiveMethod, reference: collectiveRef || undefined });
-      setCollectivePayOpen(false); setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectiveMethod("CASH");
-      setSuccess(`Payment allocated across ${result?.length || 0} order(s).`);
-    } catch (e: any) { setError(e.response?.data?.detail || "Could not record payment."); }
   };
 
   const handleDelete = (orderId: number) =>
@@ -143,8 +114,6 @@ export const Processing = () => {
   const pending = orders.filter((o: any) => o.status === "PENDING");
   const totalSent = orders.reduce((s: number, o: any) => s + o.quantity_sent, 0);
   const totalReceived = orders.reduce((s: number, o: any) => s + (o.quantity_received || 0), 0);
-  const totalPaid = orders.reduce((s: number, o: any) => s + (o.total_paid || 0), 0);
-  const totalDue = orders.reduce((s: number, o: any) => s + (o.balance_due || 0), 0);
   const headerSx = { fontWeight: 700, fontSize: { xs: "0.7rem" as const, sm: "0.8rem" as const } };
   const cellSx = { fontSize: { xs: "0.7rem" as const, sm: "0.8rem" as const } };
 
@@ -166,7 +135,6 @@ export const Processing = () => {
       />
       <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
         <MenuItem onClick={() => { setMenuAnchor(null); window.location.href = "/employees"; }}>Manage employees</MenuItem>
-        <MenuItem onClick={() => { setMenuAnchor(null); setCollectiveProcId(0); setCollectiveAmount(""); setCollectiveRef(""); setCollectivePayOpen(true); }}>Pay processor/vendor</MenuItem>
       </Menu>
 
       {/* Filters */}
@@ -184,13 +152,11 @@ export const Processing = () => {
       </Box>
 
       {/* Summary */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(6, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 2 }}>
         <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Orders</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : orders.length}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "warning.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Pending</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "warning.main" }}>{isLoading ? <CircularProgress size={16} /> : pending.length}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Sent (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem" }}>{isLoading ? <CircularProgress size={16} /> : totalSent.toFixed(0)}</Typography></CardContent></Card>
         <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Received (kg)</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "success.main" }}>{isLoading ? <CircularProgress size={16} /> : totalReceived.toFixed(0)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "primary.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Paid</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "primary.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalPaid)}</Typography></CardContent></Card>
-        <Card sx={{ bgcolor: "error.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}><Typography variant="caption" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>Due</Typography><Typography variant="h6" sx={{ fontWeight: 700, fontSize: "1.1rem", color: "error.main" }}>{isLoading ? <CircularProgress size={16} /> : formatMoney(totalDue)}</Typography></CardContent></Card>
       </Box>
 
       {/* Orders Table (desktop) / Cards (mobile) */}
@@ -206,15 +172,14 @@ export const Processing = () => {
               <TableCell sx={{ ...headerSx, display: { xs: "none", md: "table-cell" } }}>Received</TableCell>
               <TableCell sx={{ ...headerSx, display: { xs: "none", md: "table-cell" } }}>Yield</TableCell>
               <TableCell sx={headerSx}>Status</TableCell>
-              <TableCell sx={headerSx}>Balance</TableCell>
               <TableCell sx={headerSx}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isLoading ? (
-              <TableSkeleton rows={5} colSpan={9} />
+              <TableSkeleton rows={5} colSpan={8} />
             ) : ordersError ? (
-              <TableRow><TableCell colSpan={9} align="center"><ErrorState message={(ordersError as any).message} onRetry={() => refetchOrders()} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} align="center"><ErrorState message={(ordersError as any).message} onRetry={() => refetchOrders()} /></TableCell></TableRow>
             ) : orders.length ? orders.map((order: any) => (
               <TableRow key={order.id} hover>
                 <TableCell sx={{ ...cellSx, fontWeight: 600 }}>#{order.id}</TableCell>
@@ -226,7 +191,6 @@ export const Processing = () => {
                 <TableCell>
                   <StatusChip status={order.status === "COMPLETED" ? "success" : "warning"} label={order.status} />
                 </TableCell>
-                <TableCell sx={{ ...cellSx, fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }} className="tnum">{formatMoney(order.balance_due)}</TableCell>
                 <TableCell>
                   <Box sx={{ display: "flex", gap: 0.5 }}>
                     <Button size="small" onClick={() => setDetailId(order.id)} aria-label={`View processing order ${order.id}`}>View</Button>
@@ -253,7 +217,7 @@ export const Processing = () => {
                 </TableCell>
               </TableRow>
             )) : (
-              <TableRow><TableCell colSpan={9} align="center" sx={{ py: 3 }}><EmptyState title="No processing orders found." message="Create an order to send raw material for processing." actionLabel="New Order" onAction={() => { resetCreate(); setCreateOpen(true); }} /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} align="center" sx={{ py: 3 }}><EmptyState title="No processing orders found." message="Create an order to send raw material for processing." actionLabel="New Order" onAction={() => { resetCreate(); setCreateOpen(true); }} /></TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -279,7 +243,6 @@ export const Processing = () => {
                   <Box sx={{ display: "flex", gap: 2, mt: 1 }} className="tnum">
                     <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Sent</Typography><Typography variant="body2" sx={{ fontWeight: 700 }}>{order.quantity_sent} kg</Typography></Box>
                     <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Received</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{order.quantity_received > 0 ? `${order.quantity_received} kg` : "—"}</Typography></Box>
-                    <Box><Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Balance</Typography><Typography variant="body2" sx={{ fontWeight: 700, color: order.balance_due > 0 ? "error.main" : "success.main" }}>{formatMoney(order.balance_due)}</Typography></Box>
                   </Box>
                   <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
                     {order.status === "PENDING" && (
@@ -396,38 +359,15 @@ export const Processing = () => {
                     </CardContent></Card>
                   </>
                 )}
-                <Card sx={{ bgcolor: detailOrder.balance_due > 0 ? "error.50" : "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                  <Typography variant="caption" color="text.secondary">Balance due</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: detailOrder.balance_due > 0 ? "error.main" : "success.main" }}>{formatMoney(detailOrder.balance_due)}</Typography>
-                </CardContent></Card>
               </Box>
 
               {detailOrder.notes && <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Notes: {detailOrder.notes}</Typography>}
-
-              {detailOrder.payments.length > 0 && (
-                <>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Payments</Typography>
-                  <TableContainer component={Paper} sx={{ mb: 1, overflowX: "auto" }}>
-                    <Table size="small" sx={{ minWidth: 360 }}>
-                      <TableHead><TableRow><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Date</TableCell><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Amount</TableCell><TableCell sx={{ fontWeight: 700, fontSize: "0.75rem" }}>Method</TableCell></TableRow></TableHead>
-                      <TableBody>{detailOrder.payments.map((p: any) => (
-                        <TableRow key={p.id}>
-                          <TableCell sx={{ fontSize: "0.8rem" }}>{formatDate(p.paid_at)}</TableCell>
-                          <TableCell sx={{ fontSize: "0.8rem", fontWeight: 700 }}>{formatMoney(p.amount)}</TableCell>
-                          <TableCell sx={{ fontSize: "0.8rem" }}>{p.method}</TableCell>
-                        </TableRow>
-                      ))}</TableBody>
-                    </Table>
-                  </TableContainer>
-                </>
-              )}
             </>
           )}
         </DialogContent>
         <DialogActions sx={{ justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             {detailOrder?.status === "PENDING" && <Button size="small" variant="outlined" color="success" sx={{ minHeight: 44 }} onClick={() => { setReceiveOpen(detailOrder.id); setDetailId(null); }}>Mark received</Button>}
-            {detailOrder && detailOrder.balance_due > 0 && <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setPayOpen(detailOrder.id); setDetailId(null); }}>Pay</Button>}
             {detailOrder?.status === "COMPLETED" && isSuperAdmin && (
               <Button size="small" variant="outlined" sx={{ minHeight: 44 }} onClick={() => { setEditOpen(detailOrder.id); setEditRawId(detailOrder.raw_ingredient_id); setEditProcessorId(detailOrder.processor_id); setEditQtySent(String(detailOrder.quantity_sent)); setEditCostPerKg(String(detailOrder.cost_per_expected_kg)); setEditNotes(detailOrder.notes || ""); setDetailId(null); }}>
                 Edit
@@ -452,23 +392,6 @@ export const Processing = () => {
           <Button onClick={() => setReceiveOpen(null)}>Cancel</Button>
           <Button variant="contained" onClick={saveReceive} disabled={receiveProcessing.isPending}>
             {receiveProcessing.isPending ? <CircularProgress size={20} /> : "Receive"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Payment Dialog */}
-      <Dialog open={!!payOpen} onClose={() => setPayOpen(null)} fullScreen={isMobile} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Record payment</DialogTitle>
-        <DialogContent>
-          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
-          <TextField margin="dense" label="Amount (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-          <TextField margin="dense" label="Method" fullWidth value={payMethod} onChange={(e) => setPayMethod(e.target.value)} helperText="Free text, e.g. CASH, UPI, Bank transfer" />
-          <TextField margin="dense" label="Reference" fullWidth value={payRef} onChange={(e) => setPayRef(e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPayOpen(null)}>Cancel</Button>
-          <Button variant="contained" onClick={savePayment} disabled={addPayment.isPending}>
-            {addPayment.isPending ? <CircularProgress size={20} /> : "Pay"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -551,33 +474,6 @@ export const Processing = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Collective Payment Dialog */}
-      <Dialog open={collectivePayOpen} onClose={() => setCollectivePayOpen(false)} fullScreen={isMobile} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Pay Processor (collective)</DialogTitle>
-        <DialogContent>
-          {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError("")}>{error}</Alert>}
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: "0.8rem" }}>
-            Allocate a lump-sum payment across all pending orders for this processor (oldest first).
-          </Typography>
-          <Autocomplete
-            options={processors}
-            getOptionLabel={(p: any) => p.name}
-            value={processors.find((p: any) => p.id === collectiveProcId) || null}
-            onChange={(_, v) => setCollectiveProcId(v?.id || 0)}
-            renderInput={(params) => <TextField {...params} margin="dense" label="Processor" />}
-          />
-          <TextField margin="dense" label="Amount" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={collectiveAmount} onChange={(e) => setCollectiveAmount(e.target.value)} />
-          <TextField margin="dense" label="Method" fullWidth value={collectiveMethod} onChange={(e) => setCollectiveMethod(e.target.value)} helperText="Free text, e.g. CASH, UPI, Bank transfer" />
-          <TextField margin="dense" label="Reference" fullWidth value={collectiveRef} onChange={(e) => setCollectiveRef(e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCollectivePayOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="success" onClick={saveCollectivePayment} disabled={collectivePayment.isPending}>
-            {collectivePayment.isPending ? <CircularProgress size={20} /> : "Pay & Allocate"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       <ConfirmDialog
         open={!!deleteTarget}
         title={`Delete order ${deleteTarget?.order?.id ?? ""}?`}
@@ -598,7 +494,7 @@ export const Processing = () => {
       />
 
       {success && <Alert severity="success" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setSuccess("")}>{success}</Alert>}
-      {error && !createOpen && !receiveOpen && !payOpen && !detailId && !processorOpen && !collectivePayOpen && !editOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}
+      {error && !createOpen && !receiveOpen && !detailId && !processorOpen && !editOpen && <Alert severity="error" sx={{ position: "fixed", bottom: { xs: 80, sm: 16 }, right: 16, zIndex: 9999 }} onClose={() => setError("")}>{error}</Alert>}
     </Box>
   );
 };

@@ -14,7 +14,7 @@ const COLORS = ["#1976d2", "#388e3c", "#f57c00", "#d32f2f", "#7b1fa2", "#00796b"
 const CustomTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <Box sx={{ bgcolor: "white", border: 1, borderColor: "divider", borderRadius: 2, px: 2, py: 1, boxShadow: 1 }}>
+    <Box sx={{ bgcolor: "grey.900", border: 1, borderColor: "divider", borderRadius: 2, px: 2, py: 1 }}>
       <Typography variant="caption" sx={{ fontWeight: 700 }}>{payload[0].name}</Typography>
       <Typography variant="caption" sx={{ display: "block" }}>{formatMoney(Number(payload[0].value))} ({((Number(payload[0].value) / Number(payload[0].payload.total)) * 100).toFixed(0)}%)</Typography>
     </Box>
