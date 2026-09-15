@@ -1,13 +1,10 @@
 import {
-  Box, Button, Card, CardContent, CircularProgress, Stack, TextField,
+  Box, Button, Card, CardContent, CircularProgress, Stack,
   Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  useTheme,
+  Tabs, Tab, useTheme, useMediaQuery,
 } from "@mui/material";
 import {
   AttachMoney as MoneyIcon,
-  TrendingUp as TrendUpIcon,
-  TrendingDown as TrendDownIcon,
-  People as PeopleIcon,
   ShoppingCart as CartIcon,
   LocalShipping as TruckIcon,
   AccountBalance as BankIcon,
@@ -84,6 +81,8 @@ const StatItem = ({ icon, label, value, color }: { icon: React.ReactNode; label:
 export const Dashboard = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [mobileTab, setMobileTab] = useState(0);
   const initialRange = rangeFor("last7");
   const [preset, setPreset] = useState("last7");
   const [startDate, setStartDate] = useState(initialRange.start);
@@ -207,245 +206,399 @@ export const Dashboard = () => {
         </Typography>
       </Box>
 
-      {/* Hero KPI row */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: { xs: 1, sm: 1.5 }, mb: 3 }}>
-        {heroCards.map((card) => (
-          <Card key={card.label} sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
-            <CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
-              <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>{card.label}</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, fontSize: { xs: "1.5rem", sm: "2rem" }, color: card.color, mb: 1 }}>{card.value}</Typography>
-              <MiniSparkline data={card.sparkData} color={card.sparkColor} />
+      {/* Hero KPI row — compact on mobile, full cards with sparklines on desktop */}
+      {isMobile ? (
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, mb: 2 }}>
+          {heroCards.map((card) => (
+            <Box key={card.label} sx={{ textAlign: "center" }}>
+              <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary", display: "block" }}>{card.label}</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: "0.95rem", color: card.color }}>{card.value}</Typography>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5, mb: 3 }}>
+          {heroCards.map((card) => (
+            <Card key={card.label} sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+              <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>{card.label}</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "2rem", color: card.color, mb: 1 }}>{card.value}</Typography>
+                <MiniSparkline data={card.sparkData} color={card.sparkColor} />
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      )}
+
+      {/* Mobile tabs */}
+      {isMobile && (
+        <Tabs value={mobileTab} onChange={(_, v) => setMobileTab(v)} variant="fullWidth" sx={{ mb: 2, minHeight: 36, "& .MuiTab-root": { minHeight: 36, fontSize: "0.75rem", fontWeight: 600, textTransform: "none" } }}>
+          <Tab label="Overview" />
+          <Tab label="Trends" />
+          <Tab label="Breakdown" />
+          <Tab label="Top lists" />
+        </Tabs>
+      )}
+
+      {/* === DESKTOP: all sections visible === */}
+      {!isMobile && (<>
+        {/* Sales and suppliers */}
+        <SectionLabel>Sales and suppliers</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
+          <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" />
+          <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" />
+          <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" />
+          <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" />
+        </Box>
+
+        {/* Employees and cost */}
+        <SectionLabel>Employees and cost</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
+          <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" />
+          <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" />
+          <StatItem icon={<CartIcon />} label="Cost of goods sold" value={formatMoney(data.cost)} color="text.primary" />
+          <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" />
+        </Box>
+
+        {/* Cash flow this period */}
+        <SectionLabel>Cash flow this period</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
+          <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" />
+          <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" />
+        </Box>
+
+        {/* Charts Row */}
+        <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 2, mt: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales & Profit Trend</Typography>
+              {trendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                    <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                    <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                    <Line type="monotone" dataKey="Revenue" stroke={theme.palette.primary.main} strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="Profit" stroke={theme.palette.success.main} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
-        ))}
-      </Box>
 
-      {/* Sales and suppliers */}
-      <SectionLabel>Sales and suppliers</SectionLabel>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 2, sm: 3 }, mb: 1 }}>
-        <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" />
-        <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" />
-        <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" />
-        <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" />
-      </Box>
+          <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales by Product</Typography>
+              {productData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={productData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value" labelLine={false} label={false}>
+                      {productData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                    <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No product data yet</Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
 
-      {/* Employees and cost */}
-      <SectionLabel>Employees and cost</SectionLabel>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 2, sm: 3 }, mb: 1 }}>
-        <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" />
-        <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" />
-        <StatItem icon={<CartIcon />} label="Cost of goods sold" value={formatMoney(data.cost)} color="text.primary" />
-        <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" />
-      </Box>
+        {/* Cost vs Revenue & Margin % Trend */}
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cost vs Sales</Typography>
+              {costRevenueData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={costRevenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                    <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                    <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                    <Bar dataKey="Cost" fill={theme.palette.secondary.main} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="Revenue" fill={theme.palette.primary.main} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Cash flow this period */}
-      <SectionLabel>Cash flow this period</SectionLabel>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" }, gap: { xs: 2, sm: 3 }, mb: 1 }}>
-        <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" />
-        <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" />
-      </Box>
+          <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+            <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Margin % Trend</Typography>
+              {marginData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={marginData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                    <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                    <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                    <Line type="monotone" dataKey="Margin %" stroke={theme.palette.info.main} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
 
-      {/* Charts Row */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
-          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales & Profit Trend</Typography>
+        {/* Operations & Alerts */}
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mt: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
+            <Typography variant="body2">Sales: {data.invoice_count} invoices | Paid: {formatMoney(data.paid)}</Typography>
+            <Typography variant="body2">Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {formatMoney(data.avg_batch_cost)}</Typography>
+            <Typography variant="body2">Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
+            <Typography variant="body2">Finished stock: {data.packaged_stock_packs} packs</Typography>
+            <Typography variant="body2" sx={{ color: data.pending_orders_count > 0 ? "warning.main" : "text.secondary", fontWeight: data.pending_orders_count > 0 ? 700 : 400 }}>
+              Pending orders: {data.pending_orders_count} {data.order_shortage_count > 0 ? `| ${data.order_shortage_count} units short` : ""}
+            </Typography>
+            {data.recipe_ops && data.recipe_ops.length > 1 && (
+              <Box sx={{ mt: 1.5, borderTop: 1, borderColor: "divider", pt: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.68rem", color: "text.secondary", display: "block", mb: 0.5 }}>Per-recipe breakdown</Typography>
+                <Box sx={{ overflowX: "auto" }}>
+                  <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
+                    <Box component="thead" sx={{ "& th": { fontWeight: 700, fontSize: "0.65rem", color: "text.secondary", textAlign: "left", py: 0.5, px: 0.7, borderBottom: 1, borderColor: "divider", whiteSpace: "nowrap" } }}>
+                      <Box component="tr"><Box component="th">Recipe</Box><Box component="th" sx={{ textAlign: "right" }}>Batches</Box><Box component="th" sx={{ textAlign: "right" }}>Produced</Box><Box component="th" sx={{ textAlign: "right" }}>Ready</Box><Box component="th" sx={{ textAlign: "right" }}>Packed</Box></Box>
+                    </Box>
+                    <Box component="tbody" sx={{ "& td": { py: 0.6, px: 0.7, borderBottom: 1, borderColor: "divider", fontSize: "0.72rem" } }}>
+                      {data.recipe_ops.map((r: any) => (
+                        <Box component="tr" key={r.recipe_id}>
+                          <Box component="td" sx={{ fontWeight: 600 }}>{r.recipe_name}</Box>
+                          <Box component="td" sx={{ textAlign: "right" }}>{r.batch_count}</Box>
+                          <Box component="td" sx={{ textAlign: "right" }}>{r.produced_qty}</Box>
+                          <Box component="td" sx={{ textAlign: "right" }}>{r.ready_to_pack_qty}</Box>
+                          <Box component="td" sx={{ textAlign: "right" }}>{r.packed_packs}</Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+          </CardContent></Card>
+          <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>
+            <Typography variant="body2">Low stock: {data.low_stock_count} | Out of stock: {data.out_of_stock_count}</Typography>
+            <Typography variant="body2">Missing selling price: {data.missing_price_count}</Typography>
+            {data.alerts?.slice(0, 3).map((alert: any) => (
+              <Typography variant="caption" key={`${alert.category}-${alert.name}`} sx={{ display: "block", fontSize: "0.7rem" }}>
+                {alert.category}: {alert.name} ({alert.quantity} {alert.unit})
+              </Typography>
+            ))}
+          </CardContent></Card>
+        </Box>
+
+        {/* Top Products Table */}
+        <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
+          <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Products</Typography>
+            <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Product</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Qty</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Profit</TableCell>
+            </TableRow></TableHead><TableBody>
+              {data.top_products?.slice(0, 5).map((product: any) => <TableRow key={product.name}>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{product.name}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{product.quantity}</TableCell>
+                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(product.profit)}</TableCell>
+              </TableRow>)}
+            </TableBody></Table></TableContainer>
+          </CardContent>
+        </Card>
+
+        {/* Top Customers Table */}
+        <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
+          <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Customers</Typography>
+            <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Customer</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Cost</TableCell>
+              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Profit</TableCell>
+            </TableRow></TableHead><TableBody>
+              {(data.top_customers || []).slice(0, 8).map((customer: any) => (
+                <TableRow key={customer.customer_id} hover sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }} onClick={() => navigate(`/customers/${customer.customer_id}`)}>
+                  <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{customer.name}</TableCell>
+                  <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.revenue)}</TableCell>
+                  <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.cost)}</TableCell>
+                  <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "success.main" : "error.main" }}>{formatMoney(customer.profit)}</TableCell>
+                </TableRow>
+              ))}
+              {(!data.top_customers || data.top_customers.length === 0) && (
+                <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3, fontSize: "0.8rem", color: "text.secondary" }}>No customer data for this period</TableCell></TableRow>
+              )}
+            </TableBody></Table></TableContainer>
+          </CardContent>
+        </Card>
+      </>)}
+
+      {/* === MOBILE: tab-based rendering === */}
+      {isMobile && mobileTab === 0 && (<>
+        <SectionLabel>Sales and suppliers</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
+          <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" />
+          <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" />
+          <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" />
+          <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" />
+        </Box>
+        <SectionLabel>Employees and cost</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
+          <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" />
+          <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" />
+          <StatItem icon={<CartIcon />} label="COGS" value={formatMoney(data.cost)} color="text.primary" />
+          <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" />
+        </Box>
+        <SectionLabel>Cash flow</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
+          <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" />
+          <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" />
+        </Box>
+        <SectionLabel>Operations</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2 }}>
+          <StatItem icon={<CartIcon />} label="Invoices" value={String(data.invoice_count)} color="text.primary" />
+          <StatItem icon={<ReceiptIcon />} label="Batches" value={String(data.batch_count)} color="text.primary" />
+          <StatItem icon={<TruckIcon />} label="Ready to pack" value={String(data.ready_to_pack_qty)} color="text.primary" />
+          <StatItem icon={<TruckIcon />} label="Packed" value={String(data.packed_packs)} color="text.primary" />
+        </Box>
+        {data.pending_orders_count > 0 && (
+          <Box sx={{ mt: 1.5, p: 1, borderRadius: 1, bgcolor: "warning.light" }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, color: "warning.main" }}>
+              {data.pending_orders_count} pending orders{data.order_shortage_count > 0 ? `, ${data.order_shortage_count} units short` : ""}
+            </Typography>
+          </Box>
+        )}
+      </>)}
+
+      {isMobile && mobileTab === 1 && (<>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider", mb: 1.5 }}>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Sales & Profit Trend</Typography>
             {trendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
-                  <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: theme.palette.text.secondary }} />
+                  <YAxis tick={{ fontSize: 9, fill: theme.palette.text.secondary }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
                   <Line type="monotone" dataKey="Revenue" stroke={theme.palette.primary.main} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="Profit" stroke={theme.palette.success.main} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
-            ) : (
-              <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
-              </Box>
-            )}
+            ) : <Box sx={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}><Typography color="text.secondary" sx={{ fontSize: "0.75rem" }}>No data</Typography></Box>}
           </CardContent>
         </Card>
-
-        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
-          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales by Product</Typography>
-            {productData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={productData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                    labelLine={false}
-                    label={false}
-                  >
-                    {productData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
-                  <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <Box sx={{ height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No product data yet</Typography>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Cost vs Revenue & Margin % Trend */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
-          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cost vs Sales</Typography>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider", mb: 1.5 }}>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Cost vs Sales</Typography>
             {costRevenueData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={costRevenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={costRevenueData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
-                  <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: theme.palette.text.secondary }} />
+                  <YAxis tick={{ fontSize: 9, fill: theme.palette.text.secondary }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
                   <Bar dataKey="Cost" fill={theme.palette.secondary.main} radius={[3, 3, 0, 0]} />
                   <Bar dataKey="Revenue" fill={theme.palette.primary.main} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            ) : (
-              <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
-              </Box>
-            )}
+            ) : <Box sx={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}><Typography color="text.secondary" sx={{ fontSize: "0.75rem" }}>No data</Typography></Box>}
           </CardContent>
         </Card>
-
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
-          <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Margin % Trend</Typography>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Margin % Trend</Typography>
             {marginData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={marginData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={marginData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
-                  <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
-                  <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: theme.palette.text.secondary }} />
+                  <YAxis tick={{ fontSize: 9, fill: theme.palette.text.secondary }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
                   <Line type="monotone" dataKey="Margin %" stroke={theme.palette.info.main} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
-            ) : (
-              <Box sx={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography color="text.secondary" sx={{ fontSize: "0.8rem" }}>No trend data for this period</Typography>
-              </Box>
-            )}
+            ) : <Box sx={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}><Typography color="text.secondary" sx={{ fontSize: "0.75rem" }}>No data</Typography></Box>}
           </CardContent>
         </Card>
-      </Box>
+      </>)}
 
-      {/* Operations & Alerts */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: { xs: 1, sm: 2 }, mt: 2 }}>
-        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Sales: {data.invoice_count} invoices | Paid: {formatMoney(data.paid)}</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {formatMoney(data.avg_batch_cost)}</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Finished stock: {data.packaged_stock_packs} packs</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" }, color: data.pending_orders_count > 0 ? "warning.main" : "text.secondary", fontWeight: data.pending_orders_count > 0 ? 700 : 400 }}>
-            Pending orders: {data.pending_orders_count} {data.order_shortage_count > 0 ? `| ${data.order_shortage_count} units short` : ""}
-          </Typography>
-          {data.recipe_ops && data.recipe_ops.length > 1 && (
-            <Box sx={{ mt: 1.5, borderTop: 1, borderColor: "divider", pt: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: "0.68rem", color: "text.secondary", display: "block", mb: 0.5 }}>Per-recipe breakdown</Typography>
-              <Box sx={{ overflowX: "auto" }}>
-                <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.72rem" }}>
-                  <Box component="thead" sx={{ "& th": { fontWeight: 700, fontSize: "0.65rem", color: "text.secondary", textAlign: "left", py: 0.5, px: 0.7, borderBottom: 1, borderColor: "divider", whiteSpace: "nowrap" } }}>
-                    <Box component="tr"><Box component="th">Recipe</Box><Box component="th" sx={{ textAlign: "right" }}>Batches</Box><Box component="th" sx={{ textAlign: "right" }}>Produced</Box><Box component="th" sx={{ textAlign: "right" }}>Ready</Box><Box component="th" sx={{ textAlign: "right" }}>Packed</Box></Box>
-                  </Box>
-                  <Box component="tbody" sx={{ "& td": { py: 0.6, px: 0.7, borderBottom: 1, borderColor: "divider", fontSize: "0.72rem" } }}>
-                    {data.recipe_ops.map((r: any) => (
-                      <Box component="tr" key={r.recipe_id}>
-                        <Box component="td" sx={{ fontWeight: 600 }}>{r.recipe_name}</Box>
-                        <Box component="td" sx={{ textAlign: "right" }}>{r.batch_count}</Box>
-                        <Box component="td" sx={{ textAlign: "right" }}>{r.produced_qty}</Box>
-                        <Box component="td" sx={{ textAlign: "right" }}>{r.ready_to_pack_qty}</Box>
-                        <Box component="td" sx={{ textAlign: "right" }}>{r.packed_packs}</Box>
-                      </Box>
+      {isMobile && mobileTab === 2 && (
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Sales by Product</Typography>
+            {productData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={productData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2} dataKey="value" labelLine={false} label={false}>
+                    {productData.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
-                  </Box>
+                  </Pie>
+                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, fontSize: 11 }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : <Box sx={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}><Typography color="text.secondary" sx={{ fontSize: "0.75rem" }}>No product data yet</Typography></Box>}
+          </CardContent>
+        </Card>
+      )}
+
+      {isMobile && mobileTab === 3 && (<>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider", mb: 1.5 }}>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Top Products</Typography>
+            {data.top_products?.slice(0, 5).map((product: any) => (
+              <Box key={product.name} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: "1px solid", borderColor: "divider" }}>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.8rem" }}>{product.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{product.quantity} units</Typography>
                 </Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.8rem" }}>{formatMoney(product.revenue)}</Typography>
               </Box>
-            </Box>
-          )}
-        </CardContent></Card>
-        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: { xs: 1.5, sm: 2 }, "&:last-child": { pb: { xs: 1.5, sm: 2 } } }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Low stock: {data.low_stock_count} | Out of stock: {data.out_of_stock_count}</Typography>
-          <Typography variant="body2" sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" } }}>Missing selling price: {data.missing_price_count}</Typography>
-          {data.alerts?.slice(0, 3).map((alert: any) => (
-            <Typography variant="caption" key={`${alert.category}-${alert.name}`} sx={{ display: "block", fontSize: "0.7rem" }}>
-              {alert.category}: {alert.name} ({alert.quantity} {alert.unit})
-            </Typography>
-          ))}
-        </CardContent></Card>
-      </Box>
-
-      {/* Top Products Table */}
-      <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
-        <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Products</Typography>
-          <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Product</TableCell>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Qty</TableCell>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Profit</TableCell>
-          </TableRow></TableHead><TableBody>
-            {data.top_products?.slice(0, 5).map((product: any) => <TableRow key={product.name}>
-              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{product.name}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{product.quantity}</TableCell>
-              <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(product.revenue)}</TableCell><TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(product.profit)}</TableCell>
-            </TableRow>)}
-          </TableBody></Table></TableContainer>
-        </CardContent>
-      </Card>
-
-      {/* Top Customers Table */}
-      <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
-        <CardContent sx={{ p: { xs: 1, sm: 2 }, "&:last-child": { pb: { xs: 1, sm: 2 } } }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Customers</Typography>
-          <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Customer</TableCell>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Cost</TableCell>
-            <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Profit</TableCell>
-          </TableRow></TableHead><TableBody>
-            {(data.top_customers || []).slice(0, 8).map((customer: any) => (
-              <TableRow
-                key={customer.customer_id}
-                hover
-                sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
-                onClick={() => navigate(`/customers/${customer.customer_id}`)}
-              >
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 600 }}>{customer.name}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.revenue)}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem" }}>{formatMoney(customer.cost)}</TableCell>
-                <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700, color: customer.profit >= 0 ? "success.main" : "error.main" }}>{formatMoney(customer.profit)}</TableCell>
-              </TableRow>
             ))}
-            {(!data.top_customers || data.top_customers.length === 0) && (
-              <TableRow><TableCell colSpan={4} align="center" sx={{ py: 3, fontSize: "0.8rem", color: "text.secondary" }}>No customer data for this period</TableCell></TableRow>
-            )}
-          </TableBody></Table></TableContainer>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Top Customers</Typography>
+            {(data.top_customers || []).slice(0, 5).map((customer: any) => (
+              <Box key={customer.customer_id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: "1px solid", borderColor: "divider", cursor: "pointer" }} onClick={() => navigate(`/customers/${customer.customer_id}`)}>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.8rem" }}>{customer.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{formatMoney(customer.revenue)} revenue</Typography>
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.8rem", color: customer.profit >= 0 ? "success.main" : "error.main" }}>{formatMoney(customer.profit)}</Typography>
+              </Box>
+            ))}
+          </CardContent>
+        </Card>
+      </>)}
     </Box>
   );
 };

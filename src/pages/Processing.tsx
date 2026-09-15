@@ -1,4 +1,4 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Fab, IconButton, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Fab, IconButton, Menu, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AddIcon from "@mui/icons-material/Add";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
@@ -325,40 +325,17 @@ export const Processing = () => {
         <DialogContent sx={{ pb: 1 }}>
           {detailOrder && (
             <>
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1, mb: 2 }}>
-                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                  <Typography variant="caption" color="text.secondary">Raw ingredient</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.raw_ingredient_name}</Typography>
-                </CardContent></Card>
-                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                  <Typography variant="caption" color="text.secondary">Quantity sent</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.quantity_sent} kg</Typography>
-                </CardContent></Card>
-                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                  <Typography variant="caption" color="text.secondary">Cost/kg</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(detailOrder.cost_per_expected_kg)}</Typography>
-                </CardContent></Card>
-                <Card sx={{ bgcolor: "grey.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                  <Typography variant="caption" color="text.secondary">Total cost</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(detailOrder.total_cost)}</Typography>
-                </CardContent></Card>
-                {detailOrder.quantity_received > 0 && (
-                  <>
-                    <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                      <Typography variant="caption" color="text.secondary">Received</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.quantity_received} kg</Typography>
-                    </CardContent></Card>
-                    <Card sx={{ bgcolor: "success.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                      <Typography variant="caption" color="text.secondary">Yield</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{detailOrder.yield_pct.toFixed(1)}%</Typography>
-                    </CardContent></Card>
-                    <Card sx={{ bgcolor: "info.50" }}><CardContent sx={{ p: 1, "&:last-child": { pb: 1 } }}>
-                      <Typography variant="caption" color="text.secondary">Cost/kg received</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatMoney(detailOrder.cost_per_received_kg)}</Typography>
-                    </CardContent></Card>
-                  </>
-                )}
-              </Box>
+              <StatStrip stats={[
+                { label: "Raw ingredient", value: detailOrder.raw_ingredient_name },
+                { label: "Quantity sent", value: `${detailOrder.quantity_sent} kg` },
+                { label: "Cost/kg", value: formatMoney(detailOrder.cost_per_expected_kg) },
+                { label: "Total cost", value: formatMoney(detailOrder.total_cost) },
+                ...(detailOrder.quantity_received > 0 ? [
+                  { label: "Received", value: `${detailOrder.quantity_received} kg`, color: "success.main" },
+                  { label: "Yield", value: `${detailOrder.yield_pct.toFixed(1)}%`, color: "success.main" },
+                  { label: "Cost/kg received", value: formatMoney(detailOrder.cost_per_received_kg), color: "info.main" },
+                ] : []),
+              ]} />
 
               {detailOrder.notes && <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Notes: {detailOrder.notes}</Typography>}
             </>
