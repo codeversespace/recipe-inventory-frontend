@@ -1,6 +1,7 @@
 import {
   Box, Button, Card, CardContent, CircularProgress, Stack, TextField,
   Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  useTheme,
 } from "@mui/material";
 import {
   AttachMoney as MoneyIcon,
@@ -58,7 +59,7 @@ const MiniSparkline = ({ data, color }: { data: number[]; color: string }) => {
   return (
     <ResponsiveContainer width="100%" height={40}>
       <LineChart data={chartData} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
-        <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} activeDot={false} />
+        <Line type="monotone" dataKey="v" stroke={color} strokeWidth={2} dot={false} activeDot={false} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -82,6 +83,7 @@ const StatItem = ({ icon, label, value, color }: { icon: React.ReactNode; label:
 
 export const Dashboard = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const initialRange = rangeFor("last7");
   const [preset, setPreset] = useState("last7");
   const [startDate, setStartDate] = useState(initialRange.start);
@@ -138,23 +140,23 @@ export const Dashboard = () => {
     {
       label: "Total sales",
       value: formatMoney(data.revenue),
-      color: "text.primary",
+      color: theme.palette.text.primary,
       sparkData: revenueSparkline,
-      sparkColor: "success.main",
+      sparkColor: theme.palette.success.main,
     },
     {
       label: "Profit",
       value: formatMoney(data.profit),
-      color: data.profit >= 0 ? "success.main" : "error.main",
+      color: data.profit >= 0 ? theme.palette.success.main : theme.palette.error.main,
       sparkData: profitSparkline,
-      sparkColor: data.profit >= 0 ? "success.main" : "error.main",
+      sparkColor: data.profit >= 0 ? theme.palette.success.main : theme.palette.error.main,
     },
     {
       label: "Net cash",
       value: formatMoney(netCash),
-      color: netCash >= 0 ? "success.main" : "error.main",
+      color: netCash >= 0 ? theme.palette.success.main : theme.palette.error.main,
       sparkData: cashSparkline,
-      sparkColor: netCash >= 0 ? "success.main" : "error.main",
+      sparkColor: netCash >= 0 ? theme.palette.success.main : theme.palette.error.main,
     },
   ];
 
@@ -251,13 +253,13 @@ export const Dashboard = () => {
             {trendData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="divider" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="Revenue" stroke="primary.main" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="Profit" stroke="success.main" strokeWidth={2} dot={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                  <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                  <Line type="monotone" dataKey="Revenue" stroke={theme.palette.primary.main} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="Profit" stroke={theme.palette.success.main} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -289,8 +291,8 @@ export const Dashboard = () => {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
-                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <RechartsTooltip formatter={(value: any) => formatMoney(value)} contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: theme.palette.text.secondary }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -310,13 +312,13 @@ export const Dashboard = () => {
             {costRevenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={costRevenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="divider" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="Cost" fill="secondary.main" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Revenue" fill="primary.main" radius={[3, 3, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                  <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                  <Bar dataKey="Cost" fill={theme.palette.secondary.main} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Revenue" fill={theme.palette.primary.main} radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -333,12 +335,12 @@ export const Dashboard = () => {
             {marginData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={marginData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="divider" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: 1, borderColor: "divider" }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="Margin %" stroke="info.main" strokeWidth={2} dot={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                  <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: theme.palette.text.secondary }} />
+                  <Line type="monotone" dataKey="Margin %" stroke={theme.palette.info.main} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (

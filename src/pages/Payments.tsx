@@ -1,4 +1,4 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Select, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useTheme } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useSuppliers, useSupplierPayments } from "../hooks/useApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
@@ -26,6 +26,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const Payments = () => {
+  const theme = useTheme();
   const { data: sales = [], isLoading: salesLoading } = usePaymentsSales();
   const { data: customers = [], isLoading: customersLoading } = useCustomers();
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
@@ -143,17 +144,17 @@ export const Payments = () => {
               <AreaChart data={cashFlowData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <defs>
                   <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#388e3c" stopOpacity={0.3} />
-                    <stop offset="50%" stopColor="#388e3c" stopOpacity={0.05} />
-                    <stop offset="50%" stopColor="#d32f2f" stopOpacity={0.05} />
-                    <stop offset="100%" stopColor="#d32f2f" stopOpacity={0.3} />
+                    <stop offset="0%" stopColor={theme.palette.success.main} stopOpacity={0.3} />
+                    <stop offset="50%" stopColor={theme.palette.success.main} stopOpacity={0.05} />
+                    <stop offset="50%" stopColor={theme.palette.error.main} stopOpacity={0.05} />
+                    <stop offset="100%" stopColor={theme.palette.error.main} stopOpacity={0.3} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="divider" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
+                <YAxis tick={{ fontSize: 10, fill: theme.palette.text.secondary }} />
                 <RechartsTooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="Balance" stroke="primary.main" strokeWidth={2} fill="url(#balanceGradient)" dot={{ r: 3, fill: "primary.main" }} />
+                <Area type="monotone" dataKey="Balance" stroke={theme.palette.primary.main} strokeWidth={2} fill="url(#balanceGradient)" dot={{ r: 3, fill: theme.palette.primary.main }} />
               </AreaChart>
             </ResponsiveContainer>
             <Box sx={{ display: "flex", gap: 2, mt: 0.5, justifyContent: "center" }}>
