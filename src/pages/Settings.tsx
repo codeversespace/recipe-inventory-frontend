@@ -1,7 +1,8 @@
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Collapse, FormControl, IconButton, InputLabel, MenuItem, Select, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
-import { ChangeEvent, Fragment, useState } from "react";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import { ChangeEvent, Fragment, useEffect, useState } from "react";
 import { useAuthActivities, useAppSettings, useUpdateAppSetting, useAuthRoles, useAuthUsers, useCreateAuthUser, useResetAuthPassword, useUpdateAuthUser } from "../hooks/useApi";
 import { ConfirmDialog, EmptyState, PageHeader, TableSkeleton } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -24,8 +25,19 @@ export const Settings = () => {
   const [resetUserId, setResetUserId] = useState<number | null>(null);
   const [resetValue, setResetValue] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState<null | "backup" | "restore" | "clear" | "reset" | "toggle">(null);
+  const [busy, setBusy] = useState<null | "backup" | "restore" | "clear" | "reset" | "toggle" | "backupNow">(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  // Backup settings state
+  const [backupFreq, setBackupFreq] = useState("none");
+  const [backupTime, setBackupTime] = useState("02:00");
+  const [backupDayOfWeek, setBackupDayOfWeek] = useState(0);
+  const [backupDayOfMonth, setBackupDayOfMonth] = useState(1);
+  const [backupEnabled, setBackupEnabled] = useState(false);
+  const [backupLogs, setBackupLogs] = useState<any[]>([]);
+  const [backupSettingsLoading, setBackupSettingsLoading] = useState(true);
+  const [backupLogsLoading, setBackupLogsLoading] = useState(true);
+  const [backupMessage, setBackupMessage] = useState("");
 
   const toggleActive = async (managedUser: any) => {
     if (busy) return;
@@ -69,12 +81,21 @@ export const Settings = () => {
     if (busy) return;
     setBusy("backup");
     try {
-      const response = await api.get("/backup/download", { responseType: "blob" });
-      const url = URL.createObjectURL(response.data);
+      const response = await api.get("/backup/download", { responseType: "blob", timeout: 60000 });
+      const blob = response.data as Blob;
+      if (blob.type && blob.type.includes("application/json")) {
+        const text = await blob.text();
+        const parsed = JSON.parse(text);
+        setError(parsed.detail || "Could not download backup.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = "recipe-inventory-backup.db";
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not download backup.");
@@ -119,6 +140,91 @@ export const Settings = () => {
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not reset data.");
       setBusy(null);
+    }
+  };
+
+  // ── Backup settings functions ──────────────────────────────────────────────
+  const fetchBackupSettings = async () => {
+    try {
+      const { data } = await api.get("/backup/settings");
+      setBackupFreq(data.frequency);
+      setBackupTime(data.time_of_day);
+      setBackupDayOfWeek(data.day_of_week);
+      setBackupDayOfMonth(data.day_of_month);
+      setBackupEnabled(data.enabled);
+    } catch {
+      // settings may not exist yet
+    } finally {
+      setBackupSettingsLoading(false);
+    }
+  };
+
+  const fetchBackupLogs = async () => {
+    try {
+      const { data } = await api.get("/backup/logs", { params: { limit: 20 } });
+      setBackupLogs(data);
+    } catch {
+      // ignore
+    } finally {
+      setBackupLogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackupSettings();
+    fetchBackupLogs();
+  }, []);
+
+  const saveBackupSettings = async () => {
+    try {
+      await api.put("/backup/settings", {
+        frequency: backupFreq,
+        time_of_day: backupTime,
+        day_of_week: backupDayOfWeek,
+        day_of_month: backupDayOfMonth,
+        enabled: backupEnabled,
+      });
+      setBackupMessage("Backup settings saved");
+      setTimeout(() => setBackupMessage(""), 3000);
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not save backup settings.");
+    }
+  };
+
+  const triggerManualBackup = async () => {
+    setBusy("backupNow");
+    setBackupMessage("");
+    try {
+      const { data } = await api.post("/backup/trigger");
+      setBackupMessage(`Backup created: ${data.filename} (${(data.size_bytes / 1024).toFixed(1)} KB)`);
+      fetchBackupLogs();
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not create backup.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const downloadBackupFile = async (filename: string) => {
+    try {
+      const response = await api.get(`/backup/download/${encodeURIComponent(filename)}`, { responseType: "blob", timeout: 60000 });
+      const blob = response.data as Blob;
+      if (blob.type && blob.type.includes("application/json")) {
+        const text = await blob.text();
+        const parsed = JSON.parse(text);
+        setError(parsed.detail || "Could not download backup.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (requestError: any) {
+      setError(requestError.response?.data?.detail || "Could not download backup file.");
     }
   };
   const [confirmAction, setConfirmAction] = useState<null | "clear" | "reset">(null);
@@ -190,6 +296,114 @@ export const Settings = () => {
           </Box>
         </CardContent>
       </Card>
+
+      {/* ── Scheduled Backup Settings ──────────────────────────────────── */}
+      {user?.role === "super_admin" && (
+        <Card sx={{ maxWidth: 1100, mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>Scheduled Backup</Typography>
+            <Typography color="text.secondary" sx={{ mb: 2 }}>Configure automatic database backups. Backups are stored in the <code>backups/</code> folder.</Typography>
+
+            {backupSettingsLoading ? <CircularProgress size={20} /> : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Auto-backup</Typography>
+                    <Typography variant="caption" color="text.secondary">Automatically create database backups on schedule</Typography>
+                  </Box>
+                  <Switch checked={backupEnabled} onChange={(e) => setBackupEnabled(e.target.checked)} />
+                </Box>
+
+                {backupEnabled && (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "flex-end" }}>
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <InputLabel>Frequency</InputLabel>
+                      <Select value={backupFreq} label="Frequency" onChange={(e) => setBackupFreq(e.target.value)}>
+                        <MenuItem value="daily">Daily</MenuItem>
+                        <MenuItem value="weekly">Weekly</MenuItem>
+                        <MenuItem value="monthly">Monthly</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <TextField size="small" label="Time (HH:MM)" type="time" value={backupTime} onChange={(e) => setBackupTime(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} sx={{ minWidth: 130 }} />
+
+                    {backupFreq === "weekly" && (
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel>Day of week</InputLabel>
+                        <Select value={backupDayOfWeek} label="Day of week" onChange={(e) => setBackupDayOfWeek(Number(e.target.value))}>
+                          <MenuItem value={0}>Monday</MenuItem>
+                          <MenuItem value={1}>Tuesday</MenuItem>
+                          <MenuItem value={2}>Wednesday</MenuItem>
+                          <MenuItem value={3}>Thursday</MenuItem>
+                          <MenuItem value={4}>Friday</MenuItem>
+                          <MenuItem value={5}>Saturday</MenuItem>
+                          <MenuItem value={6}>Sunday</MenuItem>
+                        </Select>
+                      </FormControl>
+                    )}
+
+                    {backupFreq === "monthly" && (
+                      <TextField size="small" label="Day of month" type="number" value={backupDayOfMonth} onChange={(e) => setBackupDayOfMonth(Number(e.target.value))} slotProps={{ htmlInput: { min: 1, max: 28 } }} sx={{ minWidth: 120 }} />
+                    )}
+
+                    <Button variant="contained" onClick={saveBackupSettings} size="small">Save schedule</Button>
+                  </Box>
+                )}
+
+                <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1 }}>
+                  <Button variant="outlined" startIcon={<CloudUploadIcon />} onClick={triggerManualBackup} disabled={busy === "backupNow"} size="small">
+                    {busy === "backupNow" ? <CircularProgress size={18} /> : "Backup now"}
+                  </Button>
+                  {backupMessage && <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>{backupMessage}</Typography>}
+                </Box>
+              </Box>
+            )}
+
+            {/* Backup History */}
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Backup History</Typography>
+              {backupLogsLoading ? <CircularProgress size={20} /> : backupLogs.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">No backups yet.</Typography>
+              ) : (
+                <TableContainer sx={{ overflowX: "auto" }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontSize: "0.75rem" }}>Date</TableCell>
+                        <TableCell sx={{ fontSize: "0.75rem" }}>Filename</TableCell>
+                        <TableCell sx={{ fontSize: "0.75rem" }}>Size</TableCell>
+                        <TableCell sx={{ fontSize: "0.75rem" }}>Status</TableCell>
+                        <TableCell sx={{ fontSize: "0.75rem" }}>Source</TableCell>
+                        <TableCell sx={{ fontSize: "0.75rem" }}></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {backupLogs.map((log: any) => (
+                        <TableRow key={log.id}>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>{new Date(log.created_at).toLocaleString()}</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>{log.filename}</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>{(log.size_bytes / 1024).toFixed(1)} KB</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>
+                            <Typography variant="caption" sx={{ color: log.status === "success" ? "success.main" : "error.main", fontWeight: 600 }}>
+                              {log.status}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>{log.triggered_by}</TableCell>
+                          <TableCell sx={{ fontSize: "0.75rem" }}>
+                            <Button size="small" variant="outlined" onClick={() => downloadBackupFile(log.filename)} sx={{ fontSize: "0.7rem", py: 0, minWidth: 0 }}>
+                              Download
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
+      )}
       <Card sx={{ maxWidth: 1100, mt: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>Feature toggles</Typography>
