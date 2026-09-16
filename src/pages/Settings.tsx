@@ -89,10 +89,13 @@ export const Settings = () => {
         setError(parsed.detail || "Could not download backup.");
         return;
       }
+      const contentDisp = response.headers["content-disposition"] || "";
+      const filenameMatch = contentDisp.match(/filename="?([^";\s]+)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : "recipe-inventory-backup.db";
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "recipe-inventory-backup.db";
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -195,8 +198,26 @@ export const Settings = () => {
     setBusy("backupNow");
     setBackupMessage("");
     try {
-      const { data } = await api.post("/backup/trigger");
-      setBackupMessage(`Backup created: ${data.filename} (${(data.size_bytes / 1024).toFixed(1)} KB)`);
+      const response = await api.get("/backup/download", { responseType: "blob", timeout: 60000 });
+      const blob = response.data as Blob;
+      if (blob.type && blob.type.includes("application/json")) {
+        const text = await blob.text();
+        const parsed = JSON.parse(text);
+        setError(parsed.detail || "Could not create backup.");
+        return;
+      }
+      const contentDisp = response.headers["content-disposition"] || "";
+      const filenameMatch = contentDisp.match(/filename="?([^";\s]+)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : "backup.db";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setBackupMessage(`Backup downloaded: ${filename} (${(blob.size / 1024).toFixed(1)} KB)`);
       fetchBackupLogs();
     } catch (requestError: any) {
       setError(requestError.response?.data?.detail || "Could not create backup.");
