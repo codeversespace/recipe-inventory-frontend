@@ -290,7 +290,7 @@ export const Settings = () => {
           <Typography variant="h6" gutterBottom>Database administration</Typography>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button variant="outlined" onClick={downloadBackup} disabled={busy !== null}>{busy === "backup" ? <CircularProgress size={18} /> : "Download full backup"}</Button>
-            <Button variant="outlined" component="label" disabled={busy !== null}>{busy === "restore" ? <CircularProgress size={18} /> : "Restore database"}<input hidden type="file" accept=".db,.sqlite" onChange={restoreBackup} /></Button>
+            <Button variant="outlined" component="label" disabled={busy !== null}>{busy === "restore" ? <CircularProgress size={18} /> : "Restore database"}<input hidden type="file" accept=".db,.sqlite,.dump" onChange={restoreBackup} /></Button>
             <Button color="warning" variant="outlined" onClick={() => setConfirmAction("reset")} disabled={busy !== null}>Reset all data</Button>
             <Button color="error" variant="outlined" onClick={() => setConfirmAction("clear")} disabled={busy !== null}>Delete everything</Button>
           </Box>
@@ -302,14 +302,15 @@ export const Settings = () => {
         <Card sx={{ maxWidth: 1100, mt: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>Scheduled Backup</Typography>
-            <Typography color="text.secondary" sx={{ mb: 2 }}>Configure automatic database backups. Backups are stored in the <code>backups/</code> folder.</Typography>
+            <Typography color="text.secondary" sx={{ mb: 2 }}>Configure automatic database backups. Requires a non-serverless environment (self-hosted or VPS) with persistent filesystem.</Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>On serverless deployments (Vercel, AWS Lambda), scheduled backups are not available. Use <strong>Download backup</strong> above to save a snapshot manually.</Alert>
 
             {backupSettingsLoading ? <CircularProgress size={20} /> : (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Auto-backup</Typography>
-                    <Typography variant="caption" color="text.secondary">Automatically create database backups on schedule</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Scheduled auto-backup</Typography>
+                    <Typography variant="caption" color="text.secondary">Run backups automatically on a schedule (daily, weekly, or monthly). Requires a persistent server.</Typography>
                   </Box>
                   <Switch checked={backupEnabled} onChange={(e) => setBackupEnabled(e.target.checked)} />
                 </Box>
