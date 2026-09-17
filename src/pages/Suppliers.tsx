@@ -292,55 +292,51 @@ export const Suppliers = () => {
             </Box>
           </Box>
           {/* Mobile ledger cards */}
-          <Box sx={{ display: { xs: "block", sm: "none" } }}>
-            {filteredUnified.map((txn: any) => (
-              <Card key={txn.id} variant="outlined" sx={{ mb: 1, borderRadius: 2 }}>
-                <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.5 }}>
+          <Box sx={{ display: { xs: "block", sm: "none" }, bgcolor: "background.paper", borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+            {filteredUnified.map((txn: any, index: number) => {
+              const isPayment = txn._type === "payment";
+              const bal = balanceMap[txn.id] ?? 0;
+              return (
+                <Box key={txn.id}>
+                  {index > 0 && <Box sx={{ mx: 1.5, borderBottom: "1px solid", borderColor: "divider" }} />}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, px: 1.5, py: 1, minHeight: 52 }}>
                     <Box
                       sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         fontSize: "0.6rem",
                         fontWeight: 800,
-                        letterSpacing: 0.5,
-                        px: 1,
-                        py: 0.3,
-                        borderRadius: 1,
-                        color: txn._type === "payment" ? "success.main" : "text.secondary",
-                        bgcolor: txn._type === "payment" ? "success.50" : "grey.100",
-                        border: 1,
-                        borderColor: "divider",
+                        letterSpacing: 0.4,
+                        flexShrink: 0,
+                        color: isPayment ? "success.main" : "text.secondary",
+                        bgcolor: isPayment ? "success.light" : "grey.200",
                       }}
                     >
-                      {txn._type === "payment" ? "PAYMENT" : "PURCHASE"}
+                      {isPayment ? "PAY" : "PUR"}
                     </Box>
-                    <Box sx={{ textAlign: "right" }}>
-                      <Typography variant="caption" sx={{ fontSize: "0.7rem", color: "text.secondary", whiteSpace: "nowrap", display: "block" }}>{formatDate(txn.dateRaw)} {String(txn.dateRaw).slice(11, 16)}</Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontSize: "0.62rem",
-                          fontWeight: 700,
-                          color: balanceMap[txn.id] > 0.5 ? "error.main" : balanceMap[txn.id] < -0.5 ? "warning.main" : "success.main",
-                          display: "block",
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        Bal: {formatMoney(balanceMap[txn.id] ?? 0)}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontSize: "0.8rem", fontWeight: 500, lineHeight: 1.3 }} noWrap>{txn.title}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "text.secondary", lineHeight: 1.3 }}>
+                        {formatDate(txn.dateRaw)} {String(txn.dateRaw).slice(11, 16)}
+                        {txn.reference ? ` · ${txn.reference}` : ""}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                      <Typography variant="body2" sx={{ fontSize: "0.8rem", fontWeight: 600, lineHeight: 1.3, color: isPayment ? "success.main" : "text.primary" }} className="tnum">
+                        {isPayment ? "+" : ""}{formatMoney(txn.amount)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: "0.62rem", fontWeight: 700, lineHeight: 1.3, color: bal > 0.5 ? "error.main" : bal < -0.5 ? "warning.main" : "success.main" }}>
+                        Bal {formatMoney(bal)}
                       </Typography>
                     </Box>
                   </Box>
-                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: "0.88rem", lineHeight: 1.3 }}>{txn.title}</Typography>
-                  {txn.subtitle && <Typography variant="caption" sx={{ fontSize: "0.72rem", color: "text.secondary" }}>{txn.subtitle}</Typography>}
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 0.8 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 800, fontSize: "0.9rem", color: txn._type === "payment" ? "success.main" : "text.primary" }}>
-                      {txn._type === "payment" ? "+" : ""}
-                      {formatMoney(txn.amount)}
-                    </Typography>
-                    {txn.reference && <Typography variant="caption" sx={{ fontSize: "0.68rem", color: "text.secondary", bgcolor: "grey.50", px: 0.8, py: 0.25, borderRadius: 1 }}>{txn.reference}</Typography>}
-                  </Box>
-                </CardContent>
-              </Card>
-            ))}
+                </Box>
+              );
+            })}
           </Box>
           <Typography variant="caption" sx={{ display: "block", mt: 1, textAlign: "center", color: "text.secondary", fontSize: "0.68rem" }}>
             {filteredUnified.length} of {unifiedTransactions.length} transactions · sorted newest first
