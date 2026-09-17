@@ -24,7 +24,6 @@ import {
   Checkbox,
   Chip,
   FormControlLabel,
-  Stack,
   useMediaQuery,
   useTheme,
 } from "@mui/material";
@@ -47,8 +46,7 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
-import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormActions, FormSection, Money, OverflowMenu, PageHeader, TableSkeleton } from "../components/ui";
-import { ListItemCard } from "../components/ui/ListItemCard";
+import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, FormActions, FormSection, Money, OverflowMenu, PageHeader, PurchaseRow, TableSkeleton } from "../components/ui";
 
 export const Purchases = () => {
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
@@ -309,38 +307,33 @@ export const Purchases = () => {
         <ErrorState message={(purchasesError as any).message} onRetry={() => refetchPurchases()} />
       ) : visiblePurchases.length ? (
         isMobile ? (
-          <Stack spacing={1.5}>
-            {visiblePurchases.map((p: any) => (
-              <ListItemCard
-                key={p.id}
-                title={p.supplier_name || "—"}
-                subtitle={`${formatDate(p.purchased_at)} · ${p.item_name}`}
-                primaryValue={<Money value={p.total_amount} />}
-                meta={[
-                  { label: "Unit price", value: <Money value={p.unit_price} /> },
-                  { label: "Quantity", value: `${p.quantity} ${p.unit}` },
-                  { label: "Category", value: catLabel(p.category) },
-                  ...(p.reference ? [{ label: "Reference", value: p.reference }] : []),
-                  { label: "Price trend", value: (
-                    <ResponsiveContainer width={80} height={24}>
-                      <LineChart data={(priceHistory[p.item_name] || []).slice(-5)}>
-                        <Line type="monotone" dataKey="price" stroke="#1976d2" strokeWidth={1.5} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) },
-                ]}
-                actions={
-                  <OverflowMenu
-                    ariaLabel={`Purchase ${p.id} actions`}
-                    actions={[
-                      { label: "Edit", onClick: () => handleEdit(p) },
-                      { label: "Delete", danger: true, onClick: () => setDeleteTarget(p) },
-                    ]}
-                  />
-                }
-              />
+          <Box sx={{ bgcolor: "background.paper", borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+            {visiblePurchases.map((p: any, index: number) => (
+              <Box key={p.id}>
+                {index > 0 && <Box sx={{ mx: 1.5, borderBottom: "1px solid", borderColor: "divider" }} />}
+                <PurchaseRow
+                  itemName={p.item_name}
+                  supplierName={p.supplier_name || "—"}
+                  quantity={p.quantity}
+                  unit={p.unit}
+                  unitPrice={p.unit_price}
+                  totalAmount={p.total_amount}
+                  category={p.category}
+                  date={formatDate(p.purchased_at)}
+                  reference={p.reference}
+                  actions={
+                    <OverflowMenu
+                      ariaLabel={`Purchase ${p.id} actions`}
+                      actions={[
+                        { label: "Edit", onClick: () => handleEdit(p) },
+                        { label: "Delete", danger: true, onClick: () => setDeleteTarget(p) },
+                      ]}
+                    />
+                  }
+                />
+              </Box>
             ))}
-          </Stack>
+          </Box>
         ) : (
         <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
           <Table size="small" sx={{ minWidth: 900 }}>
