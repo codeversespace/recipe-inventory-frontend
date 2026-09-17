@@ -13,3 +13,4 @@ export { OverflowMenu } from "./OverflowMenu";
 export type { OverflowAction } from "./OverflowMenu";
 export { ListItemCard } from "./ListItemCard";
 export { StatStrip } from "./StatStrip";
+export { TransactionRow } from "./TransactionRow";

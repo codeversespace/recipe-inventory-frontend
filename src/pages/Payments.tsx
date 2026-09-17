@@ -3,8 +3,7 @@ import { useMemo, useState } from "react";
 import { useAddSupplierPaymentFromPayments, useCustomerPayment, useCustomers, usePaymentHistory, usePaymentsSales, useSuppliers, useSupplierPayments } from "../hooks/useApi";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { VoiceInput } from "../components/VoiceInput";
-import { EmptyState, PageHeader, TableSkeleton } from "../components/ui";
-import { ListItemCard } from "../components/ui/ListItemCard";
+import { EmptyState, PageHeader, TableSkeleton, TransactionRow } from "../components/ui";
 import { bestMatch } from "../utils/fuzzy";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
@@ -191,30 +190,28 @@ export const Payments = () => {
         <VoiceInput onResult={handlePaymentVoice} label="Quick voice payment" variant="payment" />
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setCustomerOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Receive</Button>
       </Box>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {salesLoading ? <TableSkeleton rows={4} colSpan={4} /> : filtered.length ? filtered.map((sale: any) => {
+      <Box sx={{ bgcolor: "background.paper", borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+        {salesLoading ? <TableSkeleton rows={4} colSpan={4} /> : filtered.length ? filtered.map((sale: any, index: number) => {
           const paidStatus = (sale.payment_status || "").toUpperCase();
-          const statusKind = paidStatus === "PAID" ? "success" : paidStatus === "PARTIAL" ? "warning" : paidStatus === "DUE" ? "error" : "default";
           return (
-            <ListItemCard
-              key={sale.id}
-              title={`#${sale.id}${sale.reference ? ` ${sale.reference}` : ""}`}
-              subtitle={sale.customer_name || "Walk-in"}
-              primaryValue={
-                <Box sx={{ color: sale.amount_due > 0 ? "error.main" : "success.main" }}>{formatMoney(sale.amount_due)}</Box>
-              }
-              status={{ kind: statusKind as any, label: sale.payment_status }}
-              meta={[
-                { label: "Total", value: formatMoney(sale.total_amount) },
-                { label: "Paid", value: formatMoney(sale.amount_paid) },
-              ]}
-            />
+            <Box key={sale.id}>
+              {index > 0 && <Box sx={{ mx: 1.5, borderBottom: "1px solid", borderColor: "divider" }} />}
+              <TransactionRow
+                name={sale.customer_name || "Walk-in"}
+                invoiceNumber={sale.id}
+                reference={sale.reference}
+                date={formatDate(sale.sold_at)}
+                totalAmount={sale.total_amount}
+                amountDue={sale.amount_due}
+                status={paidStatus}
+              />
+            </Box>
           );
-        }) : <EmptyState title="No invoices found." message="Sales with pending dues will appear here." />}
-        <Box sx={{ display: "flex", justifyContent: "space-between", px: 1.5, py: 1, bgcolor: "action.hover", borderRadius: 1 }}>
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>Total Due</Typography>
-          <Typography variant="body2" sx={{ fontWeight: 700, color: "error.main" }}>{formatMoney(filteredDue)}</Typography>
-        </Box>
+        }) : <Box sx={{ py: 4 }}><EmptyState title="No invoices found." message="Sales with pending dues will appear here." /></Box>}
+      </Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", px: 1.5, py: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>Total Due</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: "error.main" }}>{formatMoney(filteredDue)}</Typography>
       </Box>
       {historyOpen && <Card sx={{ mt: 2 }}><CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}><Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Payment history</Typography>{historyLoading ? <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>Loading...</Typography> : <TableContainer><Table size="small"><TableHead><TableRow>
         <TableCell sx={cellSx}>Date</TableCell><TableCell sx={cellSx}>Customer</TableCell><TableCell sx={cellSx}>Amount</TableCell><TableCell sx={cellSx}>Method</TableCell>
@@ -238,20 +235,19 @@ export const Payments = () => {
         <VoiceInput onResult={handlePaymentVoice} label="Quick voice payment" variant="payment" />
         <Button variant="contained" size="small" onClick={() => { setAmount(""); setReference(""); setNotes(""); setSupplierOpen(true); }} sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, whiteSpace: "nowrap" }}>+ Payment</Button>
       </Box>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {supplierHistoryLoading ? <TableSkeleton rows={4} colSpan={4} /> : filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any) => (
-          <ListItemCard
-            key={payment.id}
-            title={payment.supplier_name}
-            subtitle={`${formatDate(payment.paid_at)} · ${payment.method}`}
-            primaryValue={formatMoney(payment.amount)}
-            status={{ kind: "info", label: payment.method }}
-            meta={[
-              { label: "Date", value: formatDate(payment.paid_at) },
-              { label: "Method", value: payment.method },
-            ]}
-          />
-        )) : <EmptyState title="No supplier payments recorded." message="Recorded supplier payments will appear here." />}
+      <Box sx={{ bgcolor: "background.paper", borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+        {supplierHistoryLoading ? <TableSkeleton rows={4} colSpan={4} /> : filteredSupplierPayments.length ? filteredSupplierPayments.map((payment: any, index: number) => (
+          <Box key={payment.id}>
+            {index > 0 && <Box sx={{ mx: 1.5, borderBottom: "1px solid", borderColor: "divider" }} />}
+            <TransactionRow
+              name={payment.supplier_name}
+              date={formatDate(payment.paid_at)}
+              totalAmount={payment.amount}
+              amountDue={0}
+              status="PAID"
+            />
+          </Box>
+        )) : <Box sx={{ py: 4 }}><EmptyState title="No supplier payments recorded." message="Recorded supplier payments will appear here." /></Box>}
       </Box>
     </>}
 
