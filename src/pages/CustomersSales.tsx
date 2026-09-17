@@ -1,15 +1,15 @@
-import { Alert, Autocomplete, Box, Button, Card, CardContent, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Fab, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Card, CardContent, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Fab, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, useMediaQuery, useTheme } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAddCustomer, useAddSale, useCustomerPrices, useCustomerProfile, useCustomers, useSaleableStock, useUpdateCustomer, useSales } from "../hooks/useApi";
 import { VoiceInput } from "../components/VoiceInput";
-import { EmptyState, ErrorState, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
-import { ListItemCard } from "../components/ui/ListItemCard";
+import { EmptyState, ErrorState, OverflowMenu, PageHeader, StatusChip, TableSkeleton, TransactionRow } from "../components/ui";
 import { bestMatch } from "../utils/fuzzy";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
+import { printInvoice } from "../utils/printInvoice";
 
 type SaleLine = { stock_item_id: number; quantity: number; unit_price: string; allocations?: { batch_id: number; quantity: number }[] };
 
@@ -175,36 +175,23 @@ export const CustomersSales = () => {
       ) : salesError ? (
         <ErrorState message={(salesError as any).message} onRetry={() => refetchSales()} />
       ) : sales.length ? (
-        <Stack spacing={1.5}>
-          {sales.map((sale: any) => {
-            const hasDue = sale.amount_due > 0;
-            const metaItems = [
-              { label: "Paid", value: formatMoney(sale.amount_paid) },
-              ...(hasDue ? [{ label: "Due", value: formatMoney(sale.amount_due) }] : []),
-              ...sale.lines.map((line: any) => ({
-                label: line.item_name || line.recipe_name,
-                value: `× ${line.quantity} · ${formatMoney(line.line_total)}`
-              }))
-            ];
-            return (
-              <ListItemCard
-                key={sale.id}
-                title={sale.customer_name || "Walk-in"}
-                subtitle={`#${sale.id}${sale.reference ? ` · ${sale.reference}` : ""} · ${formatDate(sale.sold_at)}${hasDue ? ` · Due ${formatMoney(sale.amount_due)}` : ""}`}
-                primaryValue={formatMoney(sale.total_amount)}
-                status={{ kind: saleStatus(sale.payment_status), label: sale.payment_status }}
-                meta={metaItems}
-                actions={
-                  <OverflowMenu
-                    ariaLabel={`Sale ${sale.id} actions`}
-                    actions={[{ label: "Print invoice", onClick: () => window.print() }]}
-                  />
-                }
+        <Box sx={{ bgcolor: "background.paper", borderRadius: 2, overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
+          {sales.map((sale: any, index: number) => (
+            <Box key={sale.id}>
+              {index > 0 && <Box sx={{ mx: 1.5, borderBottom: "1px solid", borderColor: "divider" }} />}
+              <TransactionRow
+                name={sale.customer_name || "Walk-in"}
+                invoiceNumber={sale.id}
+                reference={sale.reference}
+                date={formatDate(sale.sold_at)}
+                totalAmount={sale.total_amount}
+                amountDue={sale.amount_due}
+                status={(sale.payment_status || "").toUpperCase()}
                 onClick={() => setInvoiceSale(sale)}
               />
-            );
-          })}
-        </Stack>
+            </Box>
+          ))}
+        </Box>
       ) : (
         <EmptyState title="No sales yet." message="Record your first sale to see invoice history here." actionLabel="Record sale" onAction={() => { setSaleLines([]); setCustomerId(0); setSaleError(""); setSaleOpen(true); }} />
       )}
@@ -395,12 +382,12 @@ export const CustomersSales = () => {
       </DialogActions>
     </Dialog>
     <Dialog open={!!profileId} onClose={() => setProfileId(0)} maxWidth="lg" fullWidth><DialogTitle>{profile?.name || "Customer profile"}</DialogTitle><DialogContent>{profile && <><Typography color="text.secondary">{profile.phone || "No phone"} · {profile.email || "No email"} · Credit limit: {formatMoney(profile.credit_limit || 0)}{profile.advance_balance > 0 ? ` · Advance: ${formatMoney(profile.advance_balance)}` : ""}</Typography><Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 2, my: 2 }}><Card><CardContent><Typography variant="caption">Sales</Typography><Typography variant="h6">{profile.total_sales}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Billed</Typography><Typography variant="h6">{formatMoney(profile.total_billed)}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Paid</Typography><Typography variant="h6">{formatMoney(profile.total_paid)}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Due</Typography><Typography variant="h6" color={profile.total_due ? "error" : "success.main"}>{formatMoney(profile.total_due)}</Typography></CardContent></Card></Box><Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}><FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Status</InputLabel><Select value={profileStatus} label="Status" onChange={(e) => setProfileStatus(e.target.value)}><MenuItem value="">All</MenuItem><MenuItem value="PAID">Paid</MenuItem><MenuItem value="PARTIAL">Partial</MenuItem><MenuItem value="PENDING">Pending</MenuItem></Select></FormControl><TextField size="small" label="From" type="date" value={profileStart} onChange={(e) => setProfileStart(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField size="small" label="To" type="date" value={profileEnd} onChange={(e) => setProfileEnd(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Box>{profileLoading ? <Typography>Loading...</Typography> : <Table size="small"><TableHead><TableRow><TableCell>Invoice</TableCell><TableCell>Date</TableCell><TableCell>Due date</TableCell><TableCell>Products</TableCell><TableCell>Status</TableCell><TableCell>Billed</TableCell><TableCell>Paid</TableCell><TableCell>Due</TableCell><TableCell>Action</TableCell></TableRow></TableHead><TableBody>{profile.sales.map((sale: any) => <TableRow key={sale.id}><TableCell>#{sale.id} {sale.reference || ""}</TableCell><TableCell>{formatDate(sale.sold_at)}</TableCell><TableCell>{sale.due_date || "—"}</TableCell><TableCell>{sale.lines.map((line: any) => `${line.recipe_name} × ${line.quantity}`).join(", ")}</TableCell><TableCell>{sale.payment_status}</TableCell><TableCell>₹{sale.total_amount.toFixed(2)}</TableCell><TableCell>₹{sale.amount_paid.toFixed(2)}</TableCell><TableCell>₹{sale.amount_due.toFixed(2)}</TableCell></TableRow>)}</TableBody></Table>}</>}</DialogContent><DialogActions><Button onClick={() => setProfileId(0)}>Close</Button></DialogActions></Dialog>
-    {invoiceSale && <Box className="print-invoice"><Box sx={{ maxWidth: 760, mx: "auto", p: { xs: 2, sm: 5 }, color: "#172033" }}><Box sx={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #0f766e", pb: 2, mb: 3 }}><Box><Typography variant="h4" sx={{ fontWeight: 800, color: "#0f766e" }}>INVOICE</Typography><Typography variant="body2">Recipe Inventory</Typography></Box><Box sx={{ textAlign: "right" }}><Typography variant="h6">#{invoiceSale.id}</Typography><Typography variant="body2">{formatDate(invoiceSale.sold_at)}</Typography>{invoiceSale.reference && <Typography variant="body2">Ref: {invoiceSale.reference}</Typography>}</Box></Box><Box sx={{ mb: 3 }}><Typography variant="overline">Bill to</Typography><Typography variant="h6">{invoiceSale.customer_name || "Walk-in customer"}</Typography></Box><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#f0fdfa" }}><TableCell>Product</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Unit price</TableCell><TableCell align="right">Amount</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch details</TableCell></TableRow></TableHead><TableBody>{invoiceSale.lines.map((line: any) => <TableRow key={line.recipe_id}><TableCell>{line.item_name || line.recipe_name}{line.allocations && line.allocations.length > 0 && <Box component="span" sx={{ display: "block", mt: 0.5 }}>{line.allocations.map((a: any) => <Typography key={a.id} variant="caption" sx={{ display: "block", color: "#64748b" }}>Batch #{a.batch_id}{a.batch_date ? ` (${a.batch_date})` : ""}: {a.quantity} units</Typography>)}</Box>}</TableCell><TableCell align="right">{line.quantity}</TableCell><TableCell align="right">{formatMoney(line.unit_price)}</TableCell><TableCell align="right">{formatMoney(line.line_total)}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{line.allocations && line.allocations.length > 0 ? line.allocations.map((a: any) => `#${a.batch_id}: ${a.quantity}`).join(", ") : "—"}</TableCell></TableRow>)}</TableBody></Table><Box sx={{ ml: "auto", maxWidth: 280, mt: 3 }}><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Total</Typography><Typography sx={{ fontWeight: 700 }}>{formatMoney(invoiceSale.total_amount)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Paid</Typography><Typography>{formatMoney(invoiceSale.amount_paid)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #ddd", mt: 1, pt: 1 }}><Typography sx={{ fontWeight: 700 }}>Due</Typography><Typography sx={{ fontWeight: 700, color: invoiceSale.amount_due ? "#dc2626" : "#15803d" }}>{formatMoney(invoiceSale.amount_due)}</Typography></Box></Box><Typography sx={{ mt: 5, textAlign: "center", color: "#64748b" }}>Thank you for your business.</Typography></Box><Box className="invoice-actions" sx={{ textAlign: "center", pb: 2 }}><Button variant="contained" onClick={() => window.print()}>Print / Save PDF</Button><Button sx={{ ml: 1 }} onClick={() => setInvoiceSale(null)}>Close</Button></Box></Box>}
+    {invoiceSale && <Box className="print-invoice"><Box sx={{ maxWidth: 760, mx: "auto", p: { xs: 2, sm: 5 }, color: "#172033" }}><Box sx={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #0f766e", pb: 2, mb: 3 }}><Box><Typography variant="h4" sx={{ fontWeight: 800, color: "#0f766e" }}>INVOICE</Typography><Typography variant="body2">Recipe Inventory</Typography></Box><Box sx={{ textAlign: "right" }}><Typography variant="h6">#{invoiceSale.id}</Typography><Typography variant="body2">{formatDate(invoiceSale.sold_at)}</Typography>{invoiceSale.reference && <Typography variant="body2">Ref: {invoiceSale.reference}</Typography>}</Box></Box><Box sx={{ mb: 3 }}><Typography variant="overline">Bill to</Typography><Typography variant="h6">{invoiceSale.customer_name || "Walk-in customer"}</Typography></Box><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#f0fdfa" }}><TableCell>Product</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Unit price</TableCell><TableCell align="right">Amount</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch details</TableCell></TableRow></TableHead><TableBody>{invoiceSale.lines.map((line: any) => <TableRow key={line.recipe_id}><TableCell>{line.item_name || line.recipe_name}{line.allocations && line.allocations.length > 0 && <Box component="span" sx={{ display: "block", mt: 0.5 }}>{line.allocations.map((a: any) => <Typography key={a.id} variant="caption" sx={{ display: "block", color: "#64748b" }}>Batch #{a.batch_id}{a.batch_date ? ` (${a.batch_date})` : ""}: {a.quantity} units</Typography>)}</Box>}</TableCell><TableCell align="right">{line.quantity}</TableCell><TableCell align="right">{formatMoney(line.unit_price)}</TableCell><TableCell align="right">{formatMoney(line.line_total)}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{line.allocations && line.allocations.length > 0 ? line.allocations.map((a: any) => `#${a.batch_id}: ${a.quantity}`).join(", ") : "—"}</TableCell></TableRow>)}</TableBody></Table><Box sx={{ ml: "auto", maxWidth: 280, mt: 3 }}><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Total</Typography><Typography sx={{ fontWeight: 700 }}>{formatMoney(invoiceSale.total_amount)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Paid</Typography><Typography>{formatMoney(invoiceSale.amount_paid)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #ddd", mt: 1, pt: 1 }}><Typography sx={{ fontWeight: 700 }}>Due</Typography><Typography sx={{ fontWeight: 700, color: invoiceSale.amount_due ? "#dc2626" : "#15803d" }}>{formatMoney(invoiceSale.amount_due)}</Typography></Box></Box><Typography sx={{ mt: 5, textAlign: "center", color: "#64748b" }}>Thank you for your business.</Typography></Box><Box className="invoice-actions" sx={{ textAlign: "center", pb: 2 }}><Button variant="contained" onClick={() => printInvoice(invoiceSale)}>Print / Save PDF</Button><Button sx={{ ml: 1 }} onClick={() => setInvoiceSale(null)}>Close</Button></Box></Box>}
     {salesOnly && (
       <Fab
         color="primary"
         aria-label="Record sale"
-        sx={{ position: "fixed", bottom: { xs: 80, sm: 24 }, right: 24, zIndex: 1000 }}
+        sx={{ position: "fixed", bottom: { xs: "calc(72px + env(safe-area-inset-bottom) + 16px)", sm: 24 }, right: 24, zIndex: 1000 }}
         onClick={() => { setSaleLines([]); setCustomerId(0); setSaleError(""); setEditingLineIndex(null); setSaleOpen(true); }}
       >
         <AddIcon />

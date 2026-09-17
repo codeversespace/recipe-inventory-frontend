@@ -552,7 +552,7 @@ export const Purchases = () => {
       <Fab
         color="primary"
         aria-label="Add Purchase"
-        sx={{ position: "fixed", bottom: { xs: 80, sm: 24 }, right: 24, zIndex: 1000 }}
+        sx={{ position: "fixed", bottom: { xs: "calc(72px + env(safe-area-inset-bottom) + 16px)", sm: 24 }, right: 24, zIndex: 1000 }}
         onClick={() => { resetForm(); setOpen(true); }}
       >
         <AddIcon />
