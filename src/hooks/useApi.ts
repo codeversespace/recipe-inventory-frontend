@@ -516,7 +516,7 @@ export const useSales = () =>
 
 export const useAddSale = () => {
   const qc = useQueryClient();
-  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; payment_method?: string; payment_reference?: string; use_advance?: boolean; lines: { recipe_id?: number; stock_item_id?: number; quantity: number; unit_price?: number; allocations?: { batch_id: number; quantity: number }[] }[] }>({
+  return useMutation<any, Error, { customer_id?: number; reference?: string; due_date?: string; payment_status: string; amount_paid: number; payment_method?: string; payment_reference?: string; use_advance?: boolean; is_gst_invoice?: boolean; place_of_supply?: string; reverse_charge?: boolean; lines: { recipe_id?: number; stock_item_id?: number; quantity: number; unit_price?: number; hsn_code?: string; gst_rate?: number; allocations?: { batch_id: number; quantity: number }[] }[] }>({
     mutationFn: (payload) => api.post("/sales", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sales"] });

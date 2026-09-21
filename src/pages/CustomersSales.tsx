@@ -5,13 +5,13 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAddCustomer, useAddSale, useCustomerPrices, useCustomerProfile, useCustomers, useSaleableStock, useUpdateCustomer, useSales } from "../hooks/useApi";
 import { VoiceInput } from "../components/VoiceInput";
-import { EmptyState, ErrorState, OverflowMenu, PageHeader, StatusChip, TableSkeleton, TransactionRow } from "../components/ui";
+import { EmptyState, ErrorState, InvoiceDialog, OverflowMenu, PageHeader, StatusChip, TableSkeleton, TransactionRow } from "../components/ui";
 import { bestMatch } from "../utils/fuzzy";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 import { printInvoice } from "../utils/printInvoice";
 
-type SaleLine = { stock_item_id: number; quantity: number; unit_price: string; allocations?: { batch_id: number; quantity: number }[] };
+type SaleLine = { stock_item_id: number; quantity: number; unit_price: string; hsn_code?: string; gst_rate?: number; allocations?: { batch_id: number; quantity: number }[] };
 
 export const CustomersSales = () => {
   const salesOnly = window.location.pathname === "/sales";
@@ -31,7 +31,7 @@ export const CustomersSales = () => {
   const { data: prices = [] } = useCustomerPrices(customerId);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [customer, setCustomer] = useState({ name: "", phone: "", email: "", address: "", credit_limit: 0 });
+  const [customer, setCustomer] = useState({ name: "", phone: "", email: "", address: "", credit_limit: 0, gstin: "", state: "", pincode: "" });
   const [saleOpen, setSaleOpen] = useState(false);
   const [saleReference, setSaleReference] = useState("");
   const [saleDueDate, setSaleDueDate] = useState("");
@@ -39,6 +39,9 @@ export const CustomersSales = () => {
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [paymentReference, setPaymentReference] = useState("");
   const [useAdvance, setUseAdvance] = useState(false);
+  const [isGstInvoice, setIsGstInvoice] = useState(false);
+  const [placeOfSupply, setPlaceOfSupply] = useState("");
+  const [reverseCharge, setReverseCharge] = useState(false);
   const [saleRecipe, setSaleRecipe] = useState(0);
   const [saleQty, setSaleQty] = useState("");
   const [salePrice, setSalePrice] = useState("");
@@ -63,7 +66,7 @@ export const CustomersSales = () => {
 
   const saleStatus = (status: string): "success" | "warning" | "error" =>
     status === "PAID" ? "success" : status === "PARTIAL" ? "warning" : "error";
-  const resetCustomer = () => { setCustomer({ name: "", phone: "", email: "", address: "", credit_limit: 0 }); setEditingId(null); setCustomerError(""); };
+  const resetCustomer = () => { setCustomer({ name: "", phone: "", email: "", address: "", credit_limit: 0, gstin: "", state: "", pincode: "" }); setEditingId(null); setCustomerError(""); };
   const saveCustomer = async () => {
     if (!customer.name.trim()) { setCustomerError("Customer name is required."); return; }
     try {
@@ -78,7 +81,7 @@ export const CustomersSales = () => {
     const item = saleableStock.find((stock: any) => stock.id === saleRecipe);
     const quantity = Number(saleQty);
     if (!item || item.unit_price <= 0 || !Number.isFinite(quantity) || quantity <= 0 || quantity > item.qty || !Number(salePrice) || Number(salePrice) <= 0 || (editingLineIndex === null && saleLines.some((line) => line.stock_item_id === saleRecipe))) { setSaleError("Choose a priced item, enter a valid quantity within available stock, and enter a price greater than zero."); return; }
-    const line = { stock_item_id: saleRecipe, quantity, unit_price: salePrice };
+    const line = { stock_item_id: saleRecipe, quantity, unit_price: salePrice, hsn_code: item.hsn_code || "", gst_rate: item.gst_rate || 0 };
     setSaleLines(editingLineIndex === null ? [...saleLines, line] : saleLines.map((oldLine, index) => index === editingLineIndex ? line : oldLine));
     setSaleRecipe(0); setSaleQty(""); setSalePrice(""); setEditingLineIndex(null); setSaleError("");
   };
@@ -99,8 +102,8 @@ export const CustomersSales = () => {
       }
     }
     try {
-      await addSale.mutateAsync({ customer_id: customerId || undefined, reference: saleReference || undefined, due_date: saleDueDate || undefined, payment_status: paid >= totalAmount ? "PAID" : paid > 0 ? "PARTIAL" : "PENDING", amount_paid: paid, payment_method: paymentMethod, payment_reference: paymentReference || undefined, use_advance: useAdvance, lines: saleLines.map((line) => ({ stock_item_id: line.stock_item_id, quantity: line.quantity, unit_price: line.unit_price ? Number(line.unit_price) : undefined, ...(line.allocations?.length ? { allocations: line.allocations } : {}) })) });
-      setSaleOpen(false); setSaleLines([]); setEditingLineIndex(null); setSaleReference(""); setSaleDueDate(""); setAmountPaid(""); setPaymentReference(""); setPaymentMethod("CASH"); setCustomerId(0); setSaleError(""); setUseAdvance(false);
+      await addSale.mutateAsync({ customer_id: customerId || undefined, reference: saleReference || undefined, due_date: saleDueDate || undefined, payment_status: paid >= totalAmount ? "PAID" : paid > 0 ? "PARTIAL" : "PENDING", amount_paid: paid, payment_method: paymentMethod, payment_reference: paymentReference || undefined, use_advance: useAdvance, is_gst_invoice: isGstInvoice, place_of_supply: placeOfSupply || undefined, reverse_charge: reverseCharge, lines: saleLines.map((line) => ({ stock_item_id: line.stock_item_id, quantity: line.quantity, unit_price: line.unit_price ? Number(line.unit_price) : undefined, hsn_code: line.hsn_code || undefined, gst_rate: line.gst_rate || undefined, ...(line.allocations?.length ? { allocations: line.allocations } : {}) })) });
+      setSaleOpen(false); setSaleLines([]); setEditingLineIndex(null); setSaleReference(""); setSaleDueDate(""); setAmountPaid(""); setPaymentReference(""); setPaymentMethod("CASH"); setCustomerId(0); setSaleError(""); setUseAdvance(false); setIsGstInvoice(false); setPlaceOfSupply(""); setReverseCharge(false);
     } catch (requestError: any) { setSaleError(requestError.response?.data?.detail || "Could not record sale."); }
   };
   const exportSales = () => {
@@ -163,7 +166,7 @@ export const CustomersSales = () => {
       subtitle={salesOnly ? "Record sales and review invoice history." : "Manage customers and record sales."}
     />
     {!salesOnly && <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 3 }}>
-      <Card><CardContent><Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}><Typography variant="h6">Customers</Typography><Button variant="contained" onClick={() => { resetCustomer(); setCustomerOpen(true); }}>Add customer</Button></Box><TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Phone</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Credit limit</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Advance</TableCell><TableCell>Actions</TableCell></TableRow></TableHead><TableBody>{customersLoading ? <TableRow><TableCell colSpan={5} align="center"><CircularProgress size={24} /></TableCell></TableRow> : customers.map((item: any) => <TableRow key={item.id} hover onClick={() => navigate(`/customers/${item.id}`)} sx={{ cursor: "pointer" }}><TableCell>{item.name}</TableCell><TableCell>{item.phone || "—"}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{formatMoney(item.credit_limit || 0)}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" }, color: (item.advance_balance || 0) > 0 ? "success.main" : "text.secondary", fontWeight: (item.advance_balance || 0) > 0 ? 700 : 400 }}>{(item.advance_balance || 0) > 0 ? formatMoney(item.advance_balance) : "—"}</TableCell><TableCell><Button size="small" onClick={(event) => { event.stopPropagation(); setEditingId(item.id); setCustomer({ name: item.name, phone: item.phone || "", email: item.email || "", address: item.address || "", credit_limit: item.credit_limit || 0 }); setCustomerOpen(true); }}>Edit</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
+      <Card><CardContent><Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}><Typography variant="h6">Customers</Typography><Button variant="contained" onClick={() => { resetCustomer(); setCustomerOpen(true); }}>Add customer</Button></Box><TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow><TableCell>Name</TableCell><TableCell>Phone</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Credit limit</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Advance</TableCell><TableCell>Actions</TableCell></TableRow></TableHead><TableBody>{customersLoading ? <TableRow><TableCell colSpan={5} align="center"><CircularProgress size={24} /></TableCell></TableRow> : customers.map((item: any) => <TableRow key={item.id} hover onClick={() => navigate(`/customers/${item.id}`)} sx={{ cursor: "pointer" }}><TableCell>{item.name}</TableCell><TableCell>{item.phone || "—"}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{formatMoney(item.credit_limit || 0)}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" }, color: (item.advance_balance || 0) > 0 ? "success.main" : "text.secondary", fontWeight: (item.advance_balance || 0) > 0 ? 700 : 400 }}>{(item.advance_balance || 0) > 0 ? formatMoney(item.advance_balance) : "—"}</TableCell><TableCell><Button size="small" onClick={(event) => { event.stopPropagation(); setEditingId(item.id); setCustomer({ name: item.name, phone: item.phone || "", email: item.email || "", address: item.address || "", credit_limit: item.credit_limit || 0, gstin: item.gstin || "", state: item.state || "", pincode: item.pincode || "" }); setCustomerOpen(true); }}>Edit</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
     </Box>}
     {salesOnly && <><Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, mb: 2, flexWrap: "wrap" }}><Typography variant="h6" sx={{ flex: "1 1 auto" }}>Sales history</Typography><VoiceInput onResult={handleSaleVoice} disabled={!saleableStock.length} label="Quick voice sale" variant="sale" /><OverflowMenu ariaLabel="Sale actions" actions={[{ label: "Export CSV", onClick: exportSales }, { label: "Print", onClick: () => window.print() }]} /><Button variant="contained" onClick={() => { setSaleLines([]); setCustomerId(0); setSaleError(""); setEditingLineIndex(null); setSaleOpen(true); }} sx={{ minHeight: 44 }}>Record sale</Button></Box>
     <Box sx={{ display: { xs: "none", sm: "block" } }}>
@@ -242,7 +245,7 @@ export const CustomersSales = () => {
       );
     })()}
     </>}
-    <Dialog open={customerOpen} onClose={() => setCustomerOpen(false)}><DialogTitle>{editingId ? "Edit customer" : "Add customer"}</DialogTitle><DialogContent>{customerError && <Alert severity="error" sx={{ mt: 1 }}>{customerError}</Alert>}<TextField margin="dense" label="Name" fullWidth value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} /><TextField margin="dense" label="Phone" fullWidth value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} /><TextField margin="dense" label="Email" fullWidth value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} /><TextField margin="dense" label="Address" fullWidth multiline value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} /><TextField margin="dense" label="Credit limit" type="number" fullWidth value={customer.credit_limit} onChange={(e) => setCustomer({ ...customer, credit_limit: Number(e.target.value) })} /></DialogContent><DialogActions><Button onClick={() => setCustomerOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveCustomer} disabled={addCustomer.isPending || updateCustomer.isPending}>{(addCustomer.isPending || updateCustomer.isPending) ? <CircularProgress size={20} color="inherit" /> : "Save"}</Button></DialogActions></Dialog>
+    <Dialog open={customerOpen} onClose={() => setCustomerOpen(false)}><DialogTitle>{editingId ? "Edit customer" : "Add customer"}</DialogTitle><DialogContent>{customerError && <Alert severity="error" sx={{ mt: 1 }}>{customerError}</Alert>}<TextField margin="dense" label="Name" fullWidth value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} /><TextField margin="dense" label="Phone" fullWidth value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} /><TextField margin="dense" label="Email" fullWidth value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} /><TextField margin="dense" label="Address" fullWidth multiline value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} /><TextField margin="dense" label="Credit limit" type="number" fullWidth value={customer.credit_limit} onChange={(e) => setCustomer({ ...customer, credit_limit: Number(e.target.value) })} /><Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>GST Details (optional)</Typography><TextField margin="dense" label="GSTIN" fullWidth value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value })} helperText="15-digit GST Identification Number" /><TextField margin="dense" label="State" fullWidth value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} helperText="e.g. Maharashtra, Delhi" /><TextField margin="dense" label="Pincode" fullWidth value={customer.pincode} onChange={(e) => setCustomer({ ...customer, pincode: e.target.value })} /></DialogContent><DialogActions><Button onClick={() => setCustomerOpen(false)}>Cancel</Button><Button variant="contained" onClick={saveCustomer} disabled={addCustomer.isPending || updateCustomer.isPending}>{(addCustomer.isPending || updateCustomer.isPending) ? <CircularProgress size={20} color="inherit" /> : "Save"}</Button></DialogActions></Dialog>
     <Dialog open={saleOpen} onClose={() => setSaleOpen(false)} fullScreen={isMobile} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 700, fontSize: "1.15rem" }}>Record sale</DialogTitle>
       <DialogContent sx={{ pb: 1, pt: "8px !important" }}>
@@ -348,6 +351,22 @@ export const CustomersSales = () => {
           </Box>
         )}
 
+        <Box sx={{ mt: 1, p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+          <FormControlLabel
+            control={<Checkbox size="small" checked={isGstInvoice} onChange={(e) => setIsGstInvoice(e.target.checked)} />}
+            label={<Typography variant="caption" sx={{ fontWeight: 600 }}>GST Invoice</Typography>}
+          />
+          {isGstInvoice && (
+            <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
+              <TextField size="small" label="Place of Supply" fullWidth value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} placeholder="e.g. Maharashtra" />
+              <FormControlLabel
+                control={<Checkbox size="small" checked={reverseCharge} onChange={(e) => setReverseCharge(e.target.checked)} />}
+                label={<Typography variant="caption">Reverse Charge</Typography>}
+              />
+            </Box>
+          )}
+        </Box>
+
         <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", letterSpacing: 0.5, textTransform: "uppercase", fontSize: "0.65rem", mb: 0.5, mt: 1.5, display: "block" }}>Payment</Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
           <TextField
@@ -382,7 +401,7 @@ export const CustomersSales = () => {
       </DialogActions>
     </Dialog>
     <Dialog open={!!profileId} onClose={() => setProfileId(0)} maxWidth="lg" fullWidth><DialogTitle>{profile?.name || "Customer profile"}</DialogTitle><DialogContent>{profile && <><Typography color="text.secondary">{profile.phone || "No phone"} · {profile.email || "No email"} · Credit limit: {formatMoney(profile.credit_limit || 0)}{profile.advance_balance > 0 ? ` · Advance: ${formatMoney(profile.advance_balance)}` : ""}</Typography><Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 2, my: 2 }}><Card><CardContent><Typography variant="caption">Sales</Typography><Typography variant="h6">{profile.total_sales}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Billed</Typography><Typography variant="h6">{formatMoney(profile.total_billed)}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Paid</Typography><Typography variant="h6">{formatMoney(profile.total_paid)}</Typography></CardContent></Card><Card><CardContent><Typography variant="caption">Due</Typography><Typography variant="h6" color={profile.total_due ? "error" : "success.main"}>{formatMoney(profile.total_due)}</Typography></CardContent></Card></Box><Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}><FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Status</InputLabel><Select value={profileStatus} label="Status" onChange={(e) => setProfileStatus(e.target.value)}><MenuItem value="">All</MenuItem><MenuItem value="PAID">Paid</MenuItem><MenuItem value="PARTIAL">Partial</MenuItem><MenuItem value="PENDING">Pending</MenuItem></Select></FormControl><TextField size="small" label="From" type="date" value={profileStart} onChange={(e) => setProfileStart(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /><TextField size="small" label="To" type="date" value={profileEnd} onChange={(e) => setProfileEnd(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} /></Box>{profileLoading ? <Typography>Loading...</Typography> : <Table size="small"><TableHead><TableRow><TableCell>Invoice</TableCell><TableCell>Date</TableCell><TableCell>Due date</TableCell><TableCell>Products</TableCell><TableCell>Status</TableCell><TableCell>Billed</TableCell><TableCell>Paid</TableCell><TableCell>Due</TableCell><TableCell>Action</TableCell></TableRow></TableHead><TableBody>{profile.sales.map((sale: any) => <TableRow key={sale.id}><TableCell>#{sale.id} {sale.reference || ""}</TableCell><TableCell>{formatDate(sale.sold_at)}</TableCell><TableCell>{sale.due_date || "—"}</TableCell><TableCell>{sale.lines.map((line: any) => `${line.recipe_name} × ${line.quantity}`).join(", ")}</TableCell><TableCell>{sale.payment_status}</TableCell><TableCell>₹{sale.total_amount.toFixed(2)}</TableCell><TableCell>₹{sale.amount_paid.toFixed(2)}</TableCell><TableCell>₹{sale.amount_due.toFixed(2)}</TableCell></TableRow>)}</TableBody></Table>}</>}</DialogContent><DialogActions><Button onClick={() => setProfileId(0)}>Close</Button></DialogActions></Dialog>
-    {invoiceSale && <Box className="print-invoice"><Box sx={{ maxWidth: 760, mx: "auto", p: { xs: 2, sm: 5 }, color: "#172033" }}><Box sx={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #0f766e", pb: 2, mb: 3 }}><Box><Typography variant="h4" sx={{ fontWeight: 800, color: "#0f766e" }}>INVOICE</Typography><Typography variant="body2">Recipe Inventory</Typography></Box><Box sx={{ textAlign: "right" }}><Typography variant="h6">#{invoiceSale.id}</Typography><Typography variant="body2">{formatDate(invoiceSale.sold_at)}</Typography>{invoiceSale.reference && <Typography variant="body2">Ref: {invoiceSale.reference}</Typography>}</Box></Box><Box sx={{ mb: 3 }}><Typography variant="overline">Bill to</Typography><Typography variant="h6">{invoiceSale.customer_name || "Walk-in customer"}</Typography></Box><Table size="small"><TableHead><TableRow sx={{ bgcolor: "#f0fdfa" }}><TableCell>Product</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Unit price</TableCell><TableCell align="right">Amount</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Batch details</TableCell></TableRow></TableHead><TableBody>{invoiceSale.lines.map((line: any) => <TableRow key={line.recipe_id}><TableCell>{line.item_name || line.recipe_name}{line.allocations && line.allocations.length > 0 && <Box component="span" sx={{ display: "block", mt: 0.5 }}>{line.allocations.map((a: any) => <Typography key={a.id} variant="caption" sx={{ display: "block", color: "#64748b" }}>Batch #{a.batch_id}{a.batch_date ? ` (${a.batch_date})` : ""}: {a.quantity} units</Typography>)}</Box>}</TableCell><TableCell align="right">{line.quantity}</TableCell><TableCell align="right">{formatMoney(line.unit_price)}</TableCell><TableCell align="right">{formatMoney(line.line_total)}</TableCell><TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{line.allocations && line.allocations.length > 0 ? line.allocations.map((a: any) => `#${a.batch_id}: ${a.quantity}`).join(", ") : "—"}</TableCell></TableRow>)}</TableBody></Table><Box sx={{ ml: "auto", maxWidth: 280, mt: 3 }}><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Total</Typography><Typography sx={{ fontWeight: 700 }}>{formatMoney(invoiceSale.total_amount)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between" }}><Typography>Paid</Typography><Typography>{formatMoney(invoiceSale.amount_paid)}</Typography></Box><Box sx={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #ddd", mt: 1, pt: 1 }}><Typography sx={{ fontWeight: 700 }}>Due</Typography><Typography sx={{ fontWeight: 700, color: invoiceSale.amount_due ? "#dc2626" : "#15803d" }}>{formatMoney(invoiceSale.amount_due)}</Typography></Box></Box><Typography sx={{ mt: 5, textAlign: "center", color: "#64748b" }}>Thank you for your business.</Typography></Box><Box className="invoice-actions" sx={{ textAlign: "center", pb: 2 }}><Button variant="contained" onClick={() => printInvoice(invoiceSale)}>Print / Save PDF</Button><Button sx={{ ml: 1 }} onClick={() => setInvoiceSale(null)}>Close</Button></Box></Box>}
+    <InvoiceDialog open={!!invoiceSale} onClose={() => setInvoiceSale(null)} sale={invoiceSale} />
     {salesOnly && (
       <Fab
         color="primary"

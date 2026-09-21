@@ -15,3 +15,4 @@ export { ListItemCard } from "./ListItemCard";
 export { StatStrip } from "./StatStrip";
 export { TransactionRow } from "./TransactionRow";
 export { PurchaseRow } from "./PurchaseRow";
+export { InvoiceDialog } from "./InvoiceDialog";

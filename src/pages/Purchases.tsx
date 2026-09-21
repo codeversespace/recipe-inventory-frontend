@@ -83,6 +83,8 @@ export const Purchases = () => {
   const [price, setPrice] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
   const [reference, setReference] = useState("");
+  const [hsnCode, setHsnCode] = useState("");
+  const [gstRate, setGstRate] = useState("");
   const [payNow, setPayNow] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("CASH");
@@ -101,6 +103,8 @@ export const Purchases = () => {
     setPrice("");
     setSellingPrice("");
     setReference("");
+    setHsnCode("");
+    setGstRate("");
     setPayNow(false);
     setPaymentAmount("");
     setPaymentMethod("CASH");
@@ -184,6 +188,8 @@ export const Purchases = () => {
             unit_price: unitPrice,
             selling_price: category === "saleable_good" && sellingPrice ? parseFloat(sellingPrice) : undefined,
             reference: reference || undefined,
+            hsn_code: hsnCode || undefined,
+            gst_rate: gstRate ? parseFloat(gstRate) : 0,
           },
         });
       } else {
@@ -196,6 +202,8 @@ export const Purchases = () => {
           unit_price: unitPrice,
           selling_price: category === "saleable_good" && sellingPrice ? parseFloat(sellingPrice) : undefined,
           reference: reference || undefined,
+          hsn_code: hsnCode || undefined,
+          gst_rate: gstRate ? parseFloat(gstRate) : 0,
           payment_amount: payNow ? paymentAmt : undefined,
           payment_method: paymentMethod,
           payment_reference: paymentReference || undefined,
@@ -217,6 +225,8 @@ export const Purchases = () => {
     setPrice(String(p.unit_price));
     setSellingPrice(p.selling_price ? String(p.selling_price) : "");
     setReference(p.reference || "");
+    setHsnCode(p.hsn_code || "");
+    setGstRate(p.gst_rate ? String(p.gst_rate) : "");
     setPayNow(false);
     setOpen(true);
   };
@@ -481,6 +491,10 @@ export const Purchases = () => {
           {category === "saleable_good" && (
             <TextField margin="dense" label="Selling Price (₹)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0 } }} fullWidth value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} helperText="Price at which this item will be sold" />
           )}
+          <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: "column", sm: "row" }, mt: 1 }}>
+            <TextField margin="dense" label="HSN Code" fullWidth value={hsnCode} onChange={(e) => setHsnCode(e.target.value)} placeholder="e.g. 1001" sx={{ flex: { sm: 1 } }} />
+            <TextField margin="dense" label="GST Rate (%)" type="number" slotProps={{ htmlInput: { inputMode: "decimal", min: 0, max: 100 } }} fullWidth value={gstRate} onChange={(e) => setGstRate(e.target.value)} placeholder="e.g. 5" sx={{ flex: { sm: 1 } }} />
+          </Box>
           </FormSection>
 
           {!editingId && (
