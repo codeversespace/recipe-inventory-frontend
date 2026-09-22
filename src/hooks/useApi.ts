@@ -587,6 +587,7 @@ export const useDashboard = (startDate: string, endDate: string) =>
       invoice_count: 0, batch_count: 0, produced_qty: 0, ready_to_pack_qty: 0,
       packed_packs: 0, packaged_stock_packs: 0, saleable_stock_value: 0,
       low_stock_count: 0, out_of_stock_count: 0, missing_price_count: 0,
+      damage_loss: 0, damage_events: 0,
       trend: [], top_products: [], alerts: [],
     },
   });
@@ -887,6 +888,86 @@ export const usePayEmployee = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["employeeLedger"] });
       qc.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+};
+
+// ── Damage records ────────────────────────────────────────────
+
+export interface DamagePayload {
+  item_type: "ingredient" | "purchase_lot" | "manual_stock" | "stock_item" | "batch";
+  ingredient_id?: number;
+  lot_id?: number;
+  manual_stock_id?: number;
+  stock_item_id?: number;
+  batch_id?: number;
+  qty: number;
+  reason: string;
+  notes?: string;
+}
+
+export const useDamageRecords = (limit = 100) =>
+  useQuery<any[], Error>({
+    queryKey: ["damageRecords", limit],
+    queryFn: async () => (await api.get("/damage", { params: { limit } })).data,
+    initialData: [],
+  });
+
+export const useDamageSummary = () =>
+  useQuery<{ total_loss: number; total_events: number; total_qty: number; loss_last_30d: number }, Error>({
+    queryKey: ["damageSummary"],
+    queryFn: async () => (await api.get("/damage/summary")).data,
+    initialData: { total_loss: 0, total_events: 0, total_qty: 0, loss_last_30d: 0 },
+  });
+
+export const useRecordDamage = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, DamagePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await api.post("/damage", payload);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["damageRecords"] });
+      qc.invalidateQueries({ queryKey: ["damageSummary"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["saleableStock"] });
+      qc.invalidateQueries({ queryKey: ["packagedStock"] });
+      qc.invalidateQueries({ queryKey: ["packingMaterials"] });
+      qc.invalidateQueries({ queryKey: ["manualStock"] });
+      qc.invalidateQueries({ queryKey: ["purchaseLots"] });
+      qc.invalidateQueries({ queryKey: ["batches"] });
+      qc.invalidateQueries({ queryKey: ["batchDetail"] });
+      qc.invalidateQueries({ queryKey: ["productionBatches"] });
+      qc.invalidateQueries({ queryKey: ["readyToPack"] });
+      qc.invalidateQueries({ queryKey: ["finishedInventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+};
+
+// ── Batch taste-test ratings ────────────────────────────────────
+
+export const useBatchRatings = (batchId: number | null) =>
+  useQuery<any[], Error>({
+    queryKey: ["batchRatings", batchId],
+    queryFn: async () => (await api.get(`/production/${batchId}/ratings`)).data,
+    enabled: !!batchId,
+    initialData: [],
+  });
+
+export const useAddBatchRating = () => {
+  const qc = useQueryClient();
+  return useMutation<any, Error, { batchId: number; rater_name: string; rating: number; review?: string }>({
+    mutationFn: async ({ batchId, ...payload }) => {
+      const { data } = await api.post(`/production/${batchId}/ratings`, payload);
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["batchRatings", vars.batchId] });
+      qc.invalidateQueries({ queryKey: ["batchDetail", vars.batchId] });
+      qc.invalidateQueries({ queryKey: ["batches"] });
+      qc.invalidateQueries({ queryKey: ["productionBatches"] });
     },
   });
 };

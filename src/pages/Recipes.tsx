@@ -36,11 +36,14 @@ export const Recipes = () => {
   const [overheadCost, setOverheadCost] = useState("");
   const [overheadType, setOverheadType] = useState("other");
   const [overheadEmployeeId, setOverheadEmployeeId] = useState<number | null>(null);
+  const [hsnCode, setHsnCode] = useState("");
+  const [gstRate, setGstRate] = useState("");
 
   const reset = () => {
     setName(""); setBatchQty(""); setBatchUnit("");
     setIngredientId(0); setLineQty(""); setLines([]); setFormError(""); setEditingId(null);
     setOverheads([]); setOverheadName(""); setOverheadCost(""); setOverheadType("other"); setOverheadEmployeeId(null);
+    setHsnCode(""); setGstRate("");
   };
   const close = () => { reset(); setOpen(false); };
 
@@ -64,7 +67,7 @@ export const Recipes = () => {
     }
     if (!lines.length) { setFormError("Add at least one ingredient to the recipe."); return; }
     try {
-      const payload = { name: name.trim(), batch_qty: quantity, batch_unit: batchUnit.trim() };
+      const payload = { name: name.trim(), batch_qty: quantity, batch_unit: batchUnit.trim(), hsn_code: hsnCode.trim() || null, gst_rate: Number(gstRate) || 0 };
       const recipe = editingId ? await updateRecipe.mutateAsync({ id: editingId, ...payload }) : await addRecipe.mutateAsync(payload);
       if (editingId) {
         const { data: existingLines } = await api.get(`/recipes/${recipe.id}/ingredients`);
@@ -86,6 +89,7 @@ export const Recipes = () => {
     const { data } = await api.get(`/recipes/${recipe.id}/ingredients`);
     const { data: overheadData } = await api.get(`/recipes/${recipe.id}/overheads`);
     setEditingId(recipe.id); setName(recipe.name); setBatchQty(String(recipe.batch_qty)); setBatchUnit(recipe.batch_unit);
+    setHsnCode(recipe.hsn_code || ""); setGstRate(recipe.gst_rate ? String(recipe.gst_rate) : "");
     setLines(data.map((line: any) => ({ id: line.id, ingredientId: line.ingredient_id, name: line.ingredient.name, quantity: line.qty_per_batch, unit: line.unit })));
     setOverheads(overheadData.map((oh: any) => ({ name: oh.name, cost_per_batch: oh.cost_per_batch, overhead_type: oh.overhead_type, employee_id: oh.employee_id })));
     setOpen(true);
@@ -121,6 +125,10 @@ export const Recipes = () => {
       <TextField margin="dense" label="Name" fullWidth value={name} onChange={(event) => setName(event.target.value)} />
       <TextField margin="dense" label="Batch Qty" fullWidth value={batchQty} onChange={(event) => setBatchQty(event.target.value)} />
       <TextField margin="dense" label="Batch Unit (kg, L, pcs)" fullWidth value={batchUnit} onChange={(event) => setBatchUnit(event.target.value)} />
+      <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+        <TextField margin="dense" label="HSN Code" value={hsnCode} onChange={(event) => setHsnCode(event.target.value)} sx={{ flex: 1 }} />
+        <TextField margin="dense" label="GST Rate (%)" type="number" value={gstRate} onChange={(event) => setGstRate(event.target.value)} sx={{ flex: 1 }} slotProps={{ htmlInput: { min: 0, max: 100, step: 0.5 } }} />
+      </Box>
       <Typography variant="subtitle1" sx={{ mt: 3 }}>Ingredients</Typography>
       {!ingredientsLoading && !rawMaterials.length && <Alert severity="info" sx={{ mt: 1 }}>Add raw materials first from the Ingredients page.</Alert>}
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 1, flexWrap: "wrap" }}><FormControl sx={{ flex: 1, minWidth: 220 }} size="small" disabled={ingredientsLoading}><InputLabel>{ingredientsLoading ? "Loading ingredients..." : "Ingredient"}</InputLabel><Select value={ingredientId} label={ingredientsLoading ? "Loading ingredients..." : "Ingredient"} onChange={(event) => setIngredientId(Number(event.target.value))}><MenuItem value={0}><em>Select an ingredient</em></MenuItem>{rawMaterials.map((ingredient) => <MenuItem key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.base_unit})</MenuItem>)}</Select></FormControl><TextField size="small" label="Qty" value={lineQty} onChange={(event) => setLineQty(event.target.value)} sx={{ width: 100 }} /><Button onClick={addLine} variant="outlined" disabled={!rawMaterials.length}>Add</Button></Box>

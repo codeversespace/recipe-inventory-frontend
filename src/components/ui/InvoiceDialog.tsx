@@ -3,6 +3,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typogra
 import { formatDate } from "../../utils/formatDate";
 import { formatMoney } from "../../utils/formatNumber";
 import { printInvoice } from "../../utils/printInvoice";
+import { useAppSettings } from "../../hooks/useApi";
 
 interface InvoiceLine {
   item_name?: string;
@@ -41,6 +42,15 @@ interface InvoiceSale {
   lines: InvoiceLine[];
 }
 
+interface BizProfile {
+  name: string;
+  address: string;
+  gstin: string;
+  state: string;
+  logo: string;
+  signature: string;
+}
+
 const Indian_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
   "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
@@ -72,13 +82,13 @@ function numberToWords(num: number): string {
   return result;
 }
 
-function SimpleInvoiceContent({ sale }: { sale: InvoiceSale }) {
+function SimpleInvoiceContent({ sale, biz }: { sale: InvoiceSale; biz: BizProfile }) {
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", color: "#172033" }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #0f766e", pb: 2, mb: 3 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800, color: "#0f766e" }}>INVOICE</Typography>
-          <Typography variant="body2">Recipe Inventory</Typography>
+          <Typography variant="body2">{biz.name || "Recipe Inventory"}</Typography>
         </Box>
         <Box sx={{ textAlign: "right" }}>
           <Typography variant="h6">#{sale.id}</Typography>
@@ -126,7 +136,7 @@ function SimpleInvoiceContent({ sale }: { sale: InvoiceSale }) {
   );
 }
 
-function GSTInvoiceContent({ sale }: { sale: InvoiceSale }) {
+function GSTInvoiceContent({ sale, biz }: { sale: InvoiceSale; biz: BizProfile }) {
   const totalCgst = sale.total_cgst || sale.lines.reduce((s, l) => s + (l.cgst_amount || 0), 0);
   const totalSgst = sale.total_sgst || sale.lines.reduce((s, l) => s + (l.sgst_amount || 0), 0);
   const totalIgst = sale.total_igst || sale.lines.reduce((s, l) => s + (l.igst_amount || 0), 0);
@@ -136,17 +146,18 @@ function GSTInvoiceContent({ sale }: { sale: InvoiceSale }) {
   return (
     <Box sx={{ maxWidth: 760, mx: "auto", color: "#172033" }}>
       <Box sx={{ textAlign: "center", mb: 2, pb: 2, borderBottom: "3px solid #0f766e" }}>
+        {biz.logo && <Box component="img" src={biz.logo} alt="Logo" sx={{ height: { xs: 60, sm: 80 }, mb: 1 }} />}
         <Typography variant="h5" sx={{ fontWeight: 800, color: "#0f766e" }}>TAX INVOICE</Typography>
-        <Typography variant="body2">Recipe Inventory</Typography>
+        <Typography variant="body2">{biz.name || "Recipe Inventory"}</Typography>
       </Box>
 
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3, gap: 3, flexWrap: "wrap" }}>
         <Box sx={{ flex: "1 1 280px" }}>
           <Typography variant="overline" sx={{ fontWeight: 700 }}>From</Typography>
-          <Typography variant="body1" sx={{ fontWeight: 700 }}>Recipe Inventory</Typography>
-          <Typography variant="body2" color="text.secondary">(Your business address)</Typography>
-          <Typography variant="body2" color="text.secondary">GSTIN: (Your GSTIN)</Typography>
-          <Typography variant="body2" color="text.secondary">State: {sale.place_of_supply || "(Your State)"}</Typography>
+          <Typography variant="body1" sx={{ fontWeight: 700 }}>{biz.name || "Recipe Inventory"}</Typography>
+          <Typography variant="body2" color="text.secondary">{biz.address || "(Your business address)"}</Typography>
+          <Typography variant="body2" color="text.secondary">GSTIN: {biz.gstin || "(Your GSTIN)"}</Typography>
+          <Typography variant="body2" color="text.secondary">State: {biz.state || sale.place_of_supply || "(Your State)"}</Typography>
         </Box>
         <Box sx={{ flex: "1 1 280px", textAlign: "right" }}>
           <Typography variant="overline" sx={{ fontWeight: 700 }}>Invoice Details</Typography>
@@ -256,10 +267,18 @@ function GSTInvoiceContent({ sale }: { sale: InvoiceSale }) {
           <Typography variant="body2" sx={{ fontSize: 11, color: "text.secondary" }}>
             We declare that this invoice shows the actual price of the goods described and that all statements are true and correct.
           </Typography>
+          <Typography variant="body2" sx={{ fontSize: 11, color: "text.secondary", mt: 0.5 }}>
+            Subject to {sale.place_of_supply || "local"} jurisdiction.
+          </Typography>
+          <Typography variant="body2" sx={{ fontSize: 11, color: "text.secondary" }}>
+            {sale.reverse_charge ? "Reverse Charge Applicable as per GST Act." : "Not liable for reverse charge under Section 9(3) or 9(4) of CGST Act."}
+          </Typography>
         </Box>
         <Box sx={{ textAlign: "right" }}>
-          <Typography variant="caption" color="text.secondary">For Recipe Inventory</Typography>
-          <Box sx={{ mt: 4, borderTop: "1px solid #94a3b8", pt: 0.5, width: 120 }}>
+          <Typography variant="caption" color="text.secondary">For {biz.name || "Recipe Inventory"}</Typography>
+          {biz.signature && <Box component="img" src={biz.signature} alt="Signature" sx={{ height: 50, mt: 1, mb: 0.5 }} />}
+          {!biz.signature && <Box sx={{ mt: 4 }} />}
+          <Box sx={{ borderTop: "1px solid #94a3b8", pt: 0.5, width: 140, ml: "auto" }}>
             <Typography variant="caption" color="text.secondary">Authorized Signatory</Typography>
           </Box>
         </Box>
@@ -277,8 +296,18 @@ interface InvoiceDialogProps {
 export const InvoiceDialog = ({ open, onClose, sale }: InvoiceDialogProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { data: settings = [] } = useAppSettings();
   if (!sale) return null;
   const isGst = sale.is_gst_invoice === 1;
+
+  const biz: BizProfile = {
+    name: settings.find((s) => s.key === "business_name")?.value || "",
+    address: settings.find((s) => s.key === "business_address")?.value || "",
+    gstin: settings.find((s) => s.key === "business_gstin")?.value || "",
+    state: settings.find((s) => s.key === "business_state")?.value || "",
+    logo: settings.find((s) => s.key === "business_logo")?.value || "",
+    signature: settings.find((s) => s.key === "business_signature")?.value || "",
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={isMobile} className="print-invoice">
@@ -286,11 +315,11 @@ export const InvoiceDialog = ({ open, onClose, sale }: InvoiceDialogProps) => {
         <Typography variant="h6">{isGst ? "GST Invoice" : "Invoice"} #{sale.id}</Typography>
       </DialogTitle>
       <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
-        {isGst ? <GSTInvoiceContent sale={sale} /> : <SimpleInvoiceContent sale={sale} />}
+        {isGst ? <GSTInvoiceContent sale={sale} biz={biz} /> : <SimpleInvoiceContent sale={sale} biz={biz} />}
       </DialogContent>
       <DialogActions className="invoice-actions" sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose}>Close</Button>
-        <Button variant="outlined" onClick={() => printInvoice(sale as any)}>Print / Save PDF</Button>
+        <Button variant="outlined" onClick={() => printInvoice(sale as any, biz)}>Print / Save PDF</Button>
       </DialogActions>
     </Dialog>
   );

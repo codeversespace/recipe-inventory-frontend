@@ -3,7 +3,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBatchDetail, usePackTypes, useProductionBatches, useRecipes, useSaleableStock, useStockBatches } from "../hooks/useApi";
-import { EmptyState, ErrorState, ListItemCard, PageHeader } from "../components/ui";
+import { EmptyState, ErrorState, ListItemCard, PageHeader, StarDisplay } from "../components/ui";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 
@@ -86,6 +86,22 @@ export const BatchTracking = () => {
       <Typography variant="body2"><strong>Recipe:</strong> {recipe?.name || "—"}</Typography>
       <Typography variant="body2"><strong>Prepared:</strong> {formatDate(selected.produced_at)} · <strong>Produced:</strong> <span className="tnum">{selected.produced_qty} kg</span></Typography>
       <Typography variant="body2"><strong>Batch cost:</strong> <span className="tnum">{formatMoney(selected.total_cost)}</span>{selected.total_revenue != null && <> · <strong>Revenue:</strong> <span className="tnum">{formatMoney(selected.total_revenue)}</span></>}</Typography>
+      {(selected.wasted_qty || 0) > 0 && <Typography variant="body2" color="warning.main"><strong>Wasted:</strong> <span className="tnum">{selected.wasted_qty} kg</span></Typography>}
+      <Box sx={{ mt: 1 }}><StarDisplay value={selected.rating_avg} count={selected.rating_count} /></Box>
+      {(selected.ratings || []).length > 0 && (
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>Taste reviews ({selected.ratings.length})</Typography>
+          {(selected.ratings || []).map((r: any) => (
+            <Box key={r.id} sx={{ py: 0.75, borderTop: "1px solid", borderColor: "divider" }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{r.rater_name}</Typography>
+                <StarDisplay value={r.rating} size="small" />
+              </Box>
+              {r.review && <Typography variant="body2" color="text.secondary">“{r.review}”</Typography>}
+            </Box>
+          ))}
+        </Box>
+      )}
       <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 2, mb: 0.5 }}>Ingredients consumed</Typography>
       <TableContainer sx={{ overflowX: "auto" }}>
         <Table size="small" sx={{ minWidth: 420 }}>
@@ -180,6 +196,7 @@ export const BatchTracking = () => {
                       <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Packed</TableCell>
                       <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Sold</TableCell>
                       <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Remaining</TableCell>
+                      <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Rating</TableCell>
                       <TableCell sx={{ ...cellSx, fontWeight: 700 }}>Details</TableCell>
                     </TableRow></TableHead>
                     <TableBody>
@@ -194,13 +211,14 @@ export const BatchTracking = () => {
                             <TableCell sx={cellSx} className="tnum">{t ? t.packed : "—"}</TableCell>
                             <TableCell sx={cellSx} className="tnum">{t ? t.allocated : "—"}</TableCell>
                             <TableCell sx={{ ...cellSx, fontWeight: 700 }} className="tnum">{t ? t.available : "—"}</TableCell>
+                            <TableCell sx={cellSx}><StarDisplay value={b.rating_avg} count={b.rating_count} /></TableCell>
                             <TableCell sx={cellSx}>
                               <Button size="small" onClick={() => setSelectedId(isOpen ? null : b.id)} aria-label={`View batch ${b.id}`} aria-expanded={isOpen}>{isOpen ? "Hide" : "View"}</Button>
                             </TableCell>
                           </TableRow>
                           {isOpen && (
                             <TableRow>
-                              <TableCell colSpan={6} sx={{ py: 0, borderBottom: "none" }}>
+                              <TableCell colSpan={7} sx={{ py: 0, borderBottom: "none" }}>
                                 <Collapse in={isOpen} timeout="auto" unmountOnExit>
                                   <Box sx={{ py: 2, px: 1 }}>
                                     {detailLoading || !selected ? (
@@ -235,6 +253,7 @@ export const BatchTracking = () => {
                         meta={[
                           { label: "Packed", value: t ? t.packed : "—" },
                           { label: "Sold", value: t ? t.allocated : "—" },
+                          { label: "Rating", value: <StarDisplay value={b.rating_avg} count={b.rating_count} /> },
                         ]}
                         onClick={() => setSelectedId(isOpen ? null : b.id)}
                       />

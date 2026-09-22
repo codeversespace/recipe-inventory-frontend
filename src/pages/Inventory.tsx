@@ -1,8 +1,8 @@
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, useMediaQuery, useTheme } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useAllSupplierPurchases, useBatches, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem, useAppSettings } from "../hooks/useApi";
-import { ConfirmDialog, DeleteButton, EmptyState, ErrorState, ListItemCard, Money, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
+import { useInventory, useOrderDemand, useSaleableStock, usePackingMaterials, useAllSupplierPurchases, useBatches, useDeleteIngredient, useDeleteManualStockItem, useDeleteStockItem, useAppSettings, useRecordDamage } from "../hooks/useApi";
+import { ConfirmDialog, DamageDialog, DeleteButton, EmptyState, ErrorState, ListItemCard, Money, OverflowMenu, PageHeader, StatusChip, TableSkeleton } from "../components/ui";
 import { groupByUnit, purchasesForItem } from "../utils/priceComparison";
 import { formatDate } from "../utils/formatDate";
 
@@ -30,6 +30,33 @@ export const Inventory = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [alertsOpen, setAlertsOpen] = useState({ shortage: false, reorder: false });
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string; type: "saleable" | "ingredient" | "packing" } | null>(null);
+  const [damageTarget, setDamageTarget] = useState<{ kind: "stock_item" | "ingredient" | "manual_stock"; id: number; name: string; qty: number; unit: string } | null>(null);
+  const [damageError, setDamageError] = useState("");
+  const recordDamage = useRecordDamage();
+
+  const submitDamage = async (payload: { qty: number; reason: string; notes?: string }) => {
+    if (!damageTarget) return;
+    setDamageError("");
+    try {
+      const base = { qty: payload.qty, reason: payload.reason, notes: payload.notes };
+      if (damageTarget.kind === "stock_item") {
+        await recordDamage.mutateAsync({ item_type: "stock_item", stock_item_id: damageTarget.id, ...base });
+      } else if (damageTarget.kind === "ingredient") {
+        await recordDamage.mutateAsync({ item_type: "ingredient", ingredient_id: damageTarget.id, ...base });
+      } else {
+        await recordDamage.mutateAsync({ item_type: "manual_stock", manual_stock_id: damageTarget.id, ...base });
+      }
+      setDamageTarget(null);
+    } catch (e: any) {
+      setDamageError(e.response?.data?.detail || "Could not record damage.");
+      throw e;
+    }
+  };
+
+  const damageAction = (kind: "stock_item" | "ingredient" | "manual_stock", item: any, qty: number, unit: string) => ({
+    label: "Mark damaged",
+    onClick: () => { setDamageError(""); setDamageTarget({ kind, id: item.id, name: item.name, qty, unit }); },
+  });
 
   const deleteMsgs = {
     ingredient: (id: number) => deleteIngredient.mutateAsync({ id, force: true }),
@@ -232,6 +259,7 @@ export const Inventory = () => {
                 actions={
                   <OverflowMenu
                     actions={[
+                      damageAction("stock_item", item, item.qty, item.unit),
                       ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "saleable" as const }), danger: true }] : []),
                     ]}
                   />
@@ -276,15 +304,18 @@ export const Inventory = () => {
                     <TableCell sx={cellSx} className="tnum"><Money value={item.unit_price} /></TableCell>
                     <TableCell sx={cellSx}>{marginChip(item)}</TableCell>
                     <TableCell sx={cellSx}>
-                      {deleteEnabled && (
-                        <DeleteButton
-                          label="Delete"
-                          itemName={item.name}
-                          confirmMessage={`Delete saleable item "${item.name}" and all its purchase history? This cannot be undone.`}
-                          onDelete={() => deleteMsgs.saleable(item.id)}
-                          onError={(e) => setErrorMsg(formatError(e))}
-                        />
-                      )}
+                      <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                        <Button size="small" onClick={() => { setDamageError(""); setDamageTarget({ kind: "stock_item", id: item.id, name: item.name, qty: item.qty, unit: item.unit }); }} sx={{ minHeight: 32 }} aria-label={`Mark ${item.name} as damaged`}>Damage</Button>
+                        {deleteEnabled && (
+                          <DeleteButton
+                            label="Delete"
+                            itemName={item.name}
+                            confirmMessage={`Delete saleable item "${item.name}" and all its purchase history? This cannot be undone.`}
+                            onDelete={() => deleteMsgs.saleable(item.id)}
+                            onError={(e) => setErrorMsg(formatError(e))}
+                          />
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );
@@ -344,6 +375,7 @@ export const Inventory = () => {
                 actions={
                   <OverflowMenu
                     actions={[
+                      damageAction("ingredient", item, item.on_hand_qty, item.base_unit),
                       ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "ingredient" as const }), danger: true }] : []),
                     ]}
                   />
@@ -369,15 +401,18 @@ export const Inventory = () => {
                   <TableCell sx={cellSx} className="tnum"><Money value={item.avg_unit_price} /></TableCell>
                   <TableCell sx={cellSx}><StatusChip status={item.is_low_stock ? "error" : "success"} label={item.is_low_stock ? "Low stock" : "In stock"} /></TableCell>
                   <TableCell sx={cellSx}>
-                    {deleteEnabled && (
-                      <DeleteButton
-                        label="Delete"
-                        itemName={item.name}
-                        confirmMessage={`Delete "${item.name}" and all its purchase history? This cannot be undone.`}
-                        onDelete={() => deleteMsgs.ingredient(item.id)}
-                        onError={(e) => setErrorMsg(formatError(e))}
-                      />
-                    )}
+                    <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                      <Button size="small" onClick={() => { setDamageError(""); setDamageTarget({ kind: "ingredient", id: item.id, name: item.name, qty: item.on_hand_qty, unit: item.base_unit }); }} sx={{ minHeight: 32 }} aria-label={`Mark ${item.name} as damaged`}>Damage</Button>
+                      {deleteEnabled && (
+                        <DeleteButton
+                          label="Delete"
+                          itemName={item.name}
+                          confirmMessage={`Delete "${item.name}" and all its purchase history? This cannot be undone.`}
+                          onDelete={() => deleteMsgs.ingredient(item.id)}
+                          onError={(e) => setErrorMsg(formatError(e))}
+                        />
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               )) : <TableRow><TableCell colSpan={6} align="center" sx={{ ...cellSx, py: 3 }}><EmptyState title="No raw materials recorded." message="Record a raw-material purchase to stock items here." /></TableCell></TableRow>}
@@ -407,6 +442,18 @@ export const Inventory = () => {
         }}
         onCancel={() => setConfirmDelete(null)}
       />
+      {damageTarget && (
+        <DamageDialog
+          open={!!damageTarget}
+          onClose={() => { setDamageTarget(null); setDamageError(""); }}
+          title={`Mark damaged: ${damageTarget.name}`}
+          unit={damageTarget.unit}
+          maxQty={damageTarget.qty}
+          pending={recordDamage.isPending}
+          error={damageError}
+          onSubmit={submitDamage}
+        />
+      )}
 
       {/* Packing Materials */}
       <Typography variant="h5" sx={{ mt: 3, mb: 1, fontSize: { xs: "1rem", sm: "1.25rem" }, fontWeight: 700 }}>Packing Materials</Typography>
@@ -439,6 +486,7 @@ export const Inventory = () => {
                 actions={
                   <OverflowMenu
                     actions={[
+                      damageAction("manual_stock", item, item.qty, item.unit),
                       ...(deleteEnabled ? [{ label: "Delete", onClick: () => setConfirmDelete({ id: item.id, name: item.name, type: "packing" as const }), danger: true }] : []),
                     ]}
                   />
@@ -464,15 +512,18 @@ export const Inventory = () => {
                 <TableCell sx={cellSx}>{item.unit}</TableCell>
                 <TableCell sx={cellSx} className="tnum"><Money value={item.unit_price} /></TableCell>
                 <TableCell sx={cellSx}>
-                  {deleteEnabled && (
-                    <DeleteButton
-                      label="Delete"
-                      itemName={item.name}
-                      confirmMessage={`Delete packing material "${item.name}" and all its purchase history? This cannot be undone.`}
-                      onDelete={() => deleteMsgs.packing(item.id)}
-                      onError={(e) => setErrorMsg(formatError(e))}
-                    />
-                  )}
+                  <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                    <Button size="small" onClick={() => { setDamageError(""); setDamageTarget({ kind: "manual_stock", id: item.id, name: item.name, qty: item.qty, unit: item.unit }); }} sx={{ minHeight: 32 }} aria-label={`Mark ${item.name} as damaged`}>Damage</Button>
+                    {deleteEnabled && (
+                      <DeleteButton
+                        label="Delete"
+                        itemName={item.name}
+                        confirmMessage={`Delete packing material "${item.name}" and all its purchase history? This cannot be undone.`}
+                        onDelete={() => deleteMsgs.packing(item.id)}
+                        onError={(e) => setErrorMsg(formatError(e))}
+                      />
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             )) : <TableRow><TableCell colSpan={5} align="center" sx={{ ...cellSx, py: 3 }}><EmptyState title="No packing materials recorded." message="Record a packing-material purchase to stock items here." /></TableCell></TableRow>}

@@ -21,6 +21,7 @@ import { Orders } from "./pages/Orders";
 import { Processing } from "./pages/Processing";
 import { Employees } from "./pages/Employees";
 import { ProductionScheduler } from "./pages/ProductionScheduler";
+import { DamageLoss } from "./pages/DamageLoss";
 import { Login } from "./pages/Login";
 import { useAuth } from "./auth/AuthContext";
 
@@ -69,6 +70,7 @@ function App() {
             <Route path="/employees" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><Employees /></RoleRoute>} />
             <Route path="/production-scheduler" element={<RoleRoute roles={["super_admin", "admin", "manager", "production"]}><ProductionScheduler /></RoleRoute>} />
             <Route path="/pack-types" element={<RoleRoute roles={["super_admin", "admin", "manager"]}><PackTypes /></RoleRoute>} />
+            <Route path="/damage-loss" element={<RoleRoute roles={["super_admin", "admin", "manager", "inventory", "production"]}><DamageLoss /></RoleRoute>} />
             <Route path="/settings" element={<RoleRoute roles={["super_admin"]}><Settings /></RoleRoute>} />
           </Routes>
         </Layout>

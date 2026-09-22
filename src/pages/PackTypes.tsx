@@ -20,6 +20,8 @@ export const PackTypes = () => {
   const [materialLines, setMaterialLines] = useState<MaterialLine[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [hsnCode, setHsnCode] = useState("");
+  const [gstRate, setGstRate] = useState("");
 
   const reset = () => {
     setName("");
@@ -29,6 +31,8 @@ export const PackTypes = () => {
     setMaterialQty("");
     setMaterialLines([]);
     setEditingId(null);
+    setHsnCode("");
+    setGstRate("");
   };
 
   const addMaterial = () => {
@@ -60,6 +64,8 @@ export const PackTypes = () => {
         name: name.trim(),
         size_grams: parsedSize,
         selling_price: parsedSellingPrice,
+        hsn_code: hsnCode.trim() || null,
+        gst_rate: Number(gstRate) || 0,
         materials: materialLines.map((line) => ({ material_id: line.material_id, qty_per_pack: Number(line.qty_per_pack) })),
       };
       if (editingId) await updatePackType.mutateAsync({ id: editingId, ...payload });
@@ -76,6 +82,8 @@ export const PackTypes = () => {
     setName(item.name);
     setSize(String(item.size_grams));
     setSellingPrice(item.selling_price == null ? "" : String(item.selling_price));
+    setHsnCode(item.hsn_code || "");
+    setGstRate(item.gst_rate ? String(item.gst_rate) : "");
     setMaterialLines((item.materials || []).map((line: any) => ({ material_id: line.material_id, qty_per_pack: String(line.qty_per_pack) })));
   };
 
@@ -95,6 +103,10 @@ export const PackTypes = () => {
             <TextField size="small" label="Name" value={name} onChange={(event) => setName(event.target.value)} sx={{ flex: "1 1 200px" }} />
             <TextField size="small" label="Size (grams)" type="number" value={size} onChange={(event) => setSize(event.target.value)} sx={{ flex: "1 1 140px" }} />
             <TextField size="small" label="Selling price per pack (₹)" type="number" value={sellingPrice} onChange={(event) => setSellingPrice(event.target.value)} sx={{ flex: "1 1 180px" }} />
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+            <TextField size="small" label="HSN Code" value={hsnCode} onChange={(event) => setHsnCode(event.target.value)} sx={{ flex: "1 1 160px" }} />
+            <TextField size="small" label="GST Rate (%)" type="number" value={gstRate} onChange={(event) => setGstRate(event.target.value)} sx={{ flex: "1 1 140px" }} slotProps={{ htmlInput: { min: 0, max: 100, step: 0.5 } }} />
           </Box>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mb: 2 }}>
             <FormControl size="small" sx={{ flex: "1 1 220px", minWidth: 0 }} disabled={materialsLoading}>

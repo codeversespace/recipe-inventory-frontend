@@ -40,6 +40,7 @@ import {
   Archive as PackingIcon,
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
+  ReportProblem as DamageIcon,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { text: "Purchases", icon: <ShoppingCartIcon />, to: "/purchases", roles: ["super_admin", "admin", "manager", "inventory"], section: "Supply" },
   { text: "Suppliers", icon: <SupplierIcon />, to: "/suppliers", roles: ["super_admin", "admin", "manager", "inventory"], section: "Supply" },
   { text: "Inventory", icon: <InventoryIcon />, to: "/inventory", roles: ["super_admin", "admin", "manager", "inventory"], section: "Supply" },
+  { text: "Damage & Loss", icon: <DamageIcon />, to: "/damage-loss", roles: ["super_admin", "admin", "manager", "inventory", "production"], section: "Supply" },
   { text: "Customers", icon: <PeopleIcon />, to: "/customers", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
   { text: "Sales", icon: <ReceiptIcon />, to: "/sales", roles: ["super_admin", "admin", "manager", "sales"], section: "Sales" },
   { text: "Orders", icon: <OrderIcon />, to: "/orders", roles: ["super_admin", "admin", "manager", "sales", "production"], section: "Sales" },

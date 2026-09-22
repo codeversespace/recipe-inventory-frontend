@@ -30,9 +30,10 @@ export const CustomerProfile = () => {
   const monthValues = Object.entries(monthly).sort(([a], [b]) => a.localeCompare(b)).slice(-6);
   const maxMonth = Math.max(...monthValues.map(([, value]) => Number(value)), 1);
   const productTotals = profile.sales.flatMap((sale: any) => sale.lines).reduce((result: Record<string, { quantity: number; revenue: number; profit: number }>, line: any) => {
-    const item = result[line.recipe_name] || { quantity: 0, revenue: 0, profit: 0 };
+    const name = line.item_name || line.recipe_name;
+    const item = result[name] || { quantity: 0, revenue: 0, profit: 0 };
     item.quantity += line.quantity; item.revenue += line.line_total; item.profit += line.profit;
-    result[line.recipe_name] = item;
+    result[name] = item;
     return result;
   }, {});
   const productEntries = Object.entries(productTotals) as [string, { quantity: number; revenue: number; profit: number }][];

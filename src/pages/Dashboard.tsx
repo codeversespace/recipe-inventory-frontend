@@ -17,6 +17,7 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDashboard } from "../hooks/useApi";
+import { InfoTip } from "../components/ui";
 import { Line, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, Tooltip as RechartsTooltip, Legend, LineChart } from "recharts";
 import { formatMoney } from "../utils/formatNumber";
 
@@ -68,15 +69,155 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   </Typography>
 );
 
-const StatItem = ({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) => (
+interface CardInfo {
+  title: string;
+  description: string;
+  example: string;
+}
+
+const CARD_INFO: Record<string, CardInfo> = {
+  "Total sales": {
+    title: "Total sales",
+    description: "Total billed amount of all sales in the selected period, including unpaid dues.",
+    example: "A ₹24,000 sale on 21 Sep counts as ₹24,000 on that date even if the customer hasn't paid yet.",
+  },
+  "Profit": {
+    title: "Profit",
+    description: "Sales revenue minus cost of goods sold (ingredients + packaging of items sold). Supplier and staff payments are not subtracted here.",
+    example: "Sold ₹1,000 of goods that cost ₹600 to make → ₹400 profit.",
+  },
+  "Net cash": {
+    title: "Net cash",
+    description: "Cash received from customers minus cash paid to suppliers and employees in the period.",
+    example: "−₹5,000 means more cash went out than came in this period.",
+  },
+  "Received": {
+    title: "Received",
+    description: "Cash actually collected from customers against this period's sales.",
+    example: "₹24,000 sale with ₹10,000 paid → ₹10,000 received and ₹14,000 dues.",
+  },
+  "Customer dues": {
+    title: "Customer dues",
+    description: "Unpaid balance on this period's sales (billed minus paid).",
+    example: "₹24,000 billed, ₹10,000 paid → ₹14,000 still due.",
+  },
+  "Paid to suppliers": {
+    title: "Paid to suppliers",
+    description: "Supplier payments made in the period, regardless of when the goods arrived.",
+    example: "Paid ₹8,000 on 5 Sep for August stock → counts on 5 Sep.",
+  },
+  "Supplier dues": {
+    title: "Supplier dues",
+    description: "All-time outstanding to suppliers: total purchases minus total payments (never below zero).",
+    example: "Purchased ₹1,00,000 so far, paid ₹70,000 → ₹30,000 dues.",
+  },
+  "Paid to employees": {
+    title: "Paid to employees",
+    description: "Staff and processor payments made in the period.",
+    example: "Weekly wages of ₹5,000 paid on Saturday count on that date.",
+  },
+  "Employee dues": {
+    title: "Employee dues",
+    description: "All-time outstanding wages: labour and processing work earned minus payments made.",
+    example: "Earned ₹20,000, paid ₹15,000 → ₹5,000 dues.",
+  },
+  "Cost of goods sold": {
+    title: "Cost of goods sold",
+    description: "Ingredient + packaging cost of only the items sold in the period.",
+    example: "Sold 10 packs costing ₹60 each to make → ₹600 cost of goods sold.",
+  },
+  "COGS": {
+    title: "Cost of goods sold",
+    description: "Ingredient + packaging cost of only the items sold in the period.",
+    example: "Sold 10 packs costing ₹60 each to make → ₹600 cost of goods sold.",
+  },
+  "Margin": {
+    title: "Margin",
+    description: "Profit ÷ revenue × 100 for the period.",
+    example: "₹400 profit on ₹1,000 sales → 40% margin.",
+  },
+  "Cash in": {
+    title: "Cash in",
+    description: "Customer payments collected in the period.",
+    example: "Three customers paid ₹5,000 each this week → ₹15,000 cash in.",
+  },
+  "Cash out": {
+    title: "Cash out",
+    description: "Supplier + employee payments made in the period.",
+    example: "₹8,000 to suppliers + ₹2,000 to staff = ₹10,000 cash out.",
+  },
+  "Damage loss": {
+    title: "Damage loss",
+    description: "Cost value of stock marked damaged, spoilt, burnt or expired in the period (Damage & Loss ledger).",
+    example: "10 kg almonds @ ₹100/kg spoilt → ₹1,000 loss.",
+  },
+  "Damage events": {
+    title: "Damage events",
+    description: "Number of damage / wastage entries recorded in the period.",
+    example: "3 spoilage + 1 breakage entries → 4 events. Open Damage & Loss for details.",
+  },
+  "Sales & Profit Trend": {
+    title: "Sales & Profit Trend",
+    description: "Daily revenue and profit lines for the period — one point per day.",
+    example: "A dip to zero on Sunday shows a no-sales day.",
+  },
+  "Sales by Product": {
+    title: "Sales by Product",
+    description: "Revenue share of the top 6 products in the period.",
+    example: "The biggest slice is your best-selling product by revenue.",
+  },
+  "Cost vs Sales": {
+    title: "Cost vs Sales",
+    description: "Daily bars comparing goods cost against sales revenue.",
+    example: "Bars of equal height on a day mean zero profit that day.",
+  },
+  "Margin % Trend": {
+    title: "Margin % Trend",
+    description: "Daily profit-margin percentage line for the period.",
+    example: "A falling line means discounts or costlier batches that week.",
+  },
+  "Operations": {
+    title: "Operations",
+    description: "Period counts: invoices raised, batches produced, packable stock left, packs packed, finished packs in stock, and pending orders with shortages.",
+    example: "Ready to pack 50 kg with 2 pending orders short by 10 units → produce more.",
+  },
+  "Alerts": {
+    title: "Alerts",
+    description: "Live counts (not limited to the period): low or out-of-stock items and packed products missing a selling price.",
+    example: "Low stock 3 → three items at or below their reorder level.",
+  },
+  "Top Products": {
+    title: "Top Products",
+    description: "Top 5 products by revenue in the period, with quantity, revenue and estimated profit.",
+    example: "Date Bites: 120 units, ₹12,000 revenue, ₹4,000 profit.",
+  },
+  "Top Customers": {
+    title: "Top Customers",
+    description: "Top customers by revenue in the period. Tap a row to open their profile.",
+    example: "Ayesha Khan: ₹24,000 revenue, ₹6,000 profit.",
+  },
+};
+
+const StatItem = ({ icon, label, value, color, info }: { icon: React.ReactNode; label: string; value: string; color: string; info?: CardInfo }) => (
   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
     <Box sx={{ color: "text.secondary", display: "flex", alignItems: "center" }}>{icon}</Box>
-    <Box>
-      <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>{label}</Typography>
+    <Box sx={{ minWidth: 0 }}>
+      <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary" }}>{label}{info && <InfoTip title={info.title} description={info.description} example={info.example} />}</Typography>
       <Typography variant="body1" sx={{ fontWeight: 700, fontSize: "1rem", color }}>{value}</Typography>
     </Box>
   </Box>
 );
+
+/** Section/card title row with a tap-friendly info button. */
+const TitleWithInfo = ({ title, infoKey, variant = "subtitle2", sx }: { title: string; infoKey: string; variant?: "subtitle2" | "body2" | "h6"; sx?: Record<string, unknown> }) => {
+  const info = CARD_INFO[infoKey];
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+      <Typography variant={variant} sx={{ fontWeight: 700, ...(sx || {}) }}>{title}</Typography>
+      {info && <InfoTip title={info.title} description={info.description} example={info.example} />}
+    </Box>
+  );
+};
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -142,6 +283,7 @@ export const Dashboard = () => {
       color: theme.palette.text.primary,
       sparkData: revenueSparkline,
       sparkColor: theme.palette.success.main,
+      info: CARD_INFO["Total sales"],
     },
     {
       label: "Profit",
@@ -149,6 +291,7 @@ export const Dashboard = () => {
       color: data.profit >= 0 ? theme.palette.success.main : theme.palette.error.main,
       sparkData: profitSparkline,
       sparkColor: data.profit >= 0 ? theme.palette.success.main : theme.palette.error.main,
+      info: CARD_INFO["Profit"],
     },
     {
       label: "Net cash",
@@ -156,6 +299,7 @@ export const Dashboard = () => {
       color: netCash >= 0 ? theme.palette.success.main : theme.palette.error.main,
       sparkData: cashSparkline,
       sparkColor: netCash >= 0 ? theme.palette.success.main : theme.palette.error.main,
+      info: CARD_INFO["Net cash"],
     },
   ];
 
@@ -211,7 +355,7 @@ export const Dashboard = () => {
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, mb: 2 }}>
           {heroCards.map((card) => (
             <Box key={card.label} sx={{ textAlign: "center" }}>
-              <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary", display: "block" }}>{card.label}</Typography>
+              <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "text.secondary", display: "block" }}>{card.label}<InfoTip title={card.info.title} description={card.info.description} example={card.info.example} /></Typography>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: "0.95rem", color: card.color }}>{card.value}</Typography>
             </Box>
           ))}
@@ -221,7 +365,7 @@ export const Dashboard = () => {
           {heroCards.map((card) => (
             <Card key={card.label} sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
               <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>{card.label}</Typography>
+                <Typography variant="body2" sx={{ fontSize: "0.75rem", color: "text.secondary", mb: 1 }}>{card.label}<InfoTip title={card.info.title} description={card.info.description} example={card.info.example} /></Typography>
                 <Typography variant="h5" sx={{ fontWeight: 700, fontSize: "2rem", color: card.color, mb: 1 }}>{card.value}</Typography>
                 <MiniSparkline data={card.sparkData} color={card.sparkColor} />
               </CardContent>
@@ -245,33 +389,44 @@ export const Dashboard = () => {
         {/* Sales and suppliers */}
         <SectionLabel>Sales and suppliers</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
-          <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" />
-          <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" />
-          <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" />
-          <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" />
+          <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" info={CARD_INFO["Received"]} />
+          <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" info={CARD_INFO["Customer dues"]} />
+          <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" info={CARD_INFO["Paid to suppliers"]} />
+          <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" info={CARD_INFO["Supplier dues"]} />
         </Box>
 
         {/* Employees and cost */}
         <SectionLabel>Employees and cost</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
-          <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" />
-          <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" />
-          <StatItem icon={<CartIcon />} label="Cost of goods sold" value={formatMoney(data.cost)} color="text.primary" />
-          <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" />
+          <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" info={CARD_INFO["Paid to employees"]} />
+          <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" info={CARD_INFO["Employee dues"]} />
+          <StatItem icon={<CartIcon />} label="Cost of goods sold" value={formatMoney(data.cost)} color="text.primary" info={CARD_INFO["Cost of goods sold"]} />
+          <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" info={CARD_INFO["Margin"]} />
         </Box>
 
         {/* Cash flow this period */}
         <SectionLabel>Cash flow this period</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
-          <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" />
-          <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" />
+          <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" info={CARD_INFO["Cash in"]} />
+          <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" info={CARD_INFO["Cash out"]} />
+        </Box>
+
+        {/* Loss & wastage this period */}
+        <SectionLabel>Loss &amp; wastage this period</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 3, mb: 1 }}>
+          <Box onClick={() => navigate("/damage-loss")} sx={{ cursor: "pointer" }} title="Open Damage & Loss ledger">
+            <StatItem icon={<WarnIcon />} label="Damage loss" value={formatMoney(data.damage_loss || 0)} color="error.main" info={CARD_INFO["Damage loss"]} />
+          </Box>
+          <Box onClick={() => navigate("/damage-loss")} sx={{ cursor: "pointer" }} title="Open Damage & Loss ledger">
+            <StatItem icon={<ReceiptIcon />} label="Damage events" value={String(data.damage_events || 0)} color="text.primary" info={CARD_INFO["Damage events"]} />
+          </Box>
         </Box>
 
         {/* Charts Row */}
         <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 2, mt: 2 }}>
           <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales & Profit Trend</Typography>
+              <TitleWithInfo title="Sales & Profit Trend" infoKey="Sales & Profit Trend" />
               {trendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -294,7 +449,7 @@ export const Dashboard = () => {
 
           <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Sales by Product</Typography>
+              <TitleWithInfo title="Sales by Product" infoKey="Sales by Product" />
               {productData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
@@ -320,7 +475,7 @@ export const Dashboard = () => {
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 2 }}>
           <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Cost vs Sales</Typography>
+              <TitleWithInfo title="Cost vs Sales" infoKey="Cost vs Sales" />
               {costRevenueData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={costRevenueData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -343,7 +498,7 @@ export const Dashboard = () => {
 
           <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Margin % Trend</Typography>
+              <TitleWithInfo title="Margin % Trend" infoKey="Margin % Trend" />
               {marginData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
                   <LineChart data={marginData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -367,7 +522,7 @@ export const Dashboard = () => {
         {/* Operations & Alerts */}
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mt: 2 }}>
           <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Operations</Typography>
+            <TitleWithInfo title="Operations" infoKey="Operations" />
             <Typography variant="body2">Sales: {data.invoice_count} invoices | Paid: {formatMoney(data.paid)}</Typography>
             <Typography variant="body2">Production: {data.batch_count} batches, {data.produced_qty} units | Avg cost: {formatMoney(data.avg_batch_cost)}</Typography>
             <Typography variant="body2">Ready to pack: {data.ready_to_pack_qty} | Packed: {data.packed_packs} packs</Typography>
@@ -400,7 +555,7 @@ export const Dashboard = () => {
             )}
           </CardContent></Card>
           <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}><CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Alerts</Typography>
+            <TitleWithInfo title="Alerts" infoKey="Alerts" />
             <Typography variant="body2">Low stock: {data.low_stock_count} | Out of stock: {data.out_of_stock_count}</Typography>
             <Typography variant="body2">Missing selling price: {data.missing_price_count}</Typography>
             {data.alerts?.slice(0, 3).map((alert: any) => (
@@ -414,7 +569,7 @@ export const Dashboard = () => {
         {/* Top Products Table */}
         <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Products</Typography>
+            <TitleWithInfo title="Top Products" infoKey="Top Products" />
             <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Product</TableCell>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Qty</TableCell>
@@ -432,7 +587,7 @@ export const Dashboard = () => {
         {/* Top Customers Table */}
         <Card sx={{ mt: 2, bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Top Customers</Typography>
+            <TitleWithInfo title="Top Customers" infoKey="Top Customers" />
             <TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Customer</TableCell>
               <TableCell sx={{ py: 0.5, px: 1, fontSize: "0.7rem", fontWeight: 700 }}>Revenue</TableCell>
@@ -459,22 +614,31 @@ export const Dashboard = () => {
       {isMobile && mobileTab === 0 && (<>
         <SectionLabel>Sales and suppliers</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
-          <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" />
-          <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" />
-          <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" />
-          <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" />
+          <StatItem icon={<MoneyIcon />} label="Received" value={formatMoney(data.paid)} color="success.main" info={CARD_INFO["Received"]} />
+          <StatItem icon={<PersonIcon />} label="Customer dues" value={formatMoney(data.due)} color="error.main" info={CARD_INFO["Customer dues"]} />
+          <StatItem icon={<TruckIcon />} label="Paid to suppliers" value={formatMoney(data.total_paid_suppliers)} color="text.primary" info={CARD_INFO["Paid to suppliers"]} />
+          <StatItem icon={<WarnIcon />} label="Supplier dues" value={formatMoney(data.supplier_dues)} color="error.main" info={CARD_INFO["Supplier dues"]} />
         </Box>
         <SectionLabel>Employees and cost</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
-          <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" />
-          <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" />
-          <StatItem icon={<CartIcon />} label="COGS" value={formatMoney(data.cost)} color="text.primary" />
-          <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" />
+          <StatItem icon={<BankIcon />} label="Paid to employees" value={formatMoney(data.total_paid_employees)} color="text.primary" info={CARD_INFO["Paid to employees"]} />
+          <StatItem icon={<PersonIcon />} label="Employee dues" value={formatMoney(data.employee_dues)} color="error.main" info={CARD_INFO["Employee dues"]} />
+          <StatItem icon={<CartIcon />} label="COGS" value={formatMoney(data.cost)} color="text.primary" info={CARD_INFO["COGS"]} />
+          <StatItem icon={<ReceiptIcon />} label="Margin" value={`${(data.margin_pct || 0).toFixed(1)}%`} color="text.primary" info={CARD_INFO["Margin"]} />
         </Box>
         <SectionLabel>Cash flow</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
-          <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" />
-          <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" />
+          <StatItem icon={<ArrowDownIcon />} label="Cash in" value={formatMoney(data.cash_in)} color="success.main" info={CARD_INFO["Cash in"]} />
+          <StatItem icon={<ArrowUpIcon />} label="Cash out" value={formatMoney(data.cash_out)} color="error.main" info={CARD_INFO["Cash out"]} />
+        </Box>
+        <SectionLabel>Loss &amp; wastage</SectionLabel>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2, mb: 1 }}>
+          <Box onClick={() => navigate("/damage-loss")} sx={{ cursor: "pointer" }} title="Open Damage & Loss ledger">
+            <StatItem icon={<WarnIcon />} label="Damage loss" value={formatMoney(data.damage_loss || 0)} color="error.main" info={CARD_INFO["Damage loss"]} />
+          </Box>
+          <Box onClick={() => navigate("/damage-loss")} sx={{ cursor: "pointer" }} title="Open Damage & Loss ledger">
+            <StatItem icon={<ReceiptIcon />} label="Damage events" value={String(data.damage_events || 0)} color="text.primary" info={CARD_INFO["Damage events"]} />
+          </Box>
         </Box>
         <SectionLabel>Operations</SectionLabel>
         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 2 }}>
@@ -495,7 +659,7 @@ export const Dashboard = () => {
       {isMobile && mobileTab === 1 && (<>
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider", mb: 1.5 }}>
           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Sales & Profit Trend</Typography>
+            <TitleWithInfo title="Sales & Profit Trend" infoKey="Sales & Profit Trend" sx={{ fontSize: "0.8rem" }} />
             {trendData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
@@ -513,7 +677,7 @@ export const Dashboard = () => {
         </Card>
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider", mb: 1.5 }}>
           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Cost vs Sales</Typography>
+            <TitleWithInfo title="Cost vs Sales" infoKey="Cost vs Sales" sx={{ fontSize: "0.8rem" }} />
             {costRevenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={costRevenueData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
@@ -531,7 +695,7 @@ export const Dashboard = () => {
         </Card>
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Margin % Trend</Typography>
+            <TitleWithInfo title="Margin % Trend" infoKey="Margin % Trend" sx={{ fontSize: "0.8rem" }} />
             {marginData.length > 0 ? (
               <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={marginData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
@@ -551,7 +715,7 @@ export const Dashboard = () => {
       {isMobile && mobileTab === 2 && (
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Sales by Product</Typography>
+            <TitleWithInfo title="Sales by Product" infoKey="Sales by Product" sx={{ fontSize: "0.8rem" }} />
             {productData.length > 0 ? (
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
@@ -572,7 +736,7 @@ export const Dashboard = () => {
       {isMobile && mobileTab === 3 && (<>
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider", mb: 1.5 }}>
           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Top Products</Typography>
+            <TitleWithInfo title="Top Products" infoKey="Top Products" sx={{ fontSize: "0.8rem" }} />
             {data.top_products?.slice(0, 5).map((product: any) => (
               <Box key={product.name} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: "1px solid", borderColor: "divider" }}>
                 <Box>
@@ -586,7 +750,7 @@ export const Dashboard = () => {
         </Card>
         <Card sx={{ bgcolor: "background.paper", borderColor: "divider" }}>
           <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, fontSize: "0.8rem" }}>Top Customers</Typography>
+            <TitleWithInfo title="Top Customers" infoKey="Top Customers" sx={{ fontSize: "0.8rem" }} />
             {(data.top_customers || []).slice(0, 5).map((customer: any) => (
               <Box key={customer.customer_id} sx={{ display: "flex", justifyContent: "space-between", py: 0.75, borderBottom: "1px solid", borderColor: "divider", cursor: "pointer" }} onClick={() => navigate(`/customers/${customer.customer_id}`)}>
                 <Box>

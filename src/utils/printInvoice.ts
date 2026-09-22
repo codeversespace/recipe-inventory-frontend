@@ -21,6 +21,9 @@ interface InvoiceSale {
   sold_at: string;
   reference?: string;
   customer_name?: string;
+  customer_address?: string;
+  customer_gstin?: string;
+  customer_state?: string;
   total_amount: number;
   amount_paid: number;
   amount_due: number;
@@ -33,6 +36,15 @@ interface InvoiceSale {
   total_igst?: number;
   total_taxable?: number;
   lines: InvoiceLine[];
+}
+
+export interface BizProfile {
+  name: string;
+  address: string;
+  gstin: string;
+  state: string;
+  logo: string;
+  signature: string;
 }
 
 function esc(s: string): string {
@@ -60,7 +72,7 @@ function numberToWords(num: number): string {
   return result;
 }
 
-function buildSimpleInvoice(sale: InvoiceSale): string {
+function buildSimpleInvoice(sale: InvoiceSale, biz: BizProfile): string {
   const lines = sale.lines
     .map((line) => {
       const name = esc(line.item_name || line.recipe_name || "");
@@ -86,13 +98,14 @@ function buildSimpleInvoice(sale: InvoiceSale): string {
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #172033; padding: 16px; max-width: 760px; margin: 0 auto; }
   @media print { body { padding: 0; } @page { margin: 12mm; } }
+  .no-print { display: none; }
 </style>
 </head>
 <body>
   <div style="display:flex;justify-content:space-between;border-bottom:3px solid #0f766e;padding-bottom:16px;margin-bottom:20px;">
     <div>
       <div style="font-size:24px;font-weight:800;color:#0f766e;">INVOICE</div>
-      <div style="font-size:13px;color:#64748b;">Recipe Inventory</div>
+      <div style="font-size:13px;color:#64748b;">${esc(biz.name || "Recipe Inventory")}</div>
     </div>
     <div style="text-align:right;">
       <div style="font-size:18px;font-weight:600;">#${sale.id}</div>
@@ -125,7 +138,7 @@ function buildSimpleInvoice(sale: InvoiceSale): string {
 </html>`;
 }
 
-function buildGSTInvoice(sale: InvoiceSale): string {
+function buildGSTInvoice(sale: InvoiceSale, biz: BizProfile): string {
   const totalCgst = sale.total_cgst || sale.lines.reduce((s, l) => s + (l.cgst_amount || 0), 0);
   const totalSgst = sale.total_sgst || sale.lines.reduce((s, l) => s + (l.sgst_amount || 0), 0);
   const totalIgst = sale.total_igst || sale.lines.reduce((s, l) => s + (l.igst_amount || 0), 0);
@@ -148,6 +161,9 @@ function buildGSTInvoice(sale: InvoiceSale): string {
     })
     .join("");
 
+  const logoHtml = biz.logo ? `<div style="margin-bottom:8px;"><img src="${esc(biz.logo)}" style="height:80px;" /></div>` : "";
+  const sigHtml = biz.signature ? `<img src="${esc(biz.signature)}" style="height:60px;margin-bottom:4px;" /><br>` : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -159,21 +175,23 @@ function buildGSTInvoice(sale: InvoiceSale): string {
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #172033; padding: 16px; max-width: 760px; margin: 0 auto; font-size: 12px; }
   @media print { body { padding: 0; } @page { margin: 12mm; } }
   th { font-size: 11px; }
+  .no-print { display: none; }
 </style>
 </head>
 <body>
   <div style="text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #0f766e;">
+    ${logoHtml}
     <div style="font-size:20px;font-weight:800;color:#0f766e;">TAX INVOICE</div>
-    <div style="font-size:12px;color:#64748b;">Recipe Inventory</div>
+    <div style="font-size:12px;color:#64748b;">${esc(biz.name || "Recipe Inventory")}</div>
   </div>
 
   <div style="display:flex;justify-content:space-between;margin-bottom:20px;gap:20px;flex-wrap:wrap;">
     <div style="flex:1;min-width:200px;">
       <div style="font-size:11px;text-transform:uppercase;color:#94a3b8;letter-spacing:0.5px;font-weight:700;">From</div>
-      <div style="font-weight:700;">Recipe Inventory</div>
-      <div style="color:#64748b;">(Your business address)</div>
-      <div style="color:#64748b;">GSTIN: (Your GSTIN)</div>
-      <div style="color:#64748b;">State: ${esc(sale.place_of_supply || "(Your State)")}</div>
+      <div style="font-weight:700;">${esc(biz.name || "Recipe Inventory")}</div>
+      <div style="color:#64748b;">${esc(biz.address || "(Your business address)")}</div>
+      <div style="color:#64748b;">GSTIN: ${esc(biz.gstin || "(Your GSTIN)")}</div>
+      <div style="color:#64748b;">State: ${esc(biz.state || sale.place_of_supply || "(Your State)")}</div>
     </div>
     <div style="flex:1;min-width:200px;text-align:right;">
       <div style="font-size:11px;text-transform:uppercase;color:#94a3b8;letter-spacing:0.5px;font-weight:700;">Invoice Details</div>
@@ -188,6 +206,9 @@ function buildGSTInvoice(sale: InvoiceSale): string {
   <div style="margin-bottom:20px;padding:8px 12px;background:#f8fafc;border-radius:4px;">
     <div style="font-size:11px;text-transform:uppercase;color:#94a3b8;letter-spacing:0.5px;font-weight:700;">Bill To</div>
     <div style="font-weight:600;">${esc(sale.customer_name || "Walk-in customer")}</div>
+    ${sale.customer_address ? `<div style="color:#64748b;font-size:12px;">${esc(sale.customer_address)}</div>` : ""}
+    ${sale.customer_gstin ? `<div style="color:#64748b;font-size:12px;">GSTIN: ${esc(sale.customer_gstin)}</div>` : ""}
+    ${sale.customer_state ? `<div style="color:#64748b;font-size:12px;">State: ${esc(sale.customer_state)}</div>` : ""}
   </div>
 
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
@@ -225,10 +246,13 @@ function buildGSTInvoice(sale: InvoiceSale): string {
     <div>
       <div style="font-size:11px;color:#94a3b8;">Declaration</div>
       <div style="font-size:10px;color:#94a3b8;">We declare that this invoice shows the actual price of the goods described and that all statements are true and correct.</div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Subject to ${esc(sale.place_of_supply || "local")} jurisdiction.</div>
+      <div style="font-size:10px;color:#94a3b8;">${sale.reverse_charge ? "Reverse Charge Applicable as per GST Act." : "Not liable for reverse charge under Section 9(3) or 9(4) of CGST Act."}</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-size:11px;color:#94a3b8;">For Recipe Inventory</div>
-      <div style="margin-top:32px;border-top:1px solid #94a3b8;padding-top:4px;width:100px;margin-left:auto;">
+      <div style="font-size:11px;color:#94a3b8;">For ${esc(biz.name || "Recipe Inventory")}</div>
+      <div style="margin-top:8px;">${sigHtml}</div>
+      <div style="margin-top:32px;border-top:1px solid #94a3b8;padding-top:4px;width:120px;margin-left:auto;">
         <div style="font-size:10px;color:#94a3b8;">Authorized Signatory</div>
       </div>
     </div>
@@ -238,9 +262,10 @@ function buildGSTInvoice(sale: InvoiceSale): string {
 </html>`;
 }
 
-export function printInvoice(sale: InvoiceSale): void {
+export function printInvoice(sale: InvoiceSale, biz?: BizProfile): void {
+  const profile: BizProfile = biz || { name: "Recipe Inventory", address: "", gstin: "", state: "", logo: "", signature: "" };
   const isGst = sale.is_gst_invoice === 1;
-  const html = isGst ? buildGSTInvoice(sale) : buildSimpleInvoice(sale);
+  const html = isGst ? buildGSTInvoice(sale, profile) : buildSimpleInvoice(sale, profile);
   const win = window.open("", "_blank", "width=800,height=600");
   if (win) {
     win.document.write(html);

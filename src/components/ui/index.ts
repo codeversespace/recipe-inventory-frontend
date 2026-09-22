@@ -16,3 +16,6 @@ export { StatStrip } from "./StatStrip";
 export { TransactionRow } from "./TransactionRow";
 export { PurchaseRow } from "./PurchaseRow";
 export { InvoiceDialog } from "./InvoiceDialog";
+export { DamageDialog, DAMAGE_REASONS } from "./DamageDialog";
+export { StarDisplay, StarInput } from "./StarRating";
+export { InfoTip } from "./InfoTip";

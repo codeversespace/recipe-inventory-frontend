@@ -2,7 +2,7 @@ import { Alert, Box, Button, Card, CardContent, CircularProgress, Collapse, Form
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import { ChangeEvent, Fragment, useEffect, useState } from "react";
+import { ChangeEvent, Fragment, useEffect, useState, useRef } from "react";
 import { useAuthActivities, useAppSettings, useUpdateAppSetting, useAuthRoles, useAuthUsers, useCreateAuthUser, useResetAuthPassword, useUpdateAuthUser } from "../hooks/useApi";
 import { ConfirmDialog, EmptyState, PageHeader, TableSkeleton } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -277,6 +277,133 @@ export const Settings = () => {
     );
   };
 
+  const BusinessProfileSection = () => {
+    const { data: settings = [], isLoading: settingsLoading } = useAppSettings();
+    const updateSetting = useUpdateAppSetting();
+    const logoRef = useRef<HTMLInputElement>(null);
+    const sigRef = useRef<HTMLInputElement>(null);
+    const [saving, setSaving] = useState<string | null>(null);
+
+    const [bizName, setBizName] = useState("");
+    const [bizAddress, setBizAddress] = useState("");
+    const [bizGstin, setBizGstin] = useState("");
+    const [bizState, setBizState] = useState("");
+    const [logoDataUrl, setLogoDataUrl] = useState("");
+    const [sigDataUrl, setSigDataUrl] = useState("");
+    const [initialized, setInitialized] = useState(false);
+
+    useEffect(() => {
+      if (!settingsLoading && settings.length && !initialized) {
+        const getVal = (key: string) => settings.find((s) => s.key === key)?.value || "";
+        setBizName(getVal("business_name"));
+        setBizAddress(getVal("business_address"));
+        setBizGstin(getVal("business_gstin"));
+        setBizState(getVal("business_state"));
+        setLogoDataUrl(getVal("business_logo"));
+        setSigDataUrl(getVal("business_signature"));
+        setInitialized(true);
+      }
+    }, [settings, settingsLoading, initialized]);
+
+    const saveField = async (key: string, value: string, desc: string) => {
+      setSaving(key);
+      try { await updateSetting.mutateAsync({ key, value, description: desc }); }
+      catch (e: any) { setError(e.response?.data?.detail || `Could not save ${key}.`); }
+      finally { setSaving(null); }
+    };
+
+    const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 500 * 1024) { setError("Logo must be under 500 KB."); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setLogoDataUrl(dataUrl);
+        saveField("business_logo", dataUrl, "Business logo shown on invoices");
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const handleSigUpload = (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 200 * 1024) { setError("Signature must be under 200 KB."); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          if (img.width > 400 || img.height > 200) {
+            setError("Signature image must be at most 400x200 pixels.");
+            return;
+          }
+          const dataUrl = reader.result as string;
+          setSigDataUrl(dataUrl);
+          saveField("business_signature", dataUrl, "Authorized signatory signature for invoices");
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const removeLogo = () => {
+      setLogoDataUrl("");
+      saveField("business_logo", "", "Business logo shown on invoices");
+    };
+
+    const removeSig = () => {
+      setSigDataUrl("");
+      saveField("business_signature", "", "Authorized signatory signature for invoices");
+    };
+
+    if (settingsLoading) return <CircularProgress size={20} />;
+
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <Typography variant="body2" color="text.secondary">These details appear on your invoices and receipts.</Typography>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <TextField size="small" label="Business Name" value={bizName} onChange={(e) => setBizName(e.target.value)} onBlur={() => saveField("business_name", bizName, "Business name for invoices")} sx={{ flex: "1 1 200px" }} disabled={saving === "business_name"} />
+          <TextField size="small" label="GSTIN" value={bizGstin} onChange={(e) => setBizGstin(e.target.value)} onBlur={() => saveField("business_gstin", bizGstin, "GSTIN number for tax invoices")} sx={{ flex: "1 1 180px" }} disabled={saving === "business_gstin"} />
+          <TextField size="small" label="State" value={bizState} onChange={(e) => setBizState(e.target.value)} onBlur={() => saveField("business_state", bizState, "Business state for GST")} sx={{ flex: "1 1 160px" }} disabled={saving === "business_state"} />
+        </Box>
+        <TextField size="small" label="Business Address" multiline minRows={2} value={bizAddress} onChange={(e) => setBizAddress(e.target.value)} onBlur={() => saveField("business_address", bizAddress, "Business address for invoices")} disabled={saving === "business_address"} />
+
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>Logo (max 500 KB, displayed on invoices)</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {logoDataUrl ? (
+                <Box sx={{ position: "relative" }}>
+                  <Box component="img" src={logoDataUrl} alt="Logo" sx={{ height: 60, maxWidth: 200, objectFit: "contain", border: "1px solid #e2e8f0", borderRadius: 1, p: 0.5 }} />
+                  <Button size="small" color="error" onClick={removeLogo} sx={{ minWidth: 0, p: 0, ml: 0.5 }}>Remove</Button>
+                </Box>
+              ) : (
+                <Button variant="outlined" size="small" startIcon={<CloudUploadIcon />} component="label" disabled={saving === "business_logo"}>
+                  Upload logo<input hidden type="file" accept="image/*" ref={logoRef} onChange={handleLogoUpload} />
+                </Button>
+              )}
+            </Box>
+          </Box>
+          <Box sx={{ flex: "1 1 200px" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>Signature (max 200 KB, max 400x200 px)</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              {sigDataUrl ? (
+                <Box sx={{ position: "relative" }}>
+                  <Box component="img" src={sigDataUrl} alt="Signature" sx={{ height: 60, maxWidth: 200, objectFit: "contain", border: "1px solid #e2e8f0", borderRadius: 1, p: 0.5 }} />
+                  <Button size="small" color="error" onClick={removeSig} sx={{ minWidth: 0, p: 0, ml: 0.5 }}>Remove</Button>
+                </Box>
+              ) : (
+                <Button variant="outlined" size="small" startIcon={<CloudUploadIcon />} component="label" disabled={saving === "business_signature"}>
+                  Upload signature<input hidden type="file" accept="image/*" ref={sigRef} onChange={handleSigUpload} />
+                </Button>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <Box>
       <PageHeader
@@ -431,6 +558,12 @@ export const Settings = () => {
           <Typography variant="h6" gutterBottom>Feature toggles</Typography>
           <Typography color="text.secondary" sx={{ mb: 2 }}>Control which actions are available across the application.</Typography>
           <AppSettingsSection />
+        </CardContent>
+      </Card>
+      <Card sx={{ maxWidth: 1100, mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Business Profile</Typography>
+          <BusinessProfileSection />
         </CardContent>
       </Card>
       <ConfirmDialog
