@@ -75,16 +75,18 @@ export async function downloadInvoicePdf(sale: InvoiceSale, biz?: BizProfile): P
     const pageHeight = 297;
     const imgWidth = pageWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const imgData = canvas.toDataURL("image/png");
+    // JPEG at high quality: flat invoice graphics compress ~10x smaller than
+    // lossless PNG (which is what produced multi-MB files), text stays crisp.
+    const imgData = canvas.toDataURL("image/jpeg", 0.9);
 
     let heightLeft = imgHeight;
     let position = 0;
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
     while (heightLeft > 0) {
       position = heightLeft - imgHeight;
       pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
     }
     pdf.save(filename);
