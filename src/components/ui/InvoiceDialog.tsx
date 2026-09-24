@@ -1,8 +1,10 @@
-import React from "react";
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography, useMediaQuery, useTheme } from "@mui/material";
+import React, { useState } from "react";
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography, useMediaQuery, useTheme } from "@mui/material";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { formatDate } from "../../utils/formatDate";
 import { formatMoney } from "../../utils/formatNumber";
 import { printInvoice } from "../../utils/printInvoice";
+import { downloadInvoicePdf } from "../../utils/downloadInvoicePdf";
 import { useAppSettings } from "../../hooks/useApi";
 
 interface InvoiceLine {
@@ -297,6 +299,8 @@ export const InvoiceDialog = ({ open, onClose, sale }: InvoiceDialogProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { data: settings = [] } = useAppSettings();
+  const [downloading, setDownloading] = useState(false);
+  const [actionError, setActionError] = useState("");
   if (!sale) return null;
   const isGst = sale.is_gst_invoice === 1;
 
@@ -309,17 +313,48 @@ export const InvoiceDialog = ({ open, onClose, sale }: InvoiceDialogProps) => {
     signature: settings.find((s) => s.key === "business_signature")?.value || "",
   };
 
+  const handlePrint = () => {
+    setActionError("");
+    const opened = printInvoice(sale as any, biz);
+    if (!opened) setActionError("Popup blocked — allow popups for this site, or use Download PDF instead.");
+  };
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setActionError("");
+    setDownloading(true);
+    try {
+      await downloadInvoicePdf(sale as any, biz);
+    } catch {
+      setActionError("Could not generate the PDF. Please try again or use Print / Save PDF.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setActionError("");
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={isMobile} className="print-invoice">
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth fullScreen={isMobile} className="print-invoice">
       <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
         <Typography variant="h6">{isGst ? "GST Invoice" : "Invoice"} #{sale.id}</Typography>
+        <IconButton onClick={handleClose} aria-label="Close invoice" sx={{ minWidth: 44, minHeight: 44 }}>
+          <CloseRoundedIcon />
+        </IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+        {actionError && <Alert severity="error" sx={{ mb: 2 }} className="invoice-actions">{actionError}</Alert>}
         {isGst ? <GSTInvoiceContent sale={sale} biz={biz} /> : <SimpleInvoiceContent sale={sale} biz={biz} />}
       </DialogContent>
-      <DialogActions className="invoice-actions" sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose}>Close</Button>
-        <Button variant="outlined" onClick={() => printInvoice(sale as any, biz)}>Print / Save PDF</Button>
+      <DialogActions className="invoice-actions" sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Button onClick={handleClose} sx={{ minHeight: 44 }}>Close</Button>
+        <Button variant="outlined" onClick={handlePrint} sx={{ minHeight: 44 }}>Print / Save PDF</Button>
+        <Button variant="contained" onClick={handleDownload} disabled={downloading} sx={{ minHeight: 44 }}>
+          {downloading ? <CircularProgress size={20} color="inherit" /> : "Download PDF"}
+        </Button>
       </DialogActions>
     </Dialog>
   );

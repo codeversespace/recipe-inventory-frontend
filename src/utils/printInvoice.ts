@@ -72,6 +72,11 @@ function numberToWords(num: number): string {
   return result;
 }
 
+const TOOLBAR_HTML = `<div class="no-print" style="display:flex;gap:8px;justify-content:center;padding:12px 0 20px;">
+  <button onclick="window.close()" style="padding:10px 20px;font-size:14px;border:1px solid #0f766e;border-radius:8px;background:#fff;color:#0f766e;min-height:44px;">&#8592; Back</button>
+  <button onclick="window.print()" style="padding:10px 20px;font-size:14px;border:1px solid #0f766e;border-radius:8px;background:#0f766e;color:#fff;min-height:44px;">Print</button>
+</div>`;
+
 function buildSimpleInvoice(sale: InvoiceSale, biz: BizProfile): string {
   const lines = sale.lines
     .map((line) => {
@@ -97,11 +102,11 @@ function buildSimpleInvoice(sale: InvoiceSale, biz: BizProfile): string {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #172033; padding: 16px; max-width: 760px; margin: 0 auto; }
-  @media print { body { padding: 0; } @page { margin: 12mm; } }
-  .no-print { display: none; }
+  @media print { body { padding: 0; } @page { margin: 12mm; } .no-print { display: none !important; } }
 </style>
 </head>
 <body>
+  ${TOOLBAR_HTML}
   <div style="display:flex;justify-content:space-between;border-bottom:3px solid #0f766e;padding-bottom:16px;margin-bottom:20px;">
     <div>
       <div style="font-size:24px;font-weight:800;color:#0f766e;">INVOICE</div>
@@ -173,12 +178,12 @@ function buildGSTInvoice(sale: InvoiceSale, biz: BizProfile): string {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #172033; padding: 16px; max-width: 760px; margin: 0 auto; font-size: 12px; }
-  @media print { body { padding: 0; } @page { margin: 12mm; } }
+  @media print { body { padding: 0; } @page { margin: 12mm; } .no-print { display: none !important; } }
   th { font-size: 11px; }
-  .no-print { display: none; }
 </style>
 </head>
 <body>
+  ${TOOLBAR_HTML}
   <div style="text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #0f766e;">
     ${logoHtml}
     <div style="font-size:20px;font-weight:800;color:#0f766e;">TAX INVOICE</div>
@@ -262,13 +267,21 @@ function buildGSTInvoice(sale: InvoiceSale, biz: BizProfile): string {
 </html>`;
 }
 
-export function printInvoice(sale: InvoiceSale, biz?: BizProfile): void {
+export function buildInvoiceHtml(sale: InvoiceSale, biz?: BizProfile): string {
   const profile: BizProfile = biz || { name: "Recipe Inventory", address: "", gstin: "", state: "", logo: "", signature: "" };
   const isGst = sale.is_gst_invoice === 1;
-  const html = isGst ? buildGSTInvoice(sale, profile) : buildSimpleInvoice(sale, profile);
+  return isGst ? buildGSTInvoice(sale, profile) : buildSimpleInvoice(sale, profile);
+}
+
+export type { InvoiceSale };
+
+export function printInvoice(sale: InvoiceSale, biz?: BizProfile): boolean {
+  const html = buildInvoiceHtml(sale, biz);
   const win = window.open("", "_blank", "width=800,height=600");
   if (win) {
     win.document.write(html);
     win.document.close();
+    return true;
   }
+  return false;
 }

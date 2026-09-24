@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, CardContent, CircularProgress, FormControl, I
 import { useNavigate, useParams } from "react-router-dom";
 import * as React from "react";
 import { useCustomerProfile, useCustomerPrices, useSaleableStock, useSetCustomerPrice } from "../hooks/useApi";
+import { InvoiceDialog } from "../components/ui";
 import { formatDate } from "../utils/formatDate";
 import { formatMoney } from "../utils/formatNumber";
 
@@ -18,6 +19,7 @@ export const CustomerProfile = () => {
   const setPrice = useSetCustomerPrice();
   const [priceItem, setPriceItem] = React.useState(0);
   const [priceValue, setPriceValue] = React.useState("");
+  const [invoiceSale, setInvoiceSale] = React.useState<any>(null);
 
   if (isLoading) return <CircularProgress />;
   if (error || !profile) return <Alert severity="error">Could not load this customer profile.</Alert>;
@@ -52,6 +54,7 @@ export const CustomerProfile = () => {
       <Card><CardContent><Typography variant="h6" sx={{ display: "flex", gap: 1, alignItems: "center" }}><Payments color="primary" /> Payment history</Typography><TableContainer sx={{ overflowX: "auto" }}><Table size="small" sx={{ mt: 1, minWidth: 420 }}><TableHead><TableRow><TableCell>Date</TableCell><TableCell>Method</TableCell><TableCell>Reference</TableCell><TableCell align="right">Amount</TableCell></TableRow></TableHead><TableBody>{profile.payments.map((payment: any) => <TableRow key={payment.id}><TableCell>{formatDate(payment.paid_at)}</TableCell><TableCell>{payment.method}</TableCell><TableCell>{payment.reference || "—"}</TableCell><TableCell align="right">{formatMoney(payment.amount)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
     </Box>
           <Card sx={{ mb: 3 }}><CardContent><Typography variant="h6" gutterBottom>Product performance</Typography><TableContainer sx={{ overflowX: "auto" }}><Table size="small" sx={{ minWidth: 420 }}><TableHead><TableRow><TableCell>Product</TableCell><TableCell>Quantity</TableCell><TableCell>Revenue</TableCell><TableCell>Estimated profit</TableCell></TableRow></TableHead><TableBody>{productEntries.map(([name, value]) => <TableRow key={name}><TableCell>{name}</TableCell><TableCell>{value.quantity}</TableCell><TableCell>{formatMoney(value.revenue)}</TableCell><TableCell>{formatMoney(value.profit)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
-    <Card><CardContent><Typography variant="h6" gutterBottom>Invoice history</Typography><TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow><TableCell>Invoice</TableCell><TableCell>Date</TableCell><TableCell>Status</TableCell><TableCell align="right">Billed</TableCell><TableCell align="right">Paid</TableCell><TableCell align="right">Due</TableCell></TableRow></TableHead><TableBody>{profile.sales.map((sale: any) => <TableRow key={sale.id}><TableCell>#{sale.id} {sale.reference || ""}</TableCell><TableCell>{formatDate(sale.sold_at)}</TableCell><TableCell>{sale.payment_status}</TableCell><TableCell align="right">{formatMoney(sale.total_amount)}</TableCell><TableCell align="right">{formatMoney(sale.amount_paid)}</TableCell><TableCell align="right">{formatMoney(sale.amount_due)}</TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
+    <Card><CardContent><Typography variant="h6" gutterBottom>Invoice history</Typography><TableContainer sx={{ overflowX: "auto" }}><Table size="small"><TableHead><TableRow><TableCell>Invoice</TableCell><TableCell>Date</TableCell><TableCell>Status</TableCell><TableCell align="right">Billed</TableCell><TableCell align="right">Paid</TableCell><TableCell align="right">Due</TableCell><TableCell>Receipt</TableCell></TableRow></TableHead><TableBody>{profile.sales.map((sale: any) => <TableRow key={sale.id}><TableCell>#{sale.id} {sale.reference || ""}</TableCell><TableCell>{formatDate(sale.sold_at)}</TableCell><TableCell>{sale.payment_status}</TableCell><TableCell align="right">{formatMoney(sale.total_amount)}</TableCell><TableCell align="right">{formatMoney(sale.amount_paid)}</TableCell><TableCell align="right">{formatMoney(sale.amount_due)}</TableCell><TableCell><Button size="small" onClick={() => setInvoiceSale(sale)} aria-label={`View invoice ${sale.id}`}>View / Print</Button></TableCell></TableRow>)}</TableBody></Table></TableContainer></CardContent></Card>
+    <InvoiceDialog open={!!invoiceSale} onClose={() => setInvoiceSale(null)} sale={invoiceSale} />
   </Box>;
 };
